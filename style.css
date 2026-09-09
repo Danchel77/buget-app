@@ -106,7 +106,10 @@ body.selection-mode .card-actions {
   }
   nav {
     max-width: 720px;
-    margin-left: auto;
-    margin-right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    border-radius: 20px 20px 0 0;
+    margin-bottom: 10px;
   }
 }
