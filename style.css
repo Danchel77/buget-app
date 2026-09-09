@@ -17,7 +17,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
-  position: relative; /* уже есть, но на всякий случай */
+  position: relative;
 }
 
 /* Скрываем чекбоксы по умолчанию */
@@ -111,5 +111,24 @@ body.selection-mode .card-actions {
     width: 100%;
     border-radius: 20px 20px 0 0;
     margin-bottom: 10px;
+    padding-top: env(safe-area-inset-bottom);
   }
+}
+/* Кнопка удаления (крестик) */
+.delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: none;
+  color: #6b7280; /* серый */
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+  z-index: 5;
+  transition: color 0.2s;
+}
+.delete-btn:hover {
+  color: #ef4444;
 }
