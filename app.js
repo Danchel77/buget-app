@@ -179,9 +179,19 @@ function toggleForm(containerId, btnId, btnText, formId, type) {
   }
 }
 
-function closeForm(containerId, btnId, btnText) {
+/* Функция закрытия формы с полной очисткой данных */
+function closeForm(containerId, btnId, btnText, formId) {
   document.getElementById(containerId).classList.add('hidden');
-  if (currentEditId) { currentEditId = null; currentEditTable = null; document.getElementById(btnId).innerText = btnText; }
+  
+  // Очищаем форму и удаляем лишние строки транзакций при отмене
+  if (formId) document.getElementById(formId).reset();
+  if (formId === 'tx-form') document.getElementById('tx-items-list').innerHTML = '';
+  
+  if (currentEditId) { 
+    currentEditId = null; 
+    currentEditTable = null; 
+    document.getElementById(btnId).innerText = btnText; 
+  }
 }
 
 function updateGoalDropdowns() {
