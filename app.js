@@ -767,13 +767,21 @@ function toggleItemSelection(id, table) {
   } else {
     selectedItems.add(key);
   }
+  
   const card = document.querySelector(`.card[data-id="${id}"][data-table="${table}"]`);
   if (card) {
     card.classList.toggle('selected', selectedItems.has(key));
     const checkbox = card.querySelector('.select-checkbox');
     if (checkbox) checkbox.checked = selectedItems.has(key);
   }
+  
+  // Обновляем счётчик
   document.getElementById('selected-count').textContent = `Выбрано: ${selectedItems.size}`;
+  
+  // Если не осталось выбранных элементов — выключаем режим выбора
+  if (selectedItems.size === 0 && selectionMode) {
+    disableSelectionMode();
+  }
 }
 
 function cancelSelection() {
@@ -857,3 +865,12 @@ document.addEventListener('touchmove', handleTouchMove, { passive: true });
 document.addEventListener('mousedown', handleMouseDown);
 document.addEventListener('mouseup', handleMouseUp);
 document.addEventListener('mousemove', handleMouseMove);
+document.addEventListener('click', (e) => {
+  if (!selectionMode) return;
+  const card = e.target.closest('.card');
+  if (!card) return;
+  // Игнорируем клики непосредственно по чекбоксу (если вдруг pointer-events не сработал)
+  if (e.target.classList.contains('select-checkbox')) return;
+  e.preventDefault();
+  toggleItemSelection(card.dataset.id, card.dataset.table);
+});
