@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js для графиков -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Hammer.js + Zoom плагин для масштабирования графика -->
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+
+  <style>
+    * { -webkit-tap-highlight-color: transparent; color-scheme: dark; }
+    body { background-color: #121212; color: #e5e7eb; } 
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+    
+    /* Неблокирующие тосты вместо полноэкранной загрузки */
+    #toast-container { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 100; transition: opacity 0.3s; pointer-events: none; }
+    .toast { background: #1f2937; border: 1px solid #374151; padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 500; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 8px;}
+    .spinner { border: 2px solid #4b5563; border-top-color: #3b82f6; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body class="pb-24">
+
+  <!-- Всплывающие уведомления -->
+  <div id="toast-container" class="hidden">
+    <div id="toast-content" class="toast">
+      <div id="toast-spinner" class="spinner"></div>
+      <span id="toast-text" class="text-white">Синхронизация...</span>
+    </div>
+  </div>
+
+  <header class="bg-gray-900 border-b border-gray-800 text-white p-4 sticky top-0 z-10 flex justify-between items-center shadow-md">
+    <h1 class="text-lg font-bold">Бюджет</h1>
+    <span class="text-xs opacity-70">Обновлено: <span id="last-sync">...</span></span>
+  </header>
+
+  <main id="app-content" class="p-4">
+    
+    <!-- ЭКРАН ТРАНЗАКЦИЙ (Массовое добавление) -->
+    <div id="transactions-tab" class="space-y-4 hidden animate-fade-in">
+      <div class="grid grid-cols-2 gap-3 mb-2">
+        <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700 shadow-sm">
+          <p class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Расходы (Тек. мес)</p>
+          <p id="month-expense" class="font-bold text-white text-lg">0 ₽</p>
+        </div>
+        <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700 shadow-sm">
+          <p class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Доходы (Тек. мес)</p>
+          <p id="month-income" class="font-bold text-emerald-400 text-lg">0 ₽</p>
+        </div>
+      </div>
+
+      <button onclick="toggleForm('tx-form-container', 'tx-submit-btn', 'Сохранить все', 'tx-form', 'tx')" class="w-full bg-blue-900/40 text-blue-300 border border-blue-800/50 font-semibold rounded-xl text-sm px-5 py-3 active:bg-blue-900/60 transition-all">+ Добавить операции</button>
+      
+      <div id="tx-form-container" class="hidden bg-gray-800 p-3 rounded-2xl border border-gray-700 shadow-sm">
+        <form id="tx-form" onsubmit="submitTransactions(event)">
+          
+          <!-- Контейнер для строк транзакций -->
+          <div id="tx-items-list"></div>
+
+          <button type="button" onclick="addTxRow()" class="w-full mb-4 py-2 border border-dashed border-gray-600 rounded-xl text-gray-400 text-sm hover:text-white transition-colors">+ Добавить еще транзакцию</button>
+          <button type="submit" id="tx-submit-btn" class="w-full bg-blue-600 text-white font-semibold rounded-xl px-5 py-4 shadow-md active:bg-blue-700">Сохранить все</button>
+        </form>
+      </div>
+      
+      <div id="transactions-list" class="space-y-4 pb-6"></div>
+    </div>
+
+    <!-- ЭКРАН ВКЛАДОВ -->
+    <div id="deposits-tab" class="hidden space-y-4">
+      <button onclick="toggleForm('deposit-form-container', 'dep-submit-btn', 'Сохранить вклад', 'deposit-form', 'dep')" class="w-full bg-blue-900/40 text-blue-300 border border-blue-800/50 font-semibold rounded-xl text-sm px-5 py-3 active:bg-blue-900/60 transition-all">+ Открыть вклад</button>
+      <div id="deposit-form-container" class="hidden bg-gray-800 p-5 rounded-2xl border border-gray-700 shadow-sm">
+        <form id="deposit-form" onsubmit="submitDeposit(event)">
+          <input type="text" id="dep-name" placeholder="Название вклада" required class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none mb-4 text-sm">
+          <select id="dep-goal" class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none mb-4 text-sm"></select>
+          <div class="flex space-x-3 mb-4">
+            <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="dep-amount" placeholder="Сумма (₽)" required class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none flex-1 text-sm">
+            <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="dep-rate" placeholder="Ставка %" required class="w-1/3 bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none text-sm">
+          </div>
+          <div class="flex space-x-3 mb-6">
+            <input type="date" id="dep-start" required class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none flex-1 text-xs">
+            <input type="date" id="dep-end" required class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none flex-1 text-xs">
+          </div>
+          <button type="submit" id="dep-submit-btn" class="w-full bg-blue-600 text-white font-semibold rounded-xl px-5 py-4 shadow-md active:bg-blue-700">Сохранить вклад</button>
+        </form>
+      </div>
+      <div id="deposits-list" class="space-y-4 pb-6"></div>
+    </div>
+
+    <!-- ЭКРАН БРОКЕРА -->
+    <div id="broker-tab" class="hidden space-y-4">
+      <!-- Плашка текущего состояния -->
+      <div class="bg-gray-800 p-5 rounded-2xl border border-gray-700 shadow-sm relative overflow-hidden">
+        <div id="broker-goal-badge" class="absolute top-0 right-0 bg-blue-600/20 text-blue-300 text-[9px] px-3 py-1 rounded-bl-lg font-bold uppercase tracking-wide border-b border-l border-blue-600/30 hidden"></div>
+        <p class="text-xs text-gray-400 uppercase tracking-wider mb-1 font-bold">Баланс счета</p>
+        <div class="flex justify-between items-end mb-4">
+          <p id="broker-balance" class="text-3xl font-bold text-white">0 ₽</p>
+          <div class="text-right">
+            <p class="text-[10px] text-gray-500 mb-0.5">Внесено: <span id="broker-deposits">0 ₽</span></p>
+            <p id="broker-profit" class="text-xs font-bold text-emerald-400">+0 ₽</p>
+          </div>
+        </div>
+        
+        <div class="flex gap-2 mb-4">
+          <button onclick="toggleForm('broker-form-container', 'broker-submit-btn', 'Добавить', 'broker-form', 'broker-add')" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-xs font-semibold py-2 rounded-lg transition-colors">+ Пополнить</button>
+          <button onclick="toggleForm('broker-form-container', 'broker-submit-btn', 'Зафиксировать', 'broker-form', 'broker-bal')" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-xs font-semibold py-2 rounded-lg transition-colors">⚖️ Баланс</button>
+          <button onclick="toggleForm('broker-goal-container', 'broker-goal-btn', 'Привязать', 'broker-goal-form', 'broker-goal')" class="w-10 bg-blue-900/40 border border-blue-800/50 flex items-center justify-center rounded-lg">🎯</button>
+        </div>
+
+        <!-- Контейнер графика -->
+        <div class="w-full h-40 mt-2">
+          <canvas id="brokerChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Форма операций брокера -->
+      <div id="broker-form-container" class="hidden bg-gray-800 p-5 rounded-2xl border border-gray-700 shadow-sm">
+        <h3 id="broker-form-title" class="font-bold text-white mb-4">Новая операция</h3>
+        <form id="broker-form" onsubmit="submitBrokerOperation(event)">
+          <input type="hidden" id="broker-type">
+          <input type="date" id="broker-date" required class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none mb-4 text-sm">
+          <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="broker-amount" placeholder="Сумма (₽)" required class="w-full text-2xl font-bold bg-transparent border-b-2 border-gray-700 focus:border-blue-500 text-white outline-none py-1 mb-6">
+          <button type="submit" id="broker-submit-btn" class="w-full bg-blue-600 text-white font-semibold rounded-xl px-5 py-4 shadow-md active:bg-blue-700">Сохранить</button>
+        </form>
+      </div>
+
+      <!-- Форма привязки цели брокера -->
+      <div id="broker-goal-container" class="hidden bg-gray-800 p-5 rounded-2xl border border-gray-700 shadow-sm">
+        <h3 class="font-bold text-white mb-4">Привязать счет к цели</h3>
+        <form id="broker-goal-form" onsubmit="submitBrokerGoal(event)">
+          <select id="broker-goal-select" class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none mb-6 text-sm"></select>
+          <button type="submit" id="broker-goal-btn" class="w-full bg-blue-600 text-white font-semibold rounded-xl px-5 py-4 shadow-md active:bg-blue-700">Привязать</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ЭКРАН ЦЕЛЕЙ -->
+    <div id="goals-tab" class="hidden space-y-4">
+      <button onclick="toggleForm('goal-form-container', 'goal-submit-btn', 'Создать цель', 'goal-form', 'goal')" class="w-full bg-blue-900/40 text-blue-300 border border-blue-800/50 font-semibold rounded-xl text-sm px-5 py-3 active:bg-blue-900/60 transition-all">+ Добавить цель</button>
+      <div id="goal-form-container" class="hidden bg-gray-800 p-5 rounded-2xl border border-gray-700 shadow-sm">
+        <form id="goal-form" onsubmit="submitGoal(event)">
+          <input type="text" id="goal-name" placeholder="На что копим?" required class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none mb-4 text-sm">
+          <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="goal-target" placeholder="Целевая сумма (₽)" required class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none mb-4 text-sm">
+          <input type="date" id="goal-deadline" class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none mb-6 text-sm">
+          <button type="submit" id="goal-submit-btn" class="w-full bg-blue-600 text-white font-semibold rounded-xl px-5 py-4 shadow-md active:bg-blue-700">Создать цель</button>
+        </form>
+      </div>
+      <div id="goals-list" class="space-y-4 pb-6"></div>
+    </div>
+  </main>
+
+  <nav class="fixed bottom-0 w-full bg-gray-900 border-t border-gray-800 flex justify-around pb-safe">
+    <button onclick="switchTab('transactions')" id="nav-transactions" class="flex-1 py-3 text-blue-400 font-medium text-xs flex flex-col items-center">💸 Траты</button>
+    <button onclick="switchTab('deposits')" id="nav-deposits" class="flex-1 py-3 text-gray-500 font-medium text-xs flex flex-col items-center">📈 Вклады</button>
+    <button onclick="switchTab('broker')" id="nav-broker" class="flex-1 py-3 text-gray-500 font-medium text-xs flex flex-col items-center">📊 Брокер</button>
+    <button onclick="switchTab('goals')" id="nav-goals" class="flex-1 py-3 text-gray-500 font-medium text-xs flex flex-col items-center">🎯 Цели</button>
+  </nav>
+
+  <!-- ШАБЛОН СТРОКИ ТРАНЗАКЦИИ (Скрыт) -->
+  <template id="tx-row-template">
+    <div class="tx-item bg-gray-900 p-4 rounded-xl mb-3 border border-gray-700 relative">
+      <button type="button" class="absolute top-3 right-3 text-gray-500 hover:text-red-400 text-xl leading-none" onclick="this.closest('.tx-item').remove()">×</button>
+      
+      <div class="flex bg-gray-800 p-1 rounded-xl mb-4 w-3/4">
+        <label class="flex-1 text-center cursor-pointer">
+          <input type="radio" value="Расход" class="tx-type peer hidden" checked>
+          <div class="peer-checked:bg-gray-700 peer-checked:text-white py-1.5 rounded-lg text-xs font-medium text-gray-500 transition-all">Расход</div>
+        </label>
+        <label class="flex-1 text-center cursor-pointer">
+          <input type="radio" value="Доход" class="tx-type peer hidden">
+          <div class="peer-checked:bg-gray-700 peer-checked:text-emerald-400 py-1.5 rounded-lg text-xs font-medium text-gray-500 transition-all">Доход</div>
+        </label>
+      </div>
+      
+      <input type="text" inputmode="decimal" oninput="formatSumInput(this)" required class="tx-amount w-full text-2xl font-bold bg-transparent border-b-2 border-gray-700 focus:border-blue-500 text-white outline-none py-1 mb-4" placeholder="Сумма (₽)">
+      
+      <div class="flex gap-2 mb-3">
+        <input type="date" required class="tx-date flex-1 bg-gray-800 border border-gray-600 text-white rounded-lg p-2 outline-none text-xs">
+        <select required class="tx-category flex-1 bg-gray-800 border border-gray-600 text-white rounded-lg p-2 outline-none text-xs">
+          <option value="" disabled selected>Категория...</option>
+          <option value="Продукты">Продукты</option><option value="Транспорт">Транспорт</option>
+          <option value="Жилье">Жилье</option><option value="Развлечения">Развлечения</option>
+          <option value="Зарплата">Зарплата</option><option value="Другое">Другое</option>
+        </select>
+      </div>
+      <input type="text" placeholder="Комментарий" class="tx-comment w-full bg-gray-800 border border-gray-600 text-white placeholder-gray-500 rounded-lg p-2 outline-none text-xs">
+    </div>
+  </template>
+
+  <script>
+    // --- ФОРМАТИРОВАНИЕ ---
+    const formatMoney = (sum) => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits:0 }).format(sum);
+    
+    function formatSumInput(el) {
+      let val = el.value.replace(/[^\d.,]/g, '').replace(',', '.');
+      if (val) {
+        let parts = val.split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+        el.value = parts.join('.');
+      }
+    }
+    function getUnformattedVal(inputElement) {
+      return parseFloat(inputElement.value.replace(/\s/g, '')) || 0;
+    }
+    function setFormattedVal(id, value) {
+      const el = document.getElementById(id); el.value = value; formatSumInput(el);
+    }
+
+    // --- СОСТОЯНИЕ И ТОСТЫ ---
+    let Cache = null;
+    let currentEditId = null, currentEditTable = null;
+    let brokerChartObj = null;
+
+    function showToast(text, isError = false, keep = false) {
+      const c = document.getElementById('toast-container');
+      document.getElementById('toast-text').innerText = text;
+      document.getElementById('toast-spinner').style.display = isError || keep===false ? 'none' : 'block';
+      
+      const content = document.getElementById('toast-content');
+      content.style.borderColor = isError ? '#ef4444' : (keep ? '#3b82f6' : '#10b981');
+      
+      c.classList.remove('hidden');
+      if (!keep) setTimeout(() => c.classList.add('hidden'), 2500);
+    }
+
+    function fetchAllData() {
+      showToast("Синхронизация...", false, true);
+      google.script.run.withSuccessHandler((data) => {
+        Cache = data;
+        updateGoalDropdowns();
+        renderTransactions(); renderDeposits(); renderBroker(); renderGoals();
+        document.getElementById('last-sync').innerText = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        document.getElementById('toast-container').classList.add('hidden');
+      }).withFailureHandler(err => showToast("Ошибка: " + err.message, true)).getAppData();
+    }
+
+    // --- НАВИГАЦИЯ И ФОРМЫ ---
+    function switchTab(tab) {
+      ['transactions', 'deposits', 'broker', 'goals'].forEach(t => {
+        document.getElementById(t + '-tab').classList.add('hidden');
+        document.getElementById('nav-' + t).classList.replace('text-blue-400', 'text-gray-500');
+      });
+      document.getElementById(tab + '-tab').classList.remove('hidden');
+      document.getElementById('nav-' + tab).classList.replace('text-gray-500', 'text-blue-400');
+      
+      if (tab === 'broker' && Cache) setTimeout(drawBrokerChart, 100); // Рисуем график когда контейнер виден
+    }
+
+    function toggleForm(containerId, btnId, btnText, formId, type) {
+      const formContainer = document.getElementById(containerId);
+      formContainer.classList.toggle('hidden');
+      
+      if (currentEditId) { currentEditId = null; currentEditTable = null; document.getElementById(btnId).innerText = btnText; }
+      
+      if (!formContainer.classList.contains('hidden')) {
+        document.getElementById(formId).reset();
+        const today = new Date().toISOString().split('T')[0];
+        
+        if (type === 'tx') {
+          document.getElementById('tx-items-list').innerHTML = '';
+          addTxRow(); // Добавляем первую пустую строку
+        } else if (type === 'dep') {
+          document.getElementById('dep-start').value = today;
+        } else if (type === 'broker-add') {
+          document.getElementById('broker-type').value = 'Пополнение';
+          document.getElementById('broker-form-title').innerText = 'Новое пополнение';
+          document.getElementById('broker-date').value = today;
+        } else if (type === 'broker-bal') {
+          document.getElementById('broker-type').value = 'Баланс';
+          document.getElementById('broker-form-title').innerText = 'Зафиксировать баланс';
+          document.getElementById('broker-date').value = today;
+        }
+      }
+    }
+
+    // Универсальный обработчик отправки
+    function submitAction(btnId, table, data, addFuncName) {
+      const btn = document.getElementById(btnId); btn.disabled = true;
+      showToast("Сохранение...", false, true);
+      
+      const h = google.script.run.withSuccessHandler(() => {
+        btn.disabled = false; btn.innerText = currentEditId ? 'Сохранить изменения' : btn.innerText;
+        document.getElementById(btn.closest('div').id).classList.add('hidden');
+        currentEditId = null; currentEditTable = null;
+        fetchAllData(); 
+      }).withFailureHandler(e => { btn.disabled = false; showToast(e.message, true); });
+
+      if (currentEditId && currentEditTable === table) h.updateRecordById(table, currentEditId, data);
+      else h[addFuncName](data);
+    }
+
+    function deleteRecord(table, id) {
+      if (!confirm('Удалить?')) return;
+      showToast("Удаление...", false, true);
+      google.script.run.withSuccessHandler(fetchAllData).deleteRecordById(table, id);
+    }
+
+    function updateGoalDropdowns() {
+      if (!Cache) return;
+      let html = '<option value="">Без привязки к цели</option>';
+      Cache.goals.forEach(g => { if(!g.isAchieved) html += `<option value="${g.id}">${g.name}</option>`; });
+      document.getElementById('dep-goal').innerHTML = html;
+      document.getElementById('broker-goal-select').innerHTML = html;
+    }
+
+    // --- ТРАНЗАКЦИИ (Массовые) ---
+    function addTxRow() {
+      const tmpl = document.getElementById('tx-row-template');
+      const clone = tmpl.content.cloneNode(true);
+      
+      // Генерируем уникальное имя для radio buttons внутри этой строки
+      const uid = 'type_' + Math.random().toString(36).substr(2, 9);
+      const radios = clone.querySelectorAll('.tx-type');
+      radios[0].name = uid; radios[1].name = uid;
+      
+      clone.querySelector('.tx-date').value = new Date().toISOString().split('T')[0];
+      document.getElementById('tx-items-list').appendChild(clone);
+    }
+
+    function submitTransactions(e) {
+      e.preventDefault();
+      const rows = document.querySelectorAll('.tx-item');
+      if (rows.length === 0) return alert('Добавьте хотя бы одну операцию');
+
+      if (currentEditId) {
+        // Режим редактирования одной записи
+        const row = rows[0];
+        const data = { 
+          'Тип': row.querySelector('.tx-type:checked').value, 'Сумма': getUnformattedVal(row.querySelector('.tx-amount')), 
+          'Дата': row.querySelector('.tx-date').value, 'Категория': row.querySelector('.tx-category').value, 'Комментарий': row.querySelector('.tx-comment').value 
+        };
+        submitAction('tx-submit-btn', 'Транзакции', data, 'addTransaction');
+      } else {
+        // Массовое добавление
+        const dataArray = Array.from(rows).map(row => ({
+          type: row.querySelector('.tx-type:checked').value, amount: getUnformattedVal(row.querySelector('.tx-amount')),
+          date: row.querySelector('.tx-date').value, category: row.querySelector('.tx-category').value, comment: row.querySelector('.tx-comment').value
+        }));
+        submitAction('tx-submit-btn', 'Транзакции', dataArray, 'addTransactions');
+      }
+    }
+
+    function editTx(id, type, amount, cat, comment, rawDate) {
+      currentEditId = id; currentEditTable = 'Транзакции';
+      document.getElementById('tx-form-container').classList.remove('hidden');
+      document.getElementById('tx-items-list').innerHTML = '';
+      addTxRow(); // Добавляем одну строку и заполняем
+      
+      const row = document.querySelector('.tx-item');
+      row.querySelector('.tx-type[value="'+type+'"]').checked = true;
+      const amtInput = row.querySelector('.tx-amount'); amtInput.value = amount; formatSumInput(amtInput);
+      row.querySelector('.tx-date').value = rawDate; row.querySelector('.tx-category').value = cat;
+      row.querySelector('.tx-comment').value = (comment && comment !== 'undefined') ? comment : '';
+      
+      document.getElementById('tx-submit-btn').innerText = 'Сохранить изменения';
+      window.scrollTo(0,0);
+    }
+
+    function renderTransactions() {
+      const data = Cache.transactions || [];
+      const currentMonthId = new Date().toISOString().slice(0, 7); 
+      const currentMonth = data.find(m => m.id === currentMonthId) || { expense: 0, income: 0 };
+      document.getElementById('month-expense').innerText = formatMoney(currentMonth.expense);
+      document.getElementById('month-income').innerText = formatMoney(currentMonth.income);
+
+      if (data.length === 0) { document.getElementById('transactions-list').innerHTML = '<div class="text-center text-gray-500 py-4">Операций пока нет</div>'; return; }
+
+      let html = '';
+      data.forEach(month => {
+        html += `<div class="pt-2 pb-1 border-b border-gray-800 flex justify-between items-end"><h3 class="font-bold text-gray-400 text-xs uppercase tracking-wider">${month.label}</h3><span class="text-[10px] text-gray-500">Доход: ${formatMoney(month.income)} | Расход: ${formatMoney(month.expense)}</span></div><div class="space-y-3 mt-3">`;
+        month.items.forEach(tx => {
+          const isExp = tx.type === 'Расход';
+          html += `<div class="bg-gray-800 p-3 rounded-2xl border border-gray-700 flex justify-between items-center">
+              <div><p class="font-medium text-white text-sm">${tx.category}</p><p class="text-[11px] text-gray-400">${tx.formattedDate} ${tx.comment ? '• '+tx.comment : ''}</p></div>
+              <div class="text-right"><p class="font-bold text-sm ${isExp?'text-white':'text-emerald-400'} mb-1">${isExp?'-':'+'}${formatMoney(tx.amount)}</p>
+                <div class="flex space-x-3 justify-end text-xs opacity-60"><button onclick="editTx('${tx.id}','${tx.type}',${tx.amount},'${tx.category}','${tx.comment}','${tx.rawDate}')">✏️</button><button onclick="deleteRecord('Транзакции','${tx.id}')" class="text-red-400">🗑️</button></div>
+              </div></div>`;
+        });
+        html += `</div>`;
+      });
+      document.getElementById('transactions-list').innerHTML = html;
+    }
+
+    // --- ВКЛАДЫ ---
+    function submitDeposit(e) {
+      e.preventDefault();
+      const data = { name: document.getElementById('dep-name').value, amount: getUnformattedVal(document.getElementById('dep-amount')), rate: getUnformattedVal(document.getElementById('dep-rate')), startDate: document.getElementById('dep-start').value, endDate: document.getElementById('dep-end').value, goalId: document.getElementById('dep-goal').value };
+      const updateData = { 'Название': data.name, 'Сумма': data.amount, 'Ставка': data.rate, 'Дата открытия': data.startDate, 'Дата закрытия': data.endDate, 'Связанная цель': data.goalId };
+      submitAction('dep-submit-btn', 'Депозиты', currentEditId ? updateData : data, 'addDeposit');
+    }
+
+    function editDep(id, name, amount, rate, start, end, goalId) {
+      currentEditId = id; currentEditTable = 'Депозиты';
+      document.getElementById('dep-name').value = name; setFormattedVal('dep-amount', amount); setFormattedVal('dep-rate', rate);
+      document.getElementById('dep-start').value = start; document.getElementById('dep-end').value = end; document.getElementById('dep-goal').value = goalId || '';
+      document.getElementById('dep-submit-btn').innerText = 'Сохранить изменения'; document.getElementById('deposit-form-container').classList.remove('hidden'); window.scrollTo(0,0);
+    }
+
+    function renderDeposits() {
+      const data = Cache.deposits || [];
+      if (data.length === 0) { document.getElementById('deposits-list').innerHTML = '<div class="text-center text-gray-500 py-4">Вкладов нет</div>'; return; }
+      document.getElementById('deposits-list').innerHTML = data.map(dep => `
+        <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700 relative overflow-hidden">
+          ${dep.goalName ? `<div class="absolute top-0 right-0 bg-blue-600/20 text-blue-300 text-[9px] px-3 py-1 rounded-bl-lg font-bold uppercase tracking-wide border-b border-l border-blue-600/30">🎯 ${dep.goalName}</div>` : ''}
+          <div class="flex justify-between items-start mb-2 ${dep.goalName ? 'pt-2' : ''}">
+            <div><h3 class="font-bold text-white">${dep.name}</h3><p class="text-xs text-gray-400">До ${dep.endDateStr} • ${dep.rate}%</p></div>
+            <div class="text-right"><p class="font-bold text-lg text-white">${formatMoney(dep.amount)}</p>
+              <div class="flex space-x-3 justify-end text-xs opacity-60 mt-1"><button onclick="editDep('${dep.id}','${dep.name}',${dep.amount},${dep.rate},'${dep.rawStart}','${dep.rawEnd}','${dep.goalId}')">✏️</button><button onclick="deleteRecord('Депозиты','${dep.id}')" class="text-red-400">🗑️</button></div>
+            </div>
+          </div>
+          <div class="bg-gray-900/50 rounded-lg p-3 mb-3 flex justify-between"><p class="font-bold text-emerald-400">+${formatMoney(dep.currentInterest)}</p><p class="font-medium text-gray-300">+${formatMoney(dep.expectedInterest)}</p></div>
+          <div class="w-full bg-gray-700 rounded-full h-1.5"><div class="bg-blue-500 h-1.5 rounded-full" style="width:${dep.progress}%"></div></div>
+        </div>`).join('');
+    }
+
+    // --- БРОКЕР ---
+    function submitBrokerOperation(e) {
+      e.preventDefault();
+      const data = { type: document.getElementById('broker-type').value, date: document.getElementById('broker-date').value, amount: getUnformattedVal(document.getElementById('broker-amount')) };
+      submitAction('broker-submit-btn', 'Брокер', data, 'addBrokerOperation');
+    }
+    
+    function submitBrokerGoal(e) {
+      e.preventDefault();
+      const goalId = document.getElementById('broker-goal-select').value;
+      if (!goalId) return alert('Выберите цель');
+      submitAction('broker-goal-btn', 'Брокер', goalId, 'setBrokerGoal');
+    }
+
+    function renderBroker() {
+      const br = Cache.broker;
+      if (!br) return;
+      document.getElementById('broker-balance').innerText = formatMoney(br.balance);
+      document.getElementById('broker-deposits').innerText = formatMoney(br.totalDeposits);
+      
+      const profitEl = document.getElementById('broker-profit');
+      profitEl.innerText = (br.profit > 0 ? '+' : '') + formatMoney(br.profit);
+      profitEl.className = `text-xs font-bold ${br.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
+
+      const badge = document.getElementById('broker-goal-badge');
+      if (br.goalName) { badge.innerText = '🎯 ' + br.goalName; badge.classList.remove('hidden'); } 
+      else { badge.classList.add('hidden'); }
+    }
+
+    function drawBrokerChart() {
+      const data = Cache.broker.chartData;
+      if (!data || data.length === 0) return;
+      
+      const ctx = document.getElementById('brokerChart').getContext('2d');
+      if (brokerChartObj) brokerChartObj.destroy(); // Удаляем старый
+
+      brokerChartObj = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.map(d => d.x.substring(0,5)), // Только ДД.ММ
+          datasets: [{
+            label: 'Баланс', data: data.map(d => d.y),
+            borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            borderWidth: 2, pointRadius: 3, fill: true, tension: 0.1
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { 
+            legend: { display: false },
+            zoom: { pan: { enabled: true, mode: 'x' }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' } }
+          },
+          scales: {
+            x: { grid: { color: '#374151' }, ticks: { color: '#9ca3af', font: { size: 10 } } },
+            y: { grid: { color: '#374151' }, ticks: { color: '#9ca3af', font: { size: 10 }, callback: v => (v/1000)+'k' } }
+          }
+        }
+      });
+    }
+
+    // --- ЦЕЛИ ---
+    function submitGoal(e) {
+      e.preventDefault();
+      const data = { name: document.getElementById('goal-name').value, target: getUnformattedVal(document.getElementById('goal-target')), deadline: document.getElementById('goal-deadline').value };
+      const updateData = { 'Название': data.name, 'Целевая сумма': data.target, 'Дедлайн': data.deadline };
+      submitAction('goal-submit-btn', 'Цели', currentEditId ? updateData : data, 'addGoal');
+    }
+
+    function editGoal(id, name, target, deadline) {
+      currentEditId = id; currentEditTable = 'Цели';
+      document.getElementById('goal-name').value = name; setFormattedVal('goal-target', document.getElementById('goal-target'));
+      document.getElementById('goal-deadline').value = deadline;
+      document.getElementById('goal-submit-btn').innerText = 'Сохранить изменения'; document.getElementById('goal-form-container').classList.remove('hidden'); window.scrollTo(0,0);
+    }
+
+    function renderGoals() {
+      const data = Cache.goals || [];
+      if (data.length === 0) { document.getElementById('goals-list').innerHTML = '<div class="text-center text-gray-500 py-4">Цели нет</div>'; return; }
+      document.getElementById('goals-list').innerHTML = data.map(goal => `
+        <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700 shadow-sm">
+          <div class="flex justify-between items-start mb-3">
+            <div><h3 class="font-bold text-white">${goal.name}</h3>${goal.isAchieved ? '<span class="text-emerald-400 text-[10px] font-bold uppercase">Достигнута</span>' : `<span class="text-xs text-gray-400">До ${goal.deadlineStr}</span>`}</div>
+            <div class="text-right"><p class="font-bold text-white">${goal.progress}%</p>
+              <div class="flex space-x-3 justify-end text-xs opacity-60 mt-1"><button onclick="editGoal('${goal.id}','${goal.name}',${goal.target},'${goal.rawDeadline}')">✏️</button><button onclick="deleteRecord('Цели','${goal.id}')" class="text-red-400">🗑️</button></div>
+            </div>
+          </div>
+          <div class="w-full bg-gray-700 rounded-full h-3 mb-2"><div class="${goal.isAchieved?'bg-emerald-500':'bg-blue-500'} h-3 rounded-full" style="width:${goal.progress}%"></div></div>
+          <div class="flex justify-between items-center text-sm"><span class="text-gray-300 font-medium">${formatMoney(goal.saved)}</span><span class="text-gray-500">из ${formatMoney(goal.target)}</span></div>
+        </div>`).join('');
+    }
+
+    window.onload = () => fetchAllData();
+  </script>
+</body>
+  </html>
