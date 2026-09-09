@@ -65,3 +65,8 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
 .selection-panel .cancel-selection {
   background: #4b5563;
 }
+.card {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
