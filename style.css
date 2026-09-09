@@ -132,3 +132,6 @@ body.selection-mode .card-actions {
 .delete-btn:hover {
   color: #ef4444;
 }
+.card-actions {
+  padding-top: 1rem;
+}
