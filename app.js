@@ -495,13 +495,13 @@ function renderTransactions() {
           <div class="card bg-gray-800 p-3 rounded-2xl border border-gray-700 flex justify-between items-center relative" data-id="${tx.id}" data-table="Transactions">
             <input type="checkbox" class="select-checkbox" data-id="${tx.id}">
             <div class="flex-1 min-w-0">
-              <p class="font-medium text-white text-sm">${tx.category}</p>
-              <p class="text-[11px] text-gray-400">${tx.formattedDate} ${tx.comment ? '• ' + tx.comment : ''}</p>
+              <p class="font-medium text-white text-sm">${escapeHtml(tx.category)}</p>
+              <p class="text-[11px] text-gray-400">${tx.formattedDate} ${tx.comment ? '• ' + escapeHtml(tx.comment) : ''}</p>
             </div>
             <div class="text-right card-actions">
               <p class="font-bold text-sm ${isExp ? 'text-white' : 'text-emerald-400'} mb-1">${isExp ? '-' : '+'}${formatMoney(tx.amount)}</p>
               <div class="flex space-x-3 justify-end text-xs opacity-60">
-                <button onclick="editTx('${tx.id}','${tx.type}',${tx.amount},'${tx.category}','${tx.comment}','${tx.rawDate}')">✏️</button>
+                <button onclick="editTx('${tx.id}','${tx.type}',${tx.amount},'${escapeHtml(tx.category)}','${escapeHtml(tx.comment)}','${tx.rawDate}')">✏️</button>
                 <button onclick="deleteRecord('Transactions','${tx.id}')" class="text-red-400">🗑️</button>
               </div>
             </div>
@@ -551,16 +551,16 @@ function renderDeposits() {
   const renderCard = (dep, isCls) => `
     <div class="card bg-gray-800 p-4 rounded-2xl border border-gray-700 relative overflow-hidden mb-4 ${isCls ? 'opacity-60 grayscale' : ''}" data-id="${dep.id}" data-table="Deposits">
       <input type="checkbox" class="select-checkbox" data-id="${dep.id}">
-      ${dep.goalName ? `<div class="absolute top-0 right-0 bg-blue-600/20 text-blue-300 text-[9px] px-3 py-1 rounded-bl-lg font-bold uppercase tracking-wide border-b border-l border-blue-600/30">🎯 ${dep.goalName}</div>` : ''}
+      ${dep.goalName ? `<div class="absolute top-0 right-0 bg-blue-600/20 text-blue-300 text-[9px] px-3 py-1 rounded-bl-lg font-bold uppercase tracking-wide border-b border-l border-blue-600/30">🎯 ${escapeHtml(dep.goalName)}</div>` : ''}
       <div class="flex justify-between items-start mb-2 ${dep.goalName ? 'pt-2' : ''}">
         <div>
-          <h3 class="font-bold text-white">${dep.name}</h3>
+          <h3 class="font-bold text-white">${escapeHtml(dep.name)}</h3>
           <p class="text-xs ${isCls ? 'text-gray-500' : 'text-gray-400'}">${isCls ? 'Закрыт ' : 'До '}${dep.endDateStr} • ${dep.rate}%</p>
         </div>
         <div class="text-right">
           <p class="font-bold text-lg text-white">${formatMoney(dep.amount)}</p>
           <div class="card-actions flex space-x-3 justify-end text-xs opacity-60 mt-1">
-            ${!isCls ? `<button onclick="editDep('${dep.id}','${dep.name}',${dep.amount},${dep.rate},'${dep.rawStart}','${dep.rawEnd}','${dep.goalId}')">✏️</button>` : ''}
+            ${!isCls ? `<button onclick="editDep('${dep.id}','${escapeHtml(dep.name)}',${dep.amount},${dep.rate},'${dep.rawStart}','${dep.rawEnd}','${dep.goalId}')">✏️</button>` : ''}
             <button onclick="deleteRecord('Deposits','${dep.id}')" class="text-red-400">🗑️</button>
           </div>
         </div>
@@ -700,15 +700,15 @@ function renderGoals() {
       <input type="checkbox" class="select-checkbox" data-id="${g.id}">
       <div class="flex justify-between items-start mb-3">
         <div>
-          <h3 class="font-bold text-white">${g.name}</h3>
+          <h3 class="font-bold text-white">${escapeHtml(g.name)}</h3>
           ${g.isAchieved
             ? '<span class="text-emerald-400 text-[10px] font-bold uppercase">Достигнута</span>'
-            : `<span class="text-xs text-gray-400">До ${g.deadlineStr}</span>`}
+            : `<span class="text-xs text-gray-400">До ${escapeHtml(g.deadlineStr)}</span>`}
         </div>
         <div class="text-right">
           <p class="font-bold text-white">${g.progress}%</p>
           <div class="card-actions flex space-x-3 justify-end text-xs opacity-60 mt-1">
-            <button onclick="editGoal('${g.id}','${g.name}',${g.target},'${g.rawDeadline}')">✏️</button>
+            <button onclick="editGoal('${g.id}','${escapeHtml(g.name)}',${g.target},'${g.rawDeadline}')">✏️</button>
             <button onclick="deleteRecord('Goals','${g.id}')" class="text-red-400">🗑️</button>
           </div>
         </div>
@@ -721,6 +721,16 @@ function renderGoals() {
         <span class="text-gray-500">из ${formatMoney(g.target)}</span>
       </div>
     </div>`).join('');
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 // ==================== РЕЖИМ МУЛЬТИВЫДЕЛЕНИЯ ====================
@@ -808,17 +818,22 @@ async function deleteSelectedItems() {
 }
 
 // Обработчики долгого нажатия
+function startLongPress(card) {
+  longPressTriggered = false;
+  clearTimeout(longPressTimer);
+  longPressTimer = setTimeout(() => {
+    longPressTriggered = true;
+    suppressClick = true;
+    setTimeout(() => { suppressClick = false; }, 400);
+    if (!selectionMode) enableSelectionMode();
+    toggleItemSelection(card.dataset.id, card.dataset.table);
+  }, 500);
+}
+
 function handleTouchStart(e) {
   const card = e.target.closest('.card');
   if (!card) return;
-  longPressTriggered = false;
-  longPressTimer = setTimeout(() => {
-  longPressTriggered = true;
-  suppressClick = true;
-  setTimeout(() => { suppressClick = false; }, 400);
-  if (!selectionMode) enableSelectionMode();
-  toggleItemSelection(card.dataset.id, card.dataset.table);
-}, 500);
+  startLongPress(card);
 }
 
 function handleTouchEnd(e) {
@@ -835,14 +850,7 @@ function handleTouchMove(e) {
 function handleMouseDown(e) {
   const card = e.target.closest('.card');
   if (!card) return;
-  longPressTriggered = false;
-  longPressTimer = setTimeout(() => {
-  longPressTriggered = true;
-  suppressClick = true;
-  setTimeout(() => { suppressClick = false; }, 400);
-  if (!selectionMode) enableSelectionMode();
-  toggleItemSelection(card.dataset.id, card.dataset.table);
-}, 500);
+  startLongPress(card);
 }
 
 function handleMouseUp(e) {
