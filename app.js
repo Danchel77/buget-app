@@ -292,30 +292,45 @@ function processTransactions(txs) {
 }
 
 function processCategories(cats) {
-  const defaultExpense = ['Продукты', 'Транспорт', 'Жилье', 'Развлечения', 'Другое'];
-  const defaultIncome = ['Зарплата', 'Другое'];
-  const expense = new Set(defaultExpense);
-  const income = new Set(defaultIncome);
+  const defaultExpense = [
+    { name: 'Продукты', icon: '🍔' },
+    { name: 'Транспорт', icon: '🚗' },
+    { name: 'Жилье', icon: '🏠' },
+    { name: 'Развлечения', icon: '🎬' },
+    { name: 'Другое', icon: '📦' }
+  ];
+  const defaultIncome = [
+    { name: 'Зарплата', icon: '💼' },
+    { name: 'Другое', icon: '📦' }
+  ];
+
+  const expense = [...defaultExpense];
+  const income = [...defaultIncome];
 
   cats.forEach(c => {
-    if (c.type === 'Расход') expense.add(c.name);
-    else if (c.type === 'Доход') income.add(c.name);
+    if (c.type === 'Расход') {
+      if (!expense.some(item => item.name === c.name)) {
+        expense.push({ name: c.name, icon: c.icon || '📦' });
+      }
+    } else if (c.type === 'Доход') {
+      if (!income.some(item => item.name === c.name)) {
+        income.push({ name: c.name, icon: c.icon || '📦' });
+      }
+    }
   });
 
-  return {
-    expense: Array.from(expense),
-    income: Array.from(income)
-  };
+  return { expense, income };
 }
 
 function showAddCategoryDialog(type, selectEl) {
   showDialog('Новая категория', `Введите название категории (${type})`, true, async () => {
     const name = prompt('Название категории:');
     if (!name) return;
+    const icon = prompt('Иконка (эмодзи, можно оставить пустым):') || '📦';
     try {
-      await db.collection('Categories').add({ name: name, type: type });
-      if (type === 'Доход') Cache.categories.income.push(name);
-      else Cache.categories.expense.push(name);
+      await db.collection('Categories').add({ name, type, icon });
+      const arr = type === 'Доход' ? Cache.categories.income : Cache.categories.expense;
+      arr.push({ name, icon });
       updateCategorySelect(selectEl, type);
       showToast('Категория добавлена');
     } catch (e) {
@@ -327,8 +342,8 @@ function showAddCategoryDialog(type, selectEl) {
 function updateCategorySelect(selectEl, type) {
   if (!Cache || !Cache.categories) return;
   const cats = type === 'Доход' ? Cache.categories.income : Cache.categories.expense;
-  selectEl.innerHTML = '<option value="" disabled selected>Категория...</option>' + 
-    cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  selectEl.innerHTML = '<option value="" disabled selected>Категория...</option>' +
+    cats.map(c => `<option value="${escapeHtml(c.name)}">${c.icon} ${escapeHtml(c.name)}</option>`).join('');
 }
 
 function processDeposits(deposits, goals) {
@@ -561,17 +576,22 @@ function renderTransactions() {
         const isExp = tx.type === 'Расход';
         return `
          <div class="card bg-gray-800 p-3 rounded-2xl border border-gray-700 flex justify-between items-center relative" data-id="${tx.id}" data-table="Transactions">
-          <input type="checkbox" class="select-checkbox" data-id="${tx.id}">
-          <button onclick="deleteRecord('Transactions','${tx.id}')" class="delete-btn" title="Удалить">✕</button>
-          <div class="flex-1 min-w-0">
-          <p class="font-medium text-white text-sm">${escapeHtml(tx.category)}</p>
-          <p class="text-[11px] text-gray-400">${tx.formattedDate} ${tx.comment ? '• ' + escapeHtml(tx.comment) : ''}</p>
-            </div>
-              <div class="text-right card-actions">
-              <p class="font-bold text-sm ${isExp ? 'text-white' : 'text-emerald-400'} mb-1">${isExp ? '-' : '+'}${formatMoney(tx.amount)}</p>
-              <button onclick="editTx('${tx.id}','${tx.type}',${tx.amount},'${escapeHtml(tx.category)}','${escapeHtml(tx.comment)}','${tx.rawDate}')" class="text-gray-400 hover:text-blue-400">✎</button>
-              </div>
-            </div>
+  <input type="checkbox" class="select-checkbox" data-id="${tx.id}">
+  <button onclick="deleteRecord('Transactions','${tx.id}')" class="delete-btn" title="Удалить">✕</button>
+  <div class="flex-1 min-w-0">
+    <p class="font-medium text-white text-sm">
+      ${(() => {
+        const cat = Cache.categories[tx.type === 'Расход' ? 'expense' : 'income'].find(c => c.name === tx.category);
+        return cat ? `<span class="mr-2">${cat.icon}</span>` : '';
+      })()}${escapeHtml(tx.category)}
+    </p>
+    <p class="text-[11px] text-gray-400">${tx.formattedDate} ${tx.comment ? '• ' + escapeHtml(tx.comment) : ''}</p>
+  </div>
+  <div class="text-right card-actions pt-4">
+    <p class="font-bold text-lg ${tx.type === 'Расход' ? 'text-red-400' : 'text-emerald-400'} mb-1">${tx.type === 'Расход' ? '-' : '+'}${formatMoney(tx.amount)}</p>
+    <button onclick="editTx('${tx.id}','${tx.type}',${tx.amount},'${escapeHtml(tx.category)}','${escapeHtml(tx.comment)}','${tx.rawDate}')" class="text-gray-400 hover:text-blue-400">✎</button>
+  </div>
+</div>
           </div>`;
       }).join('')}
     </div>`).join('');
@@ -624,7 +644,16 @@ function buildCharts() {
         x: { grid: { display: false }, ticks: { color: '#9ca3af' } },
         y: { grid: { color: '#374151' }, ticks: { color: '#9ca3af', callback: v => (v/1000)+'k' } }
       },
-      plugins: { legend: { labels: { color: '#e5e7eb' } } }
+      plugins: {
+        legend: { labels: { color: '#e5e7eb' } },
+        datalabels: {
+          anchor: 'end',
+          align: 'end',
+          color: '#e5e7eb',
+          font: { weight: 'bold', size: 10 },
+          formatter: (value) => formatMoney(value)
+        }
+      }
     }
   });
 
@@ -654,12 +683,31 @@ function updateCategoryChart(monthId) {
       type: 'doughnut',
       data: {
         labels: labels,
-        datasets: [{ data: data, backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'] }]
+        datasets: [{
+          data: data,
+          backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316']
+        }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom', labels: { color: '#e5e7eb' } } }
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              color: '#e5e7eb',
+              generateLabels: (chart) => {
+                const dataset = chart.data.datasets[0];
+                return chart.data.labels.map((label, i) => ({
+                  text: `${label}: ${formatMoney(dataset.data[i])}`,
+                  fillStyle: dataset.backgroundColor[i],
+                  hidden: false,
+                  index: i
+                }));
+              }
+            }
+          }
+        }
       }
     });
   }
