@@ -160,11 +160,12 @@ async function fetchCollection(table) {
 async function fetchAllData() {
   showToast("Синхронизация...", false, true);
   try {
-    const [txS, depS, brS, goalS] = await Promise.all([
+    const [txS, depS, brS, goalS, catS] = await Promise.all([
       db.collection('Transactions').get(),
       db.collection('Deposits').get(),
       db.collection('Broker').get(),
-      db.collection('Goals').get()
+      db.collection('Goals').get(),
+      db.collection('Categories').get()
     ]);
     const txData = txS.docs.map(d => ({ id: d.id, ...d.data() }));
     const depData = depS.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -173,11 +174,14 @@ async function fetchAllData() {
 
     const processedDeposits = processDeposits(depData, goalData);
     const processedBroker = processBroker(brData, goalData);
+    const catData = catS.docs.map(d => ({ id: d.id, ...d.data() }));
+    const categories = processCategories(catData);
     Cache = {
       transactions: processTransactions(txData),
       deposits: processedDeposits,
       broker: processedBroker,
-      goals: processGoals(goalData, processedDeposits, processedBroker)
+      goals: processGoals(goalData, processedDeposits, processedBroker),
+      categories: categories
     };
 
     updateGoalDropdowns();
@@ -285,6 +289,46 @@ function processTransactions(txs) {
       m.items.sort((a, b) => b.timestamp - a.timestamp);
       return m;
     });
+}
+
+function processCategories(cats) {
+  const defaultExpense = ['Продукты', 'Транспорт', 'Жилье', 'Развлечения', 'Другое'];
+  const defaultIncome = ['Зарплата', 'Другое'];
+  const expense = new Set(defaultExpense);
+  const income = new Set(defaultIncome);
+
+  cats.forEach(c => {
+    if (c.type === 'Расход') expense.add(c.name);
+    else if (c.type === 'Доход') income.add(c.name);
+  });
+
+  return {
+    expense: Array.from(expense),
+    income: Array.from(income)
+  };
+}
+
+function showAddCategoryDialog(type, selectEl) {
+  showDialog('Новая категория', `Введите название категории (${type})`, true, async () => {
+    const name = prompt('Название категории:');
+    if (!name) return;
+    try {
+      await db.collection('Categories').add({ name: name, type: type });
+      if (type === 'Доход') Cache.categories.income.push(name);
+      else Cache.categories.expense.push(name);
+      updateCategorySelect(selectEl, type);
+      showToast('Категория добавлена');
+    } catch (e) {
+      showToast('Ошибка', true);
+    }
+  });
+}
+
+function updateCategorySelect(selectEl, type) {
+  if (!Cache || !Cache.categories) return;
+  const cats = type === 'Доход' ? Cache.categories.income : Cache.categories.expense;
+  selectEl.innerHTML = '<option value="" disabled selected>Категория...</option>' + 
+    cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
 }
 
 function processDeposits(deposits, goals) {
@@ -436,8 +480,23 @@ function addTxRow() {
   const radios = clone.querySelectorAll('.tx-type');
   radios[0].name = uid;
   radios[1].name = uid;
-  clone.querySelector('.tx-date').value = new Date().toISOString().split('T')[0];
-  document.getElementById('tx-items-list').appendChild(clone);
+
+  const row = clone.querySelector('.tx-item');
+  row.querySelector('.tx-date').value = new Date().toISOString().split('T')[0];
+
+  // Обработчики переключения типа для обновления категорий
+  row.querySelectorAll('.tx-type').forEach(input => {
+    input.addEventListener('change', (e) => {
+      const select = row.querySelector('.tx-category');
+      updateCategorySelect(select, e.target.value);
+    });
+  });
+
+  // Инициализация категорий для выбранного по умолчанию типа
+  const initialType = row.querySelector('.tx-type:checked').value;
+  updateCategorySelect(row.querySelector('.tx-category'), initialType);
+
+  document.getElementById('tx-items-list').appendChild(row);
 }
 
 function submitTransactions(e) {
@@ -474,6 +533,7 @@ function editTx(id, type, amount, cat, comment, rawDate) {
   row.querySelector('.tx-amount').value = amount;
   formatSumInput(row.querySelector('.tx-amount'));
   row.querySelector('.tx-date').value = rawDate;
+  updateCategorySelect(row.querySelector('.tx-category'), type);
   row.querySelector('.tx-category').value = cat;
   row.querySelector('.tx-comment').value = (comment && comment !== 'undefined') ? comment : '';
   document.getElementById('tx-submit-btn').innerText = 'Сохранить изменения';
@@ -515,6 +575,94 @@ function renderTransactions() {
           </div>`;
       }).join('')}
     </div>`).join('');
+}
+
+function switchTransactionView(view) {
+  document.getElementById('transactions-list').classList.toggle('hidden', view !== 'list');
+  document.getElementById('transactions-chart').classList.toggle('hidden', view !== 'chart');
+  document.getElementById('view-list-btn').classList.toggle('bg-blue-600', view === 'list');
+  document.getElementById('view-list-btn').classList.toggle('text-white', view === 'list');
+  document.getElementById('view-list-btn').classList.toggle('bg-gray-700', view !== 'list');
+  document.getElementById('view-list-btn').classList.toggle('text-gray-300', view !== 'list');
+  document.getElementById('view-chart-btn').classList.toggle('bg-blue-600', view === 'chart');
+  document.getElementById('view-chart-btn').classList.toggle('text-white', view === 'chart');
+  document.getElementById('view-chart-btn').classList.toggle('bg-gray-700', view !== 'chart');
+  document.getElementById('view-chart-btn').classList.toggle('text-gray-300', view !== 'chart');
+  if (view === 'chart') buildCharts();
+}
+
+function buildCharts() {
+  if (!Cache || !Cache.transactions) return;
+  const months = Cache.transactions; // уже отсортированы по убыванию
+  const lastMonths = months.slice().reverse().slice(-12);
+  const labels = lastMonths.map(m => m.label);
+  const expenses = lastMonths.map(m => m.expense);
+  const incomes = lastMonths.map(m => m.income);
+
+  const select = document.getElementById('chart-month-select');
+  select.innerHTML = months.map(m => `<option value="${m.id}">${m.label}</option>`).join('');
+  if (months.length > 0) {
+    select.value = months[0].id;
+    updateCategoryChart(months[0].id);
+  }
+
+  const ctx = document.getElementById('monthlyExpensesChart').getContext('2d');
+  if (monthlyChartObj) monthlyChartObj.destroy();
+  monthlyChartObj = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: 'Расходы', data: expenses, backgroundColor: '#ef4444', borderRadius: 5 },
+        { label: 'Доходы', data: incomes, backgroundColor: '#10b981', borderRadius: 5 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#9ca3af' } },
+        y: { grid: { color: '#374151' }, ticks: { color: '#9ca3af', callback: v => (v/1000)+'k' } }
+      },
+      plugins: { legend: { labels: { color: '#e5e7eb' } } }
+    }
+  });
+
+  select.onchange = () => updateCategoryChart(select.value);
+}
+
+function updateCategoryChart(monthId) {
+  const month = Cache.transactions.find(m => m.id === monthId);
+  if (!month) return;
+  const catMap = {};
+  month.items.filter(tx => tx.type === 'Расход').forEach(tx => {
+    catMap[tx.category] = (catMap[tx.category] || 0) + tx.amount;
+  });
+  const labels = Object.keys(catMap);
+  const data = Object.values(catMap);
+
+  const ctx = document.getElementById('categoryExpensesChart').getContext('2d');
+  if (categoryChartObj) categoryChartObj.destroy();
+  if (data.length === 0) {
+    categoryChartObj = new Chart(ctx, {
+      type: 'doughnut',
+      data: { labels: ['Нет расходов'], datasets: [{ data: [1], backgroundColor: ['#374151'] }] },
+      options: { plugins: { legend: { labels: { color: '#e5e7eb' } } } }
+    });
+  } else {
+    categoryChartObj = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{ data: data, backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'] }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: '#e5e7eb' } } }
+      }
+    });
+  }
 }
 
 function submitDeposit(e) {
@@ -880,6 +1028,15 @@ document.addEventListener('click', (e) => {
   // Игнорируем первый клик после долгого нажатия
   if (suppressClick) {
     suppressClick = false;
+    return;
+  }
+
+  if (e.target.classList.contains('add-category-btn')) {
+    const row = e.target.closest('.tx-item');
+    if (!row) return;
+    const type = row.querySelector('.tx-type:checked').value;
+    const select = row.querySelector('.tx-category');
+    showAddCategoryDialog(type, select);
     return;
   }
 
