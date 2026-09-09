@@ -865,12 +865,3 @@ document.addEventListener('touchmove', handleTouchMove, { passive: true });
 document.addEventListener('mousedown', handleMouseDown);
 document.addEventListener('mouseup', handleMouseUp);
 document.addEventListener('mousemove', handleMouseMove);
-document.addEventListener('click', (e) => {
-  if (!selectionMode) return;
-  const card = e.target.closest('.card');
-  if (!card) return;
-  // Игнорируем клики непосредственно по чекбоксу (если вдруг pointer-events не сработал)
-  if (e.target.classList.contains('select-checkbox')) return;
-  e.preventDefault();
-  toggleItemSelection(card.dataset.id, card.dataset.table);
-});
