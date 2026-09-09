@@ -30,8 +30,13 @@
 </head>
 <body class="pb-24 bg-[#121212] text-[#e5e7eb]">
 
-  <!-- ЭКРАН ВХОДА -->
-  <div id="login-screen" class="fixed inset-0 bg-gray-900 z-50 flex flex-col justify-center items-center p-6">
+  <!-- ЭКРАН ЗАГРУЗКИ (показывается при старте, пока Firebase определяет авторизацию) -->
+<div id="loading-screen" class="fixed inset-0 bg-gray-900 z-50 flex flex-col justify-center items-center">
+  <div class="spinner" style="width: 40px; height: 40px; border-width: 4px;"></div>
+  <p class="text-gray-400 mt-4 text-sm">Загрузка...</p>
+</div>
+
+<div id="login-screen" class="fixed inset-0 bg-gray-900 z-50 hidden flex flex-col justify-center items-center p-6">
     <div class="bg-gray-800 p-6 rounded-2xl border border-gray-700 w-full max-w-sm shadow-lg">
       <h2 class="text-2xl font-bold text-white mb-6 text-center">Вход в Бюджет</h2>
       <form id="login-form" onsubmit="loginUser(event)">
@@ -63,7 +68,7 @@
     <h1 class="text-lg font-bold">Бюджет</h1>
     <div class="flex items-center gap-3 text-xs opacity-70">
       <span>Обновлено: <span id="last-sync">...</span></span>
-      <button onclick="logoutUser()" class="bg-gray-800 hover:bg-gray-700 px-2 py-1 rounded border border-gray-700 transition-colors">🚪 Выйти</button>
+      <button onclick="logoutUser()" class="bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded border border-gray-700 transition-colors text-sm font-medium">Выйти</button>
     </div>
   </header>
 
@@ -138,7 +143,7 @@
         <div class="flex gap-2 mb-4">
           <button onclick="toggleForm('broker-form-container', 'broker-submit-btn', 'Сохранить', 'broker-form', 'broker-add')" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-xs font-semibold py-2 rounded-lg transition-colors">+ Пополнить</button>
           <button onclick="toggleForm('broker-form-container', 'broker-submit-btn', 'Сохранить', 'broker-form', 'broker-bal')" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-xs font-semibold py-2 rounded-lg transition-colors">⚖️ Баланс</button>
-          <button onclick="toggleForm('broker-goal-container', 'broker-goal-btn', 'Привязать', 'broker-goal-form', 'broker-goal')" class="w-10 bg-blue-900/40 border border-blue-800/50 flex items-center justify-center rounded-lg">🎯</button>
+          <button onclick="toggleForm('broker-goal-container', 'broker-goal-btn', 'Привязать', 'broker-goal-form', 'broker-goal')" class="flex-1 bg-blue-900/40 text-blue-300 border border-blue-800/50 font-semibold rounded-lg text-xs py-2">Цель</button>
         </div>
         <div class="w-full h-40 mt-2"><canvas id="brokerChart"></canvas></div>
       </div>
@@ -187,11 +192,11 @@
   </main>
 
   <nav class="fixed bottom-0 w-full bg-gray-900 border-t border-gray-800 flex justify-around pb-safe">
-    <button onclick="switchTab('transactions')" id="nav-transactions" class="flex-1 py-3 text-blue-400 font-medium text-xs flex flex-col items-center">💸 Траты</button>
-    <button onclick="switchTab('deposits')" id="nav-deposits" class="flex-1 py-3 text-gray-500 font-medium text-xs flex flex-col items-center">📈 Вклады</button>
-    <button onclick="switchTab('broker')" id="nav-broker" class="flex-1 py-3 text-gray-500 font-medium text-xs flex flex-col items-center">📊 Брокер</button>
-    <button onclick="switchTab('goals')" id="nav-goals" class="flex-1 py-3 text-gray-500 font-medium text-xs flex flex-col items-center">🎯 Цели</button>
-  </nav>
+  <button onclick="switchTab('transactions')" id="nav-transactions" class="flex-1 py-4 text-blue-400 font-medium text-sm flex items-center justify-center">Траты</button>
+  <button onclick="switchTab('deposits')" id="nav-deposits" class="flex-1 py-4 text-gray-500 font-medium text-sm flex items-center justify-center">Вклады</button>
+  <button onclick="switchTab('broker')" id="nav-broker" class="flex-1 py-4 text-gray-500 font-medium text-sm flex items-center justify-center">Брокер</button>
+  <button onclick="switchTab('goals')" id="nav-goals" class="flex-1 py-4 text-gray-500 font-medium text-sm flex items-center justify-center">Цели</button>
+</nav>
 
   <!-- ШАБЛОН СТРОКИ ТРАНЗАКЦИИ -->
   <template id="tx-row-template">
