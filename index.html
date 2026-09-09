@@ -112,7 +112,6 @@
       </div>
 
       <button onclick="toggleForm('tx-form-container', 'tx-submit-btn', 'Сохранить все', 'tx-form', 'tx')" class="w-full bg-blue-900/40 text-blue-300 border border-blue-800/50 font-semibold rounded-xl text-sm px-5 py-3 active:bg-blue-900/60 transition-all">+ Добавить операции</button>
-      <button onclick="showManageCategoriesDialog()" class="w-full mt-2 bg-gray-700 text-gray-300 border border-gray-600 font-semibold rounded-xl text-sm px-5 py-3 transition-all">Управление категориями</button>
       
       <div id="tx-form-container" class="hidden bg-gray-800 p-3 rounded-2xl border border-gray-700 shadow-sm animate-fade-in">
         <form id="tx-form" onsubmit="submitTransactions(event)">
@@ -266,7 +265,8 @@
       <input type="date" required class="tx-date flex-1 bg-gray-800 border border-gray-600 text-white rounded-lg p-2 outline-none text-xs">
       <div class="flex-1 flex gap-1">
         <select required class="tx-category flex-1 bg-gray-800 border border-gray-600 text-white rounded-lg p-2 outline-none text-xs"></select>
-        <button type="button" class="add-category-btn bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-2 text-xs" title="Добавить категорию">+</button>
+<button type="button" class="manage-categories-btn bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-2 text-xs" title="Управление категориями">✎</button>
+<button type="button" class="add-category-btn bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-2 text-xs" title="Добавить категорию">+</button>
       </div>
     </div>
 
