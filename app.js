@@ -744,10 +744,12 @@ function enableSelectionMode() {
       <button id="cancel-selection" class="cancel-selection">Отмена</button>
     `;
     document.body.appendChild(panel);
+
     document.getElementById('delete-selected').addEventListener('click', deleteSelectedItems);
     document.getElementById('cancel-selection').addEventListener('click', cancelSelection);
   }
   panel.style.display = 'flex';
+  document.getElementById('selected-count').textContent = `Выбрано: ${selectedItems.size}`;
 }
 
 function disableSelectionMode() {
@@ -865,3 +867,18 @@ document.addEventListener('touchmove', handleTouchMove, { passive: true });
 document.addEventListener('mousedown', handleMouseDown);
 document.addEventListener('mouseup', handleMouseUp);
 document.addEventListener('mousemove', handleMouseMove);
+document.addEventListener('click', (e) => {
+  if (!selectionMode) return;
+
+  // Игнорируем click, который возник после долгого нажатия
+  if (longPressTriggered) {
+    longPressTriggered = false;
+    return;
+  }
+
+  const card = e.target.closest('.card');
+  if (!card) return;
+  if (e.target.classList.contains('select-checkbox')) return;
+  e.preventDefault();
+  toggleItemSelection(card.dataset.id, card.dataset.table);
+});
