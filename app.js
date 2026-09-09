@@ -95,42 +95,96 @@ async function fetchAllData() {
   } catch (err) { showToast("Ошибка", true); }
 }
 
-/* Универсальная функция добавления/обновления (Исправлено скрытие окна) */
 async function submitAction(btnId, table, data) {
-  const btn = document.getElementById(btnId); 
-  btn.disabled = true; 
+  const btn = document.getElementById(btnId);
+  btn.disabled = true;
   showToast("Сохранение...", false, true);
-  
+
   try {
+    let docId;
     if (currentEditId && currentEditTable === table) {
       await db.collection(table).doc(currentEditId).update(data);
-    } else if (Array.isArray(data)) { 
-      const batch = db.batch(); 
-      data.forEach(item => batch.set(db.collection(table).doc(), item)); 
-      await batch.commit(); 
+      docId = currentEditId;
+    } else if (Array.isArray(data)) {
+      const batch = db.batch();
+      const newDocs = [];
+      data.forEach(item => {
+        const newDocRef = db.collection(table).doc();
+        batch.set(newDocRef, item);
+        newDocs.push({ id: newDocRef.id, ...item });
+      });
+      await batch.commit();
+      // Добавляем новые документы в локальный кэш
+      if (table === 'Transactions') {
+        Cache.transactions = processTransactions([...Cache.transactions.flatMap(m => m.items.map(i => ({ id: i.id, ...i }))), ...newDocs]);
+      }
+      // Для других таблиц можно аналогично, либо просто вызвать fetchAllData если сложно
+      // Пока для простоты: если не транзакции, перезагрузим все
+      if (table !== 'Transactions') {
+        fetchAllData();
+        return;
+      }
     } else {
-      await db.collection(table).add(data);
+      const docRef = await db.collection(table).add(data);
+      docId = docRef.id;
+      // Добавляем в кэш
+      if (table === 'Transactions') {
+        Cache.transactions = processTransactions([...Cache.transactions.flatMap(m => m.items.map(i => ({ id: i.id, ...i }))), { id: docId, ...data }]);
+      } else {
+        fetchAllData();
+        return;
+      }
     }
-    
-    btn.disabled = false; 
+
+    // Обновляем UI только нужного раздела
+    if (table === 'Transactions') {
+      renderTransactions();
+    } else {
+      // Для остальных таблиц пока оставляем полную перезагрузку, т.к. логика сложнее
+      fetchAllData();
+      return;
+    }
+
+    btn.disabled = false;
     btn.innerText = currentEditId ? 'Сохранить изменения' : btn.innerText;
-    
-    // ИСПРАВЛЕНИЕ: Ищем саму форму и скрываем её родительский контейнер
     btn.closest('form').parentElement.classList.add('hidden');
-    
-    currentEditId = null; 
-    currentEditTable = null; 
-    fetchAllData(); 
-  } catch(e) { 
-    btn.disabled = false; 
-    showToast(e.message, true); 
+    currentEditId = null;
+    currentEditTable = null;
+    document.getElementById('toast-container').classList.add('hidden');
+  } catch(e) {
+    btn.disabled = false;
+    showToast(e.message, true);
   }
 }
 
 function deleteRecord(table, id) {
   showDialog('Удаление', 'Точно удалить запись? Это нельзя отменить.', true, async () => {
     showToast("Удаление...", false, true);
-    try { await db.collection(table).doc(id).delete(); fetchAllData(); } catch(e) { showToast("Ошибка", true); }
+    try {
+      await db.collection(table).doc(id).delete();
+      
+      // Локально удаляем из Cache
+      if (table === 'Transactions') {
+        // Удаляем транзакцию из всех месяцев
+        for (const month of Cache.transactions) {
+          month.items = month.items.filter(item => item.id !== id);
+          // Пересчитываем суммы месяца
+          month.income = month.items.filter(i => i.type === 'Доход').reduce((sum, i) => sum + i.amount, 0);
+          month.expense = month.items.filter(i => i.type === 'Расход').reduce((sum, i) => sum + i.amount, 0);
+        }
+        // Удаляем пустые месяцы
+        Cache.transactions = Cache.transactions.filter(month => month.items.length > 0);
+        renderTransactions();
+      } else {
+        // Для остальных таблиц пока перезагружаем всё
+        fetchAllData();
+        return;
+      }
+      
+      document.getElementById('toast-container').classList.add('hidden');
+    } catch(e) {
+      showToast("Ошибка", true);
+    }
   });
 }
 
@@ -283,3 +337,165 @@ function drawBrokerChart() { const data = Cache.broker.chartData; if (!data || d
 function submitGoal(e) { e.preventDefault(); submitAction('goal-submit-btn', 'Goals', { name: document.getElementById('goal-name').value, target: getUnformattedVal(document.getElementById('goal-target')), deadline: document.getElementById('goal-deadline').value, status: 'В процессе' }); }
 function editGoal(id, name, target, deadline) { currentEditId = id; currentEditTable = 'Goals'; document.getElementById('goal-name').value = name; setFormattedVal('goal-target', target); document.getElementById('goal-deadline').value = deadline; document.getElementById('goal-submit-btn').innerText = 'Сохранить изменения'; document.getElementById('goal-form-container').classList.remove('hidden'); window.scrollTo(0,0); }
 function renderGoals() { const data = Cache.goals || []; if (data.length === 0) return document.getElementById('goals-list').innerHTML = '<div class="text-center text-gray-500 py-4">Целей нет</div>'; document.getElementById('goals-list').innerHTML = data.map(g => `<div class="bg-gray-800 p-4 rounded-2xl border border-gray-700 shadow-sm"><div class="flex justify-between items-start mb-3"><div><h3 class="font-bold text-white">${g.name}</h3>${g.isAchieved ? '<span class="text-emerald-400 text-[10px] font-bold uppercase">Достигнута</span>' : `<span class="text-xs text-gray-400">До ${g.deadlineStr}</span>`}</div><div class="text-right"><p class="font-bold text-white">${g.progress}%</p><div class="flex space-x-3 justify-end text-xs opacity-60 mt-1"><button onclick="editGoal('${g.id}','${g.name}',${g.target},'${g.rawDeadline}')">✏️</button><button onclick="deleteRecord('Goals','${g.id}')" class="text-red-400">🗑️</button></div></div></div><div class="w-full bg-gray-700 rounded-full h-3 mb-2"><div class="${g.isAchieved?'bg-emerald-500':'bg-blue-500'} h-3 rounded-full" style="width:${g.progress}%"></div></div><div class="flex justify-between items-center text-sm"><span class="text-gray-300 font-medium">${formatMoney(g.saved)}</span><span class="text-gray-500">из ${formatMoney(g.target)}</span></div></div>`).join(''); }
+
+document.addEventListener('click', (e) => {
+  const editBtn = e.target.closest('.tx-edit-btn, .dep-edit-btn, .goal-edit-btn');
+  if (editBtn) {
+    // Определяем тип записи и вызываем нужную функцию
+    const id = editBtn.dataset.id;
+    if (editBtn.classList.contains('tx-edit-btn')) {
+      editTx(id, editBtn.dataset.type, parseFloat(editBtn.dataset.amount), editBtn.dataset.category, editBtn.dataset.comment, editBtn.dataset.rawdate);
+    } else if (editBtn.classList.contains('dep-edit-btn')) {
+      // Для вкладов нужно хранить все поля в data-атрибутах
+      // ...
+    } else if (editBtn.classList.contains('goal-edit-btn')) {
+      // ...
+    }
+    return;
+  }
+
+  const deleteBtn = e.target.closest('.tx-delete-btn, .dep-delete-btn, .goal-delete-btn');
+  if (deleteBtn) {
+    const id = deleteBtn.dataset.id;
+    const table = deleteBtn.dataset.table;
+    deleteRecord(table, id);
+  }
+});
+
+// ----- РЕЖИМ МУЛЬТИВЫДЕЛЕНИЯ -----
+let selectionMode = false;
+let selectedItems = new Set(); // ключи вида "table:id"
+let longPressTimer = null;
+let longPressTriggered = false;
+
+function enableSelectionMode() {
+  selectionMode = true;
+  document.body.classList.add('selection-mode');
+  // Показываем панель
+  const panel = document.getElementById('selection-panel');
+  if (!panel) {
+    const newPanel = document.createElement('div');
+    newPanel.id = 'selection-panel';
+    newPanel.className = 'selection-panel';
+    newPanel.innerHTML = `
+      <span id="selected-count">Выбрано: 0</span>
+      <button id="delete-selected" class="bg-red-600">Удалить</button>
+      <button id="cancel-selection" class="cancel-selection">Отмена</button>
+    `;
+    document.body.appendChild(newPanel);
+    document.getElementById('delete-selected').addEventListener('click', deleteSelectedItems);
+    document.getElementById('cancel-selection').addEventListener('click', cancelSelection);
+  }
+  document.getElementById('selection-panel').style.display = 'flex';
+}
+
+function disableSelectionMode() {
+  selectionMode = false;
+  selectedItems.clear();
+  document.body.classList.remove('selection-mode');
+  const panel = document.getElementById('selection-panel');
+  if (panel) panel.style.display = 'none';
+  // Снимаем выделение со всех карточек
+  document.querySelectorAll('.card.selected').forEach(card => card.classList.remove('selected'));
+  document.querySelectorAll('.select-checkbox').forEach(cb => cb.checked = false);
+}
+
+function toggleItemSelection(id, table) {
+  const key = `${table}:${id}`;
+  if (selectedItems.has(key)) {
+    selectedItems.delete(key);
+  } else {
+    selectedItems.add(key);
+  }
+  // Обновляем визуал
+  const card = document.querySelector(`.card[data-id="${id}"][data-table="${table}"]`);
+  if (card) {
+    card.classList.toggle('selected', selectedItems.has(key));
+    const checkbox = card.querySelector('.select-checkbox');
+    if (checkbox) checkbox.checked = selectedItems.has(key);
+  }
+  document.getElementById('selected-count').textContent = `Выбрано: ${selectedItems.size}`;
+}
+
+function cancelSelection() {
+  disableSelectionMode();
+}
+
+async function deleteSelectedItems() {
+  if (selectedItems.size === 0) return;
+  showDialog('Удаление', `Удалить выбранные записи (${selectedItems.size})?`, true, async () => {
+    showToast("Удаление...", false, true);
+    try {
+      const batch = db.batch();
+      selectedItems.forEach(key => {
+        const [table, id] = key.split(':');
+        batch.delete(db.collection(table).doc(id));
+      });
+      await batch.commit();
+      // После удаления обновляем данные: проще перезагрузить всё
+      disableSelectionMode();
+      fetchAllData();
+    } catch(e) {
+      showToast("Ошибка удаления", true);
+    }
+  });
+}
+
+// Обработка долгого нажатия на карточках
+document.addEventListener('touchstart', handleTouchStart, { passive: true });
+document.addEventListener('touchend', handleTouchEnd);
+document.addEventListener('touchmove', handleTouchMove, { passive: true });
+document.addEventListener('mousedown', handleMouseDown);
+document.addEventListener('mouseup', handleMouseUp);
+document.addEventListener('mousemove', handleMouseMove);
+
+function handleTouchStart(e) {
+  const card = e.target.closest('.card');
+  if (!card) return;
+  longPressTriggered = false;
+  longPressTimer = setTimeout(() => {
+    longPressTriggered = true;
+    if (!selectionMode) enableSelectionMode();
+    toggleItemSelection(card.dataset.id, card.dataset.table);
+  }, 500);
+}
+
+function handleTouchEnd(e) {
+  clearTimeout(longPressTimer);
+  if (longPressTriggered) {
+    e.preventDefault(); // предотвращаем последующий click
+  }
+}
+
+function handleTouchMove(e) {
+  // Если палец сдвинулся, отменяем долгое нажатие
+  clearTimeout(longPressTimer);
+}
+
+function handleMouseDown(e) {
+  const card = e.target.closest('.card');
+  if (!card) return;
+  longPressTriggered = false;
+  longPressTimer = setTimeout(() => {
+    longPressTriggered = true;
+    if (!selectionMode) enableSelectionMode();
+    toggleItemSelection(card.dataset.id, card.dataset.table);
+  }, 500);
+}
+
+function handleMouseUp(e) {
+  clearTimeout(longPressTimer);
+}
+
+function handleMouseMove(e) {
+  clearTimeout(longPressTimer);
+}
+
+// При включении режима выбора клики по карточке переключают выделение, а не действия
+document.addEventListener('click', (e) => {
+  if (!selectionMode) return;
+  const card = e.target.closest('.card');
+  if (!card) return;
+  e.preventDefault();
+  toggleItemSelection(card.dataset.id, card.dataset.table);
+});
