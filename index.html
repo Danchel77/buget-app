@@ -99,7 +99,27 @@
           </div>
         </form>
       </div>
-      
+        <!-- Переключатель вида -->
+      <div class="flex mb-2">
+        <button id="view-list-btn" onclick="switchTransactionView('list')" class="flex-1 py-2 text-sm font-medium rounded-l-lg bg-blue-600 text-white">Список</button>
+        <button id="view-chart-btn" onclick="switchTransactionView('chart')" class="flex-1 py-2 text-sm font-medium rounded-r-lg bg-gray-700 text-gray-300">Графики</button>
+      </div>
+
+      <!-- Графики -->
+      <div id="transactions-chart" class="hidden pb-6">
+        <div class="mb-4">
+          <label class="block text-xs text-gray-400 mb-1">Месяц для категорий</label>
+          <select id="chart-month-select" class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none text-sm"></select>
+        </div>
+        <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700 mb-4">
+          <h3 class="text-sm font-semibold mb-2">Расходы по месяцам</h3>
+          <div class="h-64"><canvas id="monthlyExpensesChart"></canvas></div>
+        </div>
+        <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700">
+          <h3 class="text-sm font-semibold mb-2">Расходы по категориям</h3>
+          <div class="h-64"><canvas id="categoryExpensesChart"></canvas></div>
+        </div>
+      </div>
       <div id="transactions-list" class="space-y-4 pb-6"></div>
     </div>
 
@@ -200,29 +220,33 @@
 
   <!-- ШАБЛОН СТРОКИ ТРАНЗАКЦИИ -->
   <template id="tx-row-template">
-    <div class="tx-item bg-gray-900 p-4 rounded-xl mb-3 border border-gray-700 relative">
-      <div class="flex bg-gray-800 p-1 rounded-xl mb-4 w-3/4">
-        <label class="flex-1 text-center cursor-pointer">
-          <input type="radio" value="Расход" class="tx-type peer hidden" checked>
-          <div class="peer-checked:bg-gray-700 peer-checked:text-white py-1.5 rounded-lg text-xs font-medium text-gray-500 transition-all">Расход</div>
-        </label>
-        <label class="flex-1 text-center cursor-pointer">
-          <input type="radio" value="Доход" class="tx-type peer hidden">
-          <div class="peer-checked:bg-gray-700 peer-checked:text-emerald-400 py-1.5 rounded-lg text-xs font-medium text-gray-500 transition-all">Доход</div>
-        </label>
-      </div>
-      <input type="text" inputmode="decimal" oninput="formatSumInput(this)" required class="tx-amount w-full text-2xl font-bold bg-transparent border-b-2 border-gray-700 focus:border-blue-500 text-white outline-none py-1 mb-4" placeholder="Сумма (₽)">
-      <div class="flex gap-2 mb-3">
-        <input type="date" required class="tx-date flex-1 bg-gray-800 border border-gray-600 text-white rounded-lg p-2 outline-none text-xs">
-        <select required class="tx-category flex-1 bg-gray-800 border border-gray-600 text-white rounded-lg p-2 outline-none text-xs">
-          <option value="" disabled selected>Категория...</option>
-          <option value="Продукты">Продукты</option><option value="Транспорт">Транспорт</option>
-          <option value="Жилье">Жилье</option><option value="Развлечения">Развлечения</option>
-          <option value="Зарплата">Зарплата</option><option value="Другое">Другое</option>
-        </select>
-      </div>
-      <input type="text" placeholder="Комментарий" class="tx-comment w-full bg-gray-800 border border-gray-600 text-white placeholder-gray-500 rounded-lg p-2 outline-none text-xs">
+  <div class="tx-item bg-gray-900 p-4 rounded-xl mb-3 border border-gray-700 relative">
+    <div class="flex bg-gray-800 p-1 rounded-xl mb-4 w-3/4">
+      <label class="flex-1 text-center cursor-pointer">
+        <input type="radio" value="Расход" class="tx-type peer hidden" checked>
+        <div class="peer-checked:bg-gray-700 peer-checked:text-white py-1.5 rounded-lg text-xs font-medium text-gray-500 transition-all">Расход</div>
+      </label>
+      <label class="flex-1 text-center cursor-pointer">
+        <input type="radio" value="Доход" class="tx-type peer hidden">
+        <div class="peer-checked:bg-gray-700 peer-checked:text-emerald-400 py-1.5 rounded-lg text-xs font-medium text-gray-500 transition-all">Доход</div>
+      </label>
     </div>
-  </template>
+
+    <div class="mb-4">
+      <label class="block text-xs text-gray-400 mb-1">Сумма</label>
+      <input type="text" inputmode="decimal" oninput="formatSumInput(this)" required class="tx-amount w-full text-2xl font-bold bg-gray-800 border border-gray-600 focus:border-blue-500 text-white rounded-lg p-3 outline-none" placeholder="0 ₽">
+    </div>
+
+    <div class="flex gap-2 mb-3">
+      <input type="date" required class="tx-date flex-1 bg-gray-800 border border-gray-600 text-white rounded-lg p-2 outline-none text-xs">
+      <div class="flex-1 flex gap-1">
+        <select required class="tx-category flex-1 bg-gray-800 border border-gray-600 text-white rounded-lg p-2 outline-none text-xs"></select>
+        <button type="button" class="add-category-btn bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-2 text-xs" title="Добавить категорию">+</button>
+      </div>
+    </div>
+
+    <input type="text" placeholder="Комментарий" class="tx-comment w-full bg-gray-800 border border-gray-600 text-white placeholder-gray-500 rounded-lg p-2 outline-none text-xs">
+  </div>
+</template>
 </body>
 </html>
