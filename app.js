@@ -21,6 +21,8 @@ const auth = firebase.auth();
 let Cache = null;
 let currentEditId = null, currentEditTable = null;
 let brokerChartObj = null;
+let monthlyChartObj = null;
+let categoryChartObj = null;
 
 // --- АВТОРИЗАЦИЯ ---
 function loginUser(e) {
