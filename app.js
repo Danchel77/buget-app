@@ -728,6 +728,7 @@ let selectionMode = false;
 let selectedItems = new Set(); // ключи вида "table:id"
 let longPressTimer = null;
 let longPressTriggered = false;
+let suppressClick = false;
 let lastLongPressCardId = null;
 let lastLongPressTime = 0;
 
@@ -815,8 +816,8 @@ function handleTouchStart(e) {
   longPressTriggered = false;
   longPressTimer = setTimeout(() => {
   longPressTriggered = true;
-  lastLongPressCardId = card.dataset.id;
-  lastLongPressTime = Date.now();
+  suppressClick = true;
+  setTimeout(() => { suppressClick = false; }, 400);
   if (!selectionMode) enableSelectionMode();
   toggleItemSelection(card.dataset.id, card.dataset.table);
 }, 500);
@@ -839,8 +840,8 @@ function handleMouseDown(e) {
   longPressTriggered = false;
   longPressTimer = setTimeout(() => {
   longPressTriggered = true;
-  lastLongPressCardId = card.dataset.id;
-  lastLongPressTime = Date.now();
+  suppressClick = true;
+  setTimeout(() => { suppressClick = false; }, 400);
   if (!selectionMode) enableSelectionMode();
   toggleItemSelection(card.dataset.id, card.dataset.table);
 }, 500);
@@ -863,6 +864,10 @@ document.addEventListener('mouseup', handleMouseUp);
 document.addEventListener('mousemove', handleMouseMove);
 
 document.addEventListener('click', (e) => {
+  if (suppressClick) {
+    suppressClick = false;
+    return;
+  }
   if (!selectionMode) return;
   const card = e.target.closest('.card');
   if (!card) return;
