@@ -323,21 +323,114 @@ function processCategories(cats) {
 }
 
 function showAddCategoryDialog(type, selectEl) {
-  showDialog('Новая категория', `Введите название категории (${type})`, true, async () => {
-    const name = prompt('Название категории:');
-    if (!name) return;
-    const icon = prompt('Иконка (эмодзи, можно оставить пустым):') || '📦';
+  currentCategoryType = type;
+  currentCategorySelect = selectEl;
+  selectedCategoryIcon = '📦';
+  document.getElementById('category-dialog-title').innerText = `Новая категория (${type})`;
+  document.getElementById('category-name-input').value = '';
+  renderIconGrid();
+  document.getElementById('category-dialog').classList.remove('hidden');
+}
+
+function renderIconGrid() {
+  const grid = document.getElementById('category-icon-grid');
+  grid.innerHTML = availableIcons.map(icon => `
+    <button type="button" class="icon-option ${icon === selectedCategoryIcon ? 'selected' : ''}" data-icon="${icon}">${icon}</button>
+  `).join('');
+  grid.querySelectorAll('.icon-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedCategoryIcon = btn.dataset.icon;
+      grid.querySelectorAll('.icon-option').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+  });
+}
+
+document.getElementById('category-cancel-btn').addEventListener('click', () => {
+  document.getElementById('category-dialog').classList.add('hidden');
+});
+
+document.getElementById('category-save-btn').addEventListener('click', async () => {
+  const name = document.getElementById('category-name-input').value.trim();
+  if (!name) {
+    showToast('Введите название', true);
+    return;
+  }
+  try {
+    await db.collection('Categories').add({ name, type: currentCategoryType, icon: selectedCategoryIcon });
+    const arr = currentCategoryType === 'Доход' ? Cache.categories.income : Cache.categories.expense;
+    arr.push({ name, icon: selectedCategoryIcon });
+    updateCategorySelect(currentCategorySelect, currentCategoryType);
+    document.getElementById('category-dialog').classList.add('hidden');
+    showToast('Категория добавлена');
+  } catch (e) {
+    showToast('Ошибка', true);
+  }
+});
+
+function showManageCategoriesDialog() {
+  renderManageCategories();
+  document.getElementById('manage-categories-dialog').classList.remove('hidden');
+}
+
+function renderManageCategories() {
+  const container = document.getElementById('categories-list-container');
+  let html = `<p class="text-xs text-gray-400 mb-2">Расходы</p>`;
+  Cache.categories.expense.forEach(cat => {
+    const isDefault = ['Продукты', 'Транспорт', 'Жилье', 'Развлечения', 'Другое'].includes(cat.name);
+    html += `
+      <div class="flex justify-between items-center py-2 border-b border-gray-700">
+        <span>${cat.icon} ${escapeHtml(cat.name)}</span>
+        ${!isDefault ? `<button class="text-red-400 text-xs" onclick="deleteCategory('${escapeHtml(cat.name)}', 'Расход')">✕</button>` : ''}
+      </div>`;
+  });
+  html += `<p class="text-xs text-gray-400 mt-4 mb-2">Доходы</p>`;
+  Cache.categories.income.forEach(cat => {
+    const isDefault = ['Зарплата', 'Другое'].includes(cat.name);
+    html += `
+      <div class="flex justify-between items-center py-2 border-b border-gray-700">
+        <span>${cat.icon} ${escapeHtml(cat.name)}</span>
+        ${!isDefault ? `<button class="text-red-400 text-xs" onclick="deleteCategory('${escapeHtml(cat.name)}', 'Доход')">✕</button>` : ''}
+      </div>`;
+  });
+  container.innerHTML = html;
+}
+
+async function deleteCategory(name, type) {
+  showDialog('Удаление', `Удалить категорию "${name}"?`, true, async () => {
     try {
-      await db.collection('Categories').add({ name, type, icon });
+      // Найти документ по name и type
+      const snapshot = await db.collection('Categories')
+        .where('name', '==', name)
+        .where('type', '==', type)
+        .get();
+      const batch = db.batch();
+      snapshot.docs.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+
+      // Обновить Cache
       const arr = type === 'Доход' ? Cache.categories.income : Cache.categories.expense;
-      arr.push({ name, icon });
-      updateCategorySelect(selectEl, type);
-      showToast('Категория добавлена');
+      const index = arr.findIndex(c => c.name === name);
+      if (index !== -1) arr.splice(index, 1);
+      renderManageCategories();
+      // Обновить все селекты категорий на странице
+      document.querySelectorAll('.tx-category').forEach(select => {
+        const row = select.closest('.tx-item');
+        if (row) {
+          const rowType = row.querySelector('.tx-type:checked').value;
+          if (rowType === type) updateCategorySelect(select, type);
+        }
+      });
+      showToast('Категория удалена');
     } catch (e) {
       showToast('Ошибка', true);
     }
   });
 }
+
+document.getElementById('close-manage-categories').addEventListener('click', () => {
+  document.getElementById('manage-categories-dialog').classList.add('hidden');
+});
 
 function updateCategorySelect(selectEl, type) {
   if (!Cache || !Cache.categories) return;
@@ -942,6 +1035,15 @@ let selectedItems = new Set(); // ключи вида "table:id"
 let longPressTimer = null;
 let longPressTriggered = false;
 let suppressClick = false;
+let currentCategoryType = 'Расход';
+let currentCategorySelect = null;
+let selectedCategoryIcon = '📦';
+const availableIcons = [
+  '🍔', '🚗', '🏠', '🎬', '📦', '💼', '🎓', '👶', '🐾', '💊',
+  '🛒', '✈️', '🏋️', '🎮', '📚', '🎵', '🎁', '☕', '🍕', '👕',
+  '💡', '🔧', '📱', '💻', '🖥️', '📷', '🎨', '🎸', '⚽', '🏀',
+  '🚌', '🚇', '🚕', '⛽', '🛁', '🧹', '🧺', '🪴', '🌍', '💳'
+];
 
 function enableSelectionMode() {
   selectionMode = true;
