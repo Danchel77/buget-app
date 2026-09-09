@@ -769,7 +769,15 @@ function updateCategoryChart(monthId) {
     categoryChartObj = new Chart(ctx, {
       type: 'doughnut',
       data: { labels: ['Нет расходов'], datasets: [{ data: [1], backgroundColor: ['#374151'] }] },
-      options: { plugins: { legend: { labels: { color: '#e5e7eb' } } } }
+      options: {
+        plugins: {
+          legend: {
+            labels: {
+              color: '#e5e7eb' // светлый цвет текста легенды
+            }
+          }
+        }
+      }
     });
   } else {
     categoryChartObj = new Chart(ctx, {
@@ -788,7 +796,7 @@ function updateCategoryChart(monthId) {
           legend: {
             position: 'bottom',
             labels: {
-              color: '#e5e7eb',
+              color: '#e5e7eb', // добавлено: светлый цвет
               generateLabels: (chart) => {
                 const dataset = chart.data.datasets[0];
                 return chart.data.labels.map((label, i) => ({
