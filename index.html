@@ -14,6 +14,7 @@
   <!-- Firebase (v8 compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
 
   <style>
     * { -webkit-tap-highlight-color: transparent; color-scheme: dark; }
@@ -28,6 +29,18 @@
   </style>
 </head>
 <body class="pb-24">
+
+  <!-- ЭКРАН ВХОДА -->
+  <div id="login-screen" class="fixed inset-0 bg-gray-900 z-50 flex flex-col justify-center items-center p-6">
+    <div class="bg-gray-800 p-6 rounded-2xl border border-gray-700 w-full max-w-sm shadow-lg">
+      <h2 class="text-2xl font-bold text-white mb-6 text-center">Вход в Бюджет</h2>
+      <form id="login-form" onsubmit="loginUser(event)">
+        <input type="email" id="login-email" placeholder="Email" required class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none mb-4 text-sm">
+        <input type="password" id="login-password" placeholder="Пароль" required class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none mb-6 text-sm">
+        <button type="submit" id="login-btn" class="w-full bg-blue-600 text-white font-semibold rounded-xl px-5 py-4 shadow-md active:bg-blue-700">Войти</button>
+      </form>
+    </div>
+  </div>
 
   <!-- Всплывающие уведомления -->
   <div id="toast-container" class="hidden">
@@ -193,6 +206,29 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    const auth = firebase.auth();
+
+    /* Обработка формы входа */
+    function loginUser(e) {
+      e.preventDefault();
+      const btn = document.getElementById('login-btn'); btn.disabled = true; btn.innerText = 'Вход...';
+      const email = document.getElementById('login-email').value;
+      const pass = document.getElementById('login-password').value;
+      auth.signInWithEmailAndPassword(email, pass).catch(err => {
+        btn.disabled = false; btn.innerText = 'Войти'; showToast('Ошибка: неверный email или пароль', true);
+      });
+    }
+
+    /* Отслеживание состояния авторизации */
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        document.getElementById('login-screen').classList.add('hidden');
+        switchTab('transactions'); // Показываем главную вкладку сразу после входа
+        fetchAllData(); // Загружаем данные
+      } else {
+        document.getElementById('login-screen').classList.remove('hidden');
+      }
+    });
 
     // --- ФОРМАТИРОВАНИЕ И УТИЛИТЫ ---
     const formatMoney = (sum) => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits:0 }).format(sum);
@@ -601,9 +637,6 @@
           <div class="flex justify-between items-center text-sm"><span class="text-gray-300 font-medium">${formatMoney(goal.saved)}</span><span class="text-gray-500">из ${formatMoney(goal.target)}</span></div>
         </div>`).join('');
     }
-
-    // Запуск приложения
-    window.onload = () => fetchAllData();
   </script>
 </body>
 </html>
