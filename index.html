@@ -2,8 +2,17 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Семейный бюджет</title>
+  
+  <!-- PWA настройки -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#111827">
+  <!-- Поддержка iOS -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Бюджет">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135715.png">
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -15,9 +24,9 @@
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
 
-  <!-- Подключаем файлы с версией ?v=2 для сброса кэша -->
-  <link rel="stylesheet" href="style.css?v=2">
-  <script defer src="app.js?v=2"></script>
+  <!-- Подключаем файлы с версией ?v=3 для сброса кэша -->
+  <link rel="stylesheet" href="style.css?v=3">
+  <script defer src="app.js?v=3"></script>
 </head>
 <body class="pb-24 bg-[#121212] text-[#e5e7eb]">
 
