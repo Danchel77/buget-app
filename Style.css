@@ -12,7 +12,15 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
 @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
 
-/* Чекбоксы в карточках */
+/* ==================== РЕЖИМ МУЛЬТИВЫДЕЛЕНИЯ ==================== */
+.card {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  position: relative; /* уже есть, но на всякий случай */
+}
+
+/* Скрываем чекбоксы по умолчанию */
 .select-checkbox {
   display: none;
   position: absolute;
@@ -21,26 +29,30 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
   width: 24px;
   height: 24px;
   z-index: 5;
+  pointer-events: none; /* клики по чекбоксу обрабатываются карточкой */
+  accent-color: #3b82f6;
+  cursor: pointer;
 }
-.selection-mode .select-checkbox {
+
+/* В режиме выбора показываем чекбоксы и скрываем кнопки действий */
+body.selection-mode .select-checkbox {
   display: block;
 }
-.selection-mode .card-actions {
+
+body.selection-mode .card-actions {
   display: none;
 }
-.selection-mode .card {
-  cursor: pointer;
-  user-select: none;
-}
+
+/* Выделенная карточка */
 .card.selected {
   outline: 2px solid #3b82f6;
   background-color: rgba(59, 130, 246, 0.1);
 }
 
-/* Нижняя панель для массовых действий */
+/* Панель массовых действий */
 .selection-panel {
   position: fixed;
-  bottom: 70px;
+  bottom: 70px; /* над нижней навигацией */
   left: 50%;
   transform: translateX(-50%);
   z-index: 80;
@@ -51,8 +63,11 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
   display: flex;
   align-items: center;
   gap: 15px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  font-size: 14px;
+  color: #e5e7eb;
 }
+
 .selection-panel button {
   background: #ef4444;
   color: white;
@@ -60,13 +75,19 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
   border-radius: 10px;
   padding: 8px 15px;
   font-weight: 600;
+  font-size: 14px;
   cursor: pointer;
+  transition: background 0.2s;
 }
+
+.selection-panel button:hover {
+  background: #dc2626;
+}
+
 .selection-panel .cancel-selection {
   background: #4b5563;
 }
-.card {
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
+
+.selection-panel .cancel-selection:hover {
+  background: #374151;
 }
