@@ -729,8 +729,6 @@ let selectedItems = new Set(); // ключи вида "table:id"
 let longPressTimer = null;
 let longPressTriggered = false;
 let suppressClick = false;
-let lastLongPressCardId = null;
-let lastLongPressTime = 0;
 
 function enableSelectionMode() {
   selectionMode = true;
@@ -864,29 +862,28 @@ document.addEventListener('mouseup', handleMouseUp);
 document.addEventListener('mousemove', handleMouseMove);
 
 document.addEventListener('click', (e) => {
+  // Игнорируем первый клик после долгого нажатия
   if (suppressClick) {
     suppressClick = false;
     return;
   }
+
+  // Обработка кнопок панели выбора
+  if (e.target.id === 'delete-selected') {
+    deleteSelectedItems();
+    return;
+  }
+  if (e.target.id === 'cancel-selection') {
+    cancelSelection();
+    return;
+  }
+
+  // Обработка кликов по карточкам в режиме выбора
   if (!selectionMode) return;
   const card = e.target.closest('.card');
   if (!card) return;
   if (e.target.classList.contains('select-checkbox')) return;
 
-  // Игнорируем click сразу после long press по этой же карточке
-  if (card.dataset.id === lastLongPressCardId && Date.now() - lastLongPressTime < 400) {
-    lastLongPressCardId = null; // сбрасываем для следующих кликов
-    return;
-  }
-
   e.preventDefault();
   toggleItemSelection(card.dataset.id, card.dataset.table);
-});
-
-document.addEventListener('click', (e) => {
-  if (e.target.id === 'delete-selected') {
-    deleteSelectedItems();
-  } else if (e.target.id === 'cancel-selection') {
-    cancelSelection();
-  }
 });
