@@ -1181,6 +1181,11 @@ document.addEventListener('click', (e) => {
     return;
   }
 
+  if (e.target.classList.contains('manage-categories-btn')) {
+    showManageCategoriesDialog();
+    return;
+  }
+
   if (e.target.classList.contains('add-category-btn')) {
     const row = e.target.closest('.tx-item');
     if (!row) return;
