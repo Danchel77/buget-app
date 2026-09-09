@@ -1,3 +1,10 @@
+// --- РЕГИСТРАЦИЯ PWA (SERVICE WORKER) ---
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW сбой:', err));
+  });
+}
+
 // --- ИНИЦИАЛИЗАЦИЯ FIREBASE ---
 const firebaseConfig = {
   apiKey: "AIzaSyC_JkUF__UfStFrTKecRasKqKBKXlQ4D88",
