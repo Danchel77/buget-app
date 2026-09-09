@@ -728,6 +728,8 @@ let selectionMode = false;
 let selectedItems = new Set(); // ключи вида "table:id"
 let longPressTimer = null;
 let longPressTriggered = false;
+let lastLongPressCardId = null;
+let lastLongPressTime = 0;
 
 function enableSelectionMode() {
   selectionMode = true;
@@ -744,9 +746,6 @@ function enableSelectionMode() {
       <button id="cancel-selection" class="cancel-selection">Отмена</button>
     `;
     document.body.appendChild(panel);
-
-    document.getElementById('delete-selected').addEventListener('click', deleteSelectedItems);
-    document.getElementById('cancel-selection').addEventListener('click', cancelSelection);
   }
   panel.style.display = 'flex';
   document.getElementById('selected-count').textContent = `Выбрано: ${selectedItems.size}`;
@@ -815,10 +814,12 @@ function handleTouchStart(e) {
   if (!card) return;
   longPressTriggered = false;
   longPressTimer = setTimeout(() => {
-    longPressTriggered = true;
-    if (!selectionMode) enableSelectionMode();
-    toggleItemSelection(card.dataset.id, card.dataset.table);
-  }, 500);
+  longPressTriggered = true;
+  lastLongPressCardId = card.dataset.id;
+  lastLongPressTime = Date.now();
+  if (!selectionMode) enableSelectionMode();
+  toggleItemSelection(card.dataset.id, card.dataset.table);
+}, 500);
 }
 
 function handleTouchEnd(e) {
@@ -837,10 +838,12 @@ function handleMouseDown(e) {
   if (!card) return;
   longPressTriggered = false;
   longPressTimer = setTimeout(() => {
-    longPressTriggered = true;
-    if (!selectionMode) enableSelectionMode();
-    toggleItemSelection(card.dataset.id, card.dataset.table);
-  }, 500);
+  longPressTriggered = true;
+  lastLongPressCardId = card.dataset.id;
+  lastLongPressTime = Date.now();
+  if (!selectionMode) enableSelectionMode();
+  toggleItemSelection(card.dataset.id, card.dataset.table);
+}, 500);
 }
 
 function handleMouseUp(e) {
@@ -851,15 +854,6 @@ function handleMouseMove(e) {
   clearTimeout(longPressTimer);
 }
 
-// Обработчик кликов в режиме выбора
-document.addEventListener('click', (e) => {
-  if (!selectionMode) return;
-  const card = e.target.closest('.card');
-  if (!card) return;
-  e.preventDefault();
-  toggleItemSelection(card.dataset.id, card.dataset.table);
-});
-
 // Регистрация глобальных обработчиков
 document.addEventListener('touchstart', handleTouchStart, { passive: true });
 document.addEventListener('touchend', handleTouchEnd);
@@ -867,18 +861,27 @@ document.addEventListener('touchmove', handleTouchMove, { passive: true });
 document.addEventListener('mousedown', handleMouseDown);
 document.addEventListener('mouseup', handleMouseUp);
 document.addEventListener('mousemove', handleMouseMove);
+
 document.addEventListener('click', (e) => {
   if (!selectionMode) return;
-
-  // Игнорируем click, который возник после долгого нажатия
-  if (longPressTriggered) {
-    longPressTriggered = false;
-    return;
-  }
-
   const card = e.target.closest('.card');
   if (!card) return;
   if (e.target.classList.contains('select-checkbox')) return;
+
+  // Игнорируем click сразу после long press по этой же карточке
+  if (card.dataset.id === lastLongPressCardId && Date.now() - lastLongPressTime < 400) {
+    lastLongPressCardId = null; // сбрасываем для следующих кликов
+    return;
+  }
+
   e.preventDefault();
   toggleItemSelection(card.dataset.id, card.dataset.table);
+});
+
+document.addEventListener('click', (e) => {
+  if (e.target.id === 'delete-selected') {
+    deleteSelectedItems();
+  } else if (e.target.id === 'cancel-selection') {
+    cancelSelection();
+  }
 });
