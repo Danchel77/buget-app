@@ -88,17 +88,36 @@ async function fetchAllData() {
   } catch (err) { showToast("Ошибка", true); }
 }
 
+/* Универсальная функция добавления/обновления (Исправлено скрытие окна) */
 async function submitAction(btnId, table, data) {
-  const btn = document.getElementById(btnId); btn.disabled = true; showToast("Сохранение...", false, true);
+  const btn = document.getElementById(btnId); 
+  btn.disabled = true; 
+  showToast("Сохранение...", false, true);
+  
   try {
-    if (currentEditId && currentEditTable === table) await db.collection(table).doc(currentEditId).update(data);
-    else if (Array.isArray(data)) { const batch = db.batch(); data.forEach(item => batch.set(db.collection(table).doc(), item)); await batch.commit(); } 
-    else await db.collection(table).add(data);
+    if (currentEditId && currentEditTable === table) {
+      await db.collection(table).doc(currentEditId).update(data);
+    } else if (Array.isArray(data)) { 
+      const batch = db.batch(); 
+      data.forEach(item => batch.set(db.collection(table).doc(), item)); 
+      await batch.commit(); 
+    } else {
+      await db.collection(table).add(data);
+    }
     
-    btn.disabled = false; btn.innerText = currentEditId ? 'Сохранить изменения' : btn.innerText;
-    document.getElementById(btn.closest('div').id).classList.add('hidden');
-    currentEditId = null; currentEditTable = null; fetchAllData(); 
-  } catch(e) { btn.disabled = false; showToast(e.message, true); }
+    btn.disabled = false; 
+    btn.innerText = currentEditId ? 'Сохранить изменения' : btn.innerText;
+    
+    // ИСПРАВЛЕНИЕ: Ищем саму форму и скрываем её родительский контейнер
+    btn.closest('form').parentElement.classList.add('hidden');
+    
+    currentEditId = null; 
+    currentEditTable = null; 
+    fetchAllData(); 
+  } catch(e) { 
+    btn.disabled = false; 
+    showToast(e.message, true); 
+  }
 }
 
 function deleteRecord(table, id) {
