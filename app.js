@@ -42,7 +42,13 @@ function logoutUser() {
   showDialog('Выход', 'Точно выйти из аккаунта?', true, () => auth.signOut());
 }
 
+// Показываем экран загрузки сразу при старте
+document.getElementById('loading-screen').classList.remove('hidden');
+
 auth.onAuthStateChanged(user => {
+  // Скрываем экран загрузки в любом случае
+  document.getElementById('loading-screen').classList.add('hidden');
+  
   if (user) {
     document.getElementById('login-screen').classList.add('hidden');
     switchTab('transactions');
@@ -492,17 +498,16 @@ function renderTransactions() {
       ${month.items.map(tx => {
         const isExp = tx.type === 'Расход';
         return `
-          <div class="card bg-gray-800 p-3 rounded-2xl border border-gray-700 flex justify-between items-center relative" data-id="${tx.id}" data-table="Transactions">
-            <input type="checkbox" class="select-checkbox" data-id="${tx.id}">
-            <div class="flex-1 min-w-0">
-              <p class="font-medium text-white text-sm">${escapeHtml(tx.category)}</p>
-              <p class="text-[11px] text-gray-400">${tx.formattedDate} ${tx.comment ? '• ' + escapeHtml(tx.comment) : ''}</p>
+         <div class="card bg-gray-800 p-3 rounded-2xl border border-gray-700 flex justify-between items-center relative" data-id="${tx.id}" data-table="Transactions">
+          <input type="checkbox" class="select-checkbox" data-id="${tx.id}">
+          <button onclick="deleteRecord('Transactions','${tx.id}')" class="delete-btn" title="Удалить">✕</button>
+          <div class="flex-1 min-w-0">
+          <p class="font-medium text-white text-sm">${escapeHtml(tx.category)}</p>
+          <p class="text-[11px] text-gray-400">${tx.formattedDate} ${tx.comment ? '• ' + escapeHtml(tx.comment) : ''}</p>
             </div>
-            <div class="text-right card-actions">
+              <div class="text-right card-actions">
               <p class="font-bold text-sm ${isExp ? 'text-white' : 'text-emerald-400'} mb-1">${isExp ? '-' : '+'}${formatMoney(tx.amount)}</p>
-              <div class="flex space-x-3 justify-end text-xs opacity-60">
-                <button onclick="editTx('${tx.id}','${tx.type}',${tx.amount},'${escapeHtml(tx.category)}','${escapeHtml(tx.comment)}','${tx.rawDate}')">✏️</button>
-                <button onclick="deleteRecord('Transactions','${tx.id}')" class="text-red-400">🗑️</button>
+              <button onclick="editTx('${tx.id}','${tx.type}',${tx.amount},'${escapeHtml(tx.category)}','${escapeHtml(tx.comment)}','${tx.rawDate}')" class="text-gray-400 hover:text-blue-400">✎</button>
               </div>
             </div>
           </div>`;
@@ -550,8 +555,9 @@ function renderDeposits() {
 
   const renderCard = (dep, isCls) => `
     <div class="card bg-gray-800 p-4 rounded-2xl border border-gray-700 relative overflow-hidden mb-4 ${isCls ? 'opacity-60 grayscale' : ''}" data-id="${dep.id}" data-table="Deposits">
-      <input type="checkbox" class="select-checkbox" data-id="${dep.id}">
-      ${dep.goalName ? `<div class="absolute top-0 right-0 bg-blue-600/20 text-blue-300 text-[9px] px-3 py-1 rounded-bl-lg font-bold uppercase tracking-wide border-b border-l border-blue-600/30">🎯 ${escapeHtml(dep.goalName)}</div>` : ''}
+  <input type="checkbox" class="select-checkbox" data-id="${dep.id}">
+  <button onclick="deleteRecord('Deposits','${dep.id}')" class="delete-btn" title="Удалить">✕</button>
+  ${dep.goalName ? `<div class="absolute top-0 right-0 bg-blue-600/20 text-blue-300 text-[9px] px-3 py-1 rounded-bl-lg font-bold uppercase tracking-wide border-b border-l border-blue-600/30">Цель: ${escapeHtml(dep.goalName)}</div>` : ''}
       <div class="flex justify-between items-start mb-2 ${dep.goalName ? 'pt-2' : ''}">
         <div>
           <h3 class="font-bold text-white">${escapeHtml(dep.name)}</h3>
@@ -560,8 +566,7 @@ function renderDeposits() {
         <div class="text-right">
           <p class="font-bold text-lg text-white">${formatMoney(dep.amount)}</p>
           <div class="card-actions flex space-x-3 justify-end text-xs opacity-60 mt-1">
-            ${!isCls ? `<button onclick="editDep('${dep.id}','${escapeHtml(dep.name)}',${dep.amount},${dep.rate},'${dep.rawStart}','${dep.rawEnd}','${dep.goalId}')">✏️</button>` : ''}
-            <button onclick="deleteRecord('Deposits','${dep.id}')" class="text-red-400">🗑️</button>
+            ${!isCls ? `<button onclick="editDep('${dep.id}','${escapeHtml(dep.name)}',${dep.amount},${dep.rate},'${dep.rawStart}','${dep.rawEnd}','${dep.goalId}')" class="text-gray-400 hover:text-blue-400">✎</button>` : ''}
           </div>
         </div>
       </div>
@@ -613,7 +618,7 @@ function renderBroker() {
   p.className = `text-xs font-bold ${br.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
   const b = document.getElementById('broker-goal-badge');
   if (br.goalName) {
-    b.innerText = '🎯 ' + br.goalName;
+    b.innerText = 'Цель: ' + br.goalName;
     b.classList.remove('hidden');
   } else {
     b.classList.add('hidden');
@@ -698,6 +703,7 @@ function renderGoals() {
   document.getElementById('goals-list').innerHTML = data.map(g => `
     <div class="card bg-gray-800 p-4 rounded-2xl border border-gray-700 shadow-sm relative" data-id="${g.id}" data-table="Goals">
       <input type="checkbox" class="select-checkbox" data-id="${g.id}">
+      <button onclick="deleteRecord('Goals','${g.id}')" class="delete-btn" title="Удалить">✕</button>
       <div class="flex justify-between items-start mb-3">
         <div>
           <h3 class="font-bold text-white">${escapeHtml(g.name)}</h3>
@@ -708,8 +714,7 @@ function renderGoals() {
         <div class="text-right">
           <p class="font-bold text-white">${g.progress}%</p>
           <div class="card-actions flex space-x-3 justify-end text-xs opacity-60 mt-1">
-            <button onclick="editGoal('${g.id}','${escapeHtml(g.name)}',${g.target},'${g.rawDeadline}')">✏️</button>
-            <button onclick="deleteRecord('Goals','${g.id}')" class="text-red-400">🗑️</button>
+            <button onclick="editGoal('${g.id}','${escapeHtml(g.name)}',${g.target},'${escapeHtml(g.rawDeadline)}')" class="text-gray-400 hover:text-blue-400">✎</button>
           </div>
         </div>
       </div>
