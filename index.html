@@ -15,11 +15,11 @@
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
 
-  <!-- Подключаем вынесенные файлы -->
-  <link rel="stylesheet" href="style.css">
-  <script defer src="app.js"></script>
+  <!-- Подключаем файлы с версией ?v=2 для сброса кэша -->
+  <link rel="stylesheet" href="style.css?v=2">
+  <script defer src="app.js?v=2"></script>
 </head>
-<body class="pb-24">
+<body class="pb-24 bg-[#121212] text-[#e5e7eb]">
 
   <!-- ЭКРАН ВХОДА -->
   <div id="login-screen" class="fixed inset-0 bg-gray-900 z-50 flex flex-col justify-center items-center p-6">
@@ -80,7 +80,7 @@
           <div id="tx-items-list"></div>
           <button type="button" onclick="addTxRow()" class="w-full mb-4 py-2 border border-dashed border-gray-600 rounded-xl text-gray-400 text-sm hover:text-white transition-colors">+ Добавить еще транзакцию</button>
           <div class="flex gap-2">
-            <button type="button" onclick="closeForm('tx-form-container', 'tx-submit-btn', 'Сохранить все')" class="w-1/3 bg-gray-700 text-white font-semibold rounded-xl px-4 py-4">Отмена</button>
+            <button type="button" onclick="closeForm('tx-form-container', 'tx-submit-btn', 'Сохранить все', 'tx-form')" class="w-1/3 bg-gray-700 text-white font-semibold rounded-xl px-4 py-4">Отмена</button>
             <button type="submit" id="tx-submit-btn" class="w-2/3 bg-blue-600 text-white font-semibold rounded-xl px-5 py-4">Сохранить все</button>
           </div>
         </form>
@@ -105,7 +105,7 @@
             <input type="date" id="dep-end" required class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none flex-1 text-xs">
           </div>
           <div class="flex gap-2">
-            <button type="button" onclick="closeForm('deposit-form-container', 'dep-submit-btn', 'Сохранить вклад')" class="w-1/3 bg-gray-700 text-white font-semibold rounded-xl px-4 py-4">Отмена</button>
+            <button type="button" onclick="closeForm('deposit-form-container', 'dep-submit-btn', 'Сохранить вклад', 'deposit-form')" class="w-1/3 bg-gray-700 text-white font-semibold rounded-xl px-4 py-4">Отмена</button>
             <button type="submit" id="dep-submit-btn" class="w-2/3 bg-blue-600 text-white font-semibold rounded-xl px-5 py-4">Сохранить</button>
           </div>
         </form>
@@ -141,7 +141,7 @@
           <input type="date" id="broker-date" required class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none mb-4 text-sm">
           <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="broker-amount" placeholder="Сумма (₽)" required class="w-full text-2xl font-bold bg-transparent border-b-2 border-gray-700 focus:border-blue-500 text-white outline-none py-1 mb-6">
           <div class="flex gap-2">
-            <button type="button" onclick="closeForm('broker-form-container', 'broker-submit-btn', 'Сохранить')" class="w-1/3 bg-gray-700 text-white font-semibold rounded-xl px-4 py-4">Отмена</button>
+            <button type="button" onclick="closeForm('broker-form-container', 'broker-submit-btn', 'Сохранить', 'broker-form')" class="w-1/3 bg-gray-700 text-white font-semibold rounded-xl px-4 py-4">Отмена</button>
             <button type="submit" id="broker-submit-btn" class="w-2/3 bg-blue-600 text-white font-semibold rounded-xl px-5 py-4">Сохранить</button>
           </div>
         </form>
@@ -152,7 +152,7 @@
         <form id="broker-goal-form" onsubmit="submitBrokerGoal(event)">
           <select id="broker-goal-select" class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none mb-6 text-sm"></select>
           <div class="flex gap-2">
-            <button type="button" onclick="closeForm('broker-goal-container', 'broker-goal-btn', 'Привязать')" class="w-1/3 bg-gray-700 text-white font-semibold rounded-xl px-4 py-4">Отмена</button>
+            <button type="button" onclick="closeForm('broker-goal-container', 'broker-goal-btn', 'Привязать', 'broker-goal-form')" class="w-1/3 bg-gray-700 text-white font-semibold rounded-xl px-4 py-4">Отмена</button>
             <button type="submit" id="broker-goal-btn" class="w-2/3 bg-blue-600 text-white font-semibold rounded-xl px-5 py-4">Привязать</button>
           </div>
         </form>
@@ -168,7 +168,7 @@
           <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="goal-target" placeholder="Целевая сумма (₽)" required class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none mb-4 text-sm">
           <input type="date" id="goal-deadline" class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none mb-6 text-sm">
           <div class="flex gap-2">
-            <button type="button" onclick="closeForm('goal-form-container', 'goal-submit-btn', 'Создать цель')" class="w-1/3 bg-gray-700 text-white font-semibold rounded-xl px-4 py-4">Отмена</button>
+            <button type="button" onclick="closeForm('goal-form-container', 'goal-submit-btn', 'Создать цель', 'goal-form')" class="w-1/3 bg-gray-700 text-white font-semibold rounded-xl px-4 py-4">Отмена</button>
             <button type="submit" id="goal-submit-btn" class="w-2/3 bg-blue-600 text-white font-semibold rounded-xl px-5 py-4">Сохранить</button>
           </div>
         </form>
