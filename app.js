@@ -1396,9 +1396,6 @@ document.addEventListener('click', (e) => {
   if (!selectionMode) return;
   const card = e.target.closest('.card');
   if (!card) return;
-  if (!selectionMode) return;
-  const card = e.target.closest('.card');
-  if (!card) return;
 
   e.preventDefault();
   toggleItemSelection(card.dataset.id, card.dataset.table);
