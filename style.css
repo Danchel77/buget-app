@@ -32,8 +32,8 @@ header > div { color:var(--muted) !important; font-size:12px !important; }
 header button { background:var(--surface) !important; border:1px solid var(--line) !important; color:var(--muted) !important; border-radius:16px !important; padding:10px 16px !important; }
 #app-content { width:100%; max-width:760px !important; margin:0 auto; padding:22px 18px 116px !important; }
 
-
 /* ---------- cards / transaction layout ---------- */
+
 .card {
   position:relative !important;
   -webkit-touch-callout:none;
@@ -71,114 +71,110 @@ header button { background:var(--surface) !important; border:1px solid var(--lin
   margin-top:10px !important;
 }
 
-/*
-   Transaction card uses three real grid columns:
-   1. information
-   2. amount
-   3. actions
-*/
-#transactions-list .card {
-  min-height:0;
+/* ---------- transaction card ---------- */
+
+#transactions-list .transaction-card {
   width:100%;
-  padding:10px 10px 10px 14px !important;
+  min-height:0;
+
+  padding:12px 10px 12px 14px !important;
 
   display:grid !important;
   grid-template-columns:minmax(0,1fr) max-content 34px;
   grid-template-rows:auto auto;
   column-gap:10px;
-  row-gap:0;
+  row-gap:2px;
+
   align-items:center;
-/* Left column: category and date */
-#transactions-list .card > .tx-main-info {
+
+  background:linear-gradient(145deg,var(--surface-2),var(--surface)) !important;
+  border:1px solid var(--line-strong) !important;
+  border-radius:20px !important;
+  box-shadow:0 8px 24px rgba(0,0,0,.12) !important;
+}
+
+/* Information — left column */
+#transactions-list .tx-main-info {
   grid-column:1;
   grid-row:1 / span 2;
+
   min-width:0;
   align-self:center;
 }
 
-#transactions-list .card > .tx-main-info .tx-category {
-  display:block;
+#transactions-list .tx-category {
+  display:flex;
+  align-items:center;
+  gap:4px;
+
+  min-width:0;
   margin:0 !important;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
+
+  color:var(--text) !important;
   font-size:15px !important;
   font-weight:650 !important;
   line-height:1.25;
-}
 
-#transactions-list .card > .tx-main-info .tx-meta {
-  margin:5px 0 0 !important;
-  color:var(--muted) !important;
-  font-size:11px !important;
-  line-height:1.2;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
 
-/* Let the amount and edit button become grid items of the card itself. */
-#transactions-list .card-actions {
-  display:contents !important;
+#transactions-list .tx-category > span:last-child {
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 
-/* Middle column: amount, vertically centered. */
-#transactions-list .card-actions p {
+#transactions-list .tx-category__icon {
+  flex:0 0 auto;
+}
+
+#transactions-list .tx-meta {
+  margin:5px 0 0 !important;
+
+  color:var(--muted) !important;
+  font-size:11px !important;
+  line-height:1.2;
+
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* Amount — middle column */
+#transactions-list .tx-amount {
   grid-column:2;
   grid-row:1 / span 2;
+
   align-self:center;
   justify-self:end;
 
   margin:0 !important;
   padding:0 !important;
-  font-size:17px !important;
+
+  font-size:16px !important;
+  font-weight:600 !important;
   line-height:1.1;
+
   white-space:nowrap;
-  text-align:right;
 }
 
-/* Right column: edit button only. */
-#transactions-list .card-actions button {
-  grid-column:3;
-  grid-row:2;
-  align-self:center;
-  justify-self:center;
-
-  width:36px;
-  height:32px;
-  padding:0;
-
-  display:flex;
-  align-items:center;
-  justify-content:center;
-
-  border:1px solid var(--line);
-  border-radius:10px;
-  color:var(--muted) !important;
-  background:rgba(255,255,255,.025);
-  font-size:14px;
-}
-
-#transactions-list .card-actions button:hover {
-  color:var(--accent) !important;
-  border-color:rgba(123,131,255,.3);
-}
-
-/* Right column: delete button only. */
-#transactions-list .card > .delete-btn {
+/* Delete — top right */
+#transactions-list .tx-delete-btn {
   grid-column:3;
   grid-row:1;
 
   position:static !important;
-  top:auto !important;
-  right:auto !important;
-  z-index:1;
+  inset:auto !important;
 
   align-self:center;
   justify-self:center;
 
-  width:36px !important;
-  height:32px !important;
+  width:32px !important;
+  height:30px !important;
+
+  margin:0 !important;
   padding:0 !important;
 
   display:flex !important;
@@ -186,18 +182,54 @@ header button { background:var(--surface) !important; border:1px solid var(--lin
   justify-content:center;
 
   border:1px solid var(--line) !important;
-  border-radius:10px !important;
+  border-radius:9px !important;
+
   background:rgba(255,255,255,.025) !important;
   color:var(--muted) !important;
-  font-size:16px !important;
+
+  font-size:15px !important;
   line-height:1 !important;
 }
 
-#transactions-list .card > .delete-btn:hover {
+/* Edit — bottom right */
+#transactions-list .tx-edit-btn {
+  grid-column:3;
+  grid-row:2;
+
+  align-self:center;
+  justify-self:center;
+
+  width:32px !important;
+  height:30px !important;
+
+  margin:0 !important;
+  padding:0 !important;
+
+  display:flex !important;
+  align-items:center;
+  justify-content:center;
+
+  border:1px solid var(--line) !important;
+  border-radius:9px !important;
+
+  background:rgba(255,255,255,.025) !important;
+  color:var(--muted) !important;
+
+  font-size:13px !important;
+  line-height:1 !important;
+}
+
+#transactions-list .tx-delete-btn:hover {
   color:var(--red) !important;
   background:rgba(255,111,125,.10) !important;
 }
 
+#transactions-list .tx-edit-btn:hover {
+  color:var(--accent) !important;
+  background:var(--accent-soft) !important;
+}
+
+/* Selection mode */
 .select-checkbox {
   display:none !important;
   position:absolute !important;
@@ -213,8 +245,9 @@ body.selection-mode .select-checkbox {
   display:block !important;
 }
 
-body.selection-mode #transactions-list .card > .delete-btn,
-body.selection-mode #transactions-list .card-actions {
+body.selection-mode #transactions-list .tx-delete-btn,
+body.selection-mode #transactions-list .tx-edit-btn,
+body.selection-mode #transactions-list .tx-amount {
   display:none !important;
 }
 
@@ -285,15 +318,6 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
   #app-content { padding-left:14px !important; padding-right:14px !important; }
   header { padding-left:16px !important; padding-right:16px !important; }
   header > div > span { display:none; }
-  #transactions-list .card {
-    grid-template-columns:minmax(0,1fr) max-content 34px;
-    padding:15px 10px 15px 14px !important;
-    column-gap:9px;
-  }
-  #transactions-list .card-actions p { font-size:15px !important; }
-  #transactions-list .card-actions button,
-  #transactions-list .card > .delete-btn { width:34px !important; }
-  #transactions-list .card > .tx-main-info .tx-category { font-size:15px !important; }
   .analytics-heading h2 { font-size:22px; }
   .analytics-heading .chart-select { width:142px; font-size:12px; }
   .analytics-summary__main { padding:18px 15px; }
@@ -323,7 +347,7 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
 .chart-card--structure { padding-bottom:17px; }
 .analytics-empty { padding:13px; color:var(--muted-2); font-size:12px; text-align:center; border:1px dashed var(--line); border-radius:12px; }
 
-/* ---------- deposits ---------- */
+ /* ---------- deposits ---------- */
 
 #deposits-list {
   display:flex;
@@ -331,93 +355,122 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
   gap:10px !important;
 }
 
-#deposits-list .card {
+/* ---------- deposit card ---------- */
+
+#deposits-list .deposit-card {
   position:relative !important;
-  margin-bottom:0 !important;
+
+  width:100%;
+  min-height:0;
+
+  margin:0 !important;
   padding:14px 52px 13px 15px !important;
 
-  display:block !important;
+  display:grid !important;
+
+  grid-template-columns:minmax(0,1fr) max-content;
+  grid-template-rows:auto auto auto;
+  column-gap:12px;
+  row-gap:9px;
+
+  align-items:center;
 
   background:linear-gradient(145deg,var(--surface-2),var(--surface)) !important;
   border:1px solid var(--line-strong) !important;
   border-radius:20px !important;
   box-shadow:0 8px 24px rgba(0,0,0,.12) !important;
+
+  overflow:hidden;
 }
 
-/* Название + сумма */
-#deposits-list .card > .flex.justify-between.items-start {
-  display:flex !important;
-  align-items:center !important;
-  justify-content:space-between !important;
-  gap:12px;
-  margin:0 0 11px !important;
+/* Name + date */
+#deposits-list .deposit-main {
+  grid-column:1;
+  grid-row:1;
+
   min-width:0;
 }
 
-#deposits-list .card > .flex.justify-between.items-start > div:first-child {
-  min-width:0;
-}
-
-#deposits-list .card h3 {
+#deposits-list .deposit-main h3 {
   margin:0 !important;
+
+  color:var(--text) !important;
   font-size:15px !important;
+  font-weight:650 !important;
   line-height:1.25;
+
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
 
-#deposits-list .card > .flex.justify-between.items-start > div:first-child p {
+#deposits-list .deposit-main p {
   margin:4px 0 0 !important;
+
+  color:var(--muted) !important;
   font-size:10px !important;
   line-height:1.2;
+
   white-space:nowrap;
-  color:var(--muted) !important;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 
-#deposits-list .card > .flex.justify-between.items-start > div:last-child {
-  flex:0 0 auto;
-  text-align:right;
-}
+/* Amount */
+#deposits-list .deposit-amount {
+  grid-column:2;
+  grid-row:1;
 
-#deposits-list .card > .flex.justify-between.items-start > div:last-child > p {
   margin:0 !important;
+
+  color:var(--text) !important;
   font-size:16px !important;
+  font-weight:650 !important;
   line-height:1.2;
+
   white-space:nowrap;
 }
 
-/* Кнопка редактирования */
-#deposits-list .card-actions {
-  display:flex !important;
-  justify-content:flex-end;
-  margin-top:3px !important;
-  opacity:1 !important;
-}
+/* Edit button */
+#deposits-list .deposit-edit-btn {
+  position:absolute !important;
+  right:12px;
+  top:48px;
 
-#deposits-list .card-actions button {
-  width:26px !important;
-  height:22px !important;
+  width:32px !important;
+  height:28px !important;
+
+  margin:0 !important;
   padding:0 !important;
 
-  display:flex !important;
+  display:flex;
   align-items:center;
   justify-content:center;
 
-  border:0 !important;
-  background:transparent !important;
+  border:1px solid var(--line) !important;
+  border-radius:9px !important;
+
+  background:rgba(255,255,255,.025) !important;
   color:var(--muted) !important;
+
   font-size:13px !important;
+  line-height:1 !important;
 }
 
-/* Кнопка удаления */
-#deposits-list .card .delete-btn {
+#deposits-list .deposit-edit-btn:hover {
+  color:var(--accent) !important;
+  background:var(--accent-soft) !important;
+}
+
+/* Delete button */
+#deposits-list .deposit-delete-btn {
   position:absolute !important;
   top:12px !important;
   right:12px !important;
 
   width:32px !important;
   height:30px !important;
+
   margin:0 !important;
   padding:0 !important;
 
@@ -427,45 +480,116 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
 
   border:1px solid var(--line) !important;
   border-radius:9px !important;
+
   background:rgba(255,255,255,.025) !important;
   color:var(--muted) !important;
+
   font-size:15px !important;
   line-height:1 !important;
 }
 
-/* Проценты */
-#deposits-list .card > .bg-gray-900\/50 {
-  margin:0 0 10px !important;
-  padding:9px 11px !important;
+#deposits-list .deposit-delete-btn:hover {
+  color:var(--red) !important;
+  background:rgba(255,111,125,.10) !important;
+}
 
-  display:flex !important;
+/* Goal badge */
+#deposits-list .deposit-goal-badge {
+  position:absolute;
+  top:0;
+  right:0;
+
+  padding:5px 10px;
+
+  color:#aeb4ff;
+  background:var(--accent-soft);
+
+  border-left:1px solid rgba(123,131,255,.25);
+  border-bottom:1px solid rgba(123,131,255,.25);
+  border-radius:0 0 0 9px;
+
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+
+/* Interest */
+#deposits-list .deposit-interest {
+  grid-column:1 / -1;
+  grid-row:2;
+
+  min-width:0;
+
+  margin:0 !important;
+  padding:8px 10px !important;
+
+  display:flex;
   align-items:center;
   justify-content:space-between;
   gap:10px;
 
-  border-radius:10px !important;
+  background:rgba(0,0,0,.18);
+  border-radius:10px;
 }
 
-#deposits-list .card > .bg-gray-900\/50 p {
+#deposits-list .deposit-interest p {
   margin:0 !important;
+
   font-size:11px !important;
   line-height:1.2;
+
   white-space:nowrap;
 }
 
-/* Прогресс */
-#deposits-list .card > .w-full {
-  margin:0 !important;
+#deposits-list .deposit-current-interest {
+  color:var(--green) !important;
+  font-weight:650;
 }
 
-/* Заголовки "Активные / Завершенные" */
-#deposits-list > h3 {
-  margin:8px 2px 0 !important;
-  color:var(--muted-2) !important;
-  font-size:10px !important;
-  letter-spacing:.10em;
+#deposits-list .deposit-expected-interest {
+  color:#c7ccd4 !important;
+  font-weight:500;
 }
-  
+
+/* Progress */
+#deposits-list .deposit-progress {
+  grid-column:1 / -1;
+  grid-row:3;
+
+  width:100%;
+  height:6px;
+
+  margin:0 !important;
+
+  background:rgba(255,255,255,.08);
+  border-radius:999px;
+
+  overflow:hidden;
+}
+
+#deposits-list .deposit-progress > div {
+  height:100%;
+
+  background:#6570f5;
+  border-radius:999px;
+}
+
+/* Section titles */
+#deposits-list .deposit-section-title {
+  margin:8px 2px 0 !important;
+
+  color:var(--muted-2) !important;
+
+  font-size:10px !important;
+  font-weight:700 !important;
+  letter-spacing:.10em;
+  text-transform:uppercase;
+}
+
+#deposits-list .deposit-section-title--closed {
+  margin-top:14px !important;
+}
 
 /* ============================================================
    LOADING SCREEN
