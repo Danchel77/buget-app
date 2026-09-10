@@ -674,34 +674,16 @@ function renderTransactions() {
         const isExp = tx.type === 'Расход';
 
         return `
-          <div class="card transaction-card bg-gray-800 rounded-2xl border border-gray-700 relative"
-               data-id="${tx.id}"
-               data-table="Transactions">
-
-            <input type="checkbox"
-                   class="select-checkbox"
-                   data-id="${tx.id}">
-
-            <button
-              onclick="deleteRecord('Transactions','${tx.id}')"
-              class="delete-btn tx-delete-btn"
-              title="Удалить"
-              aria-label="Удалить операцию">✕</button>
-
+          <div class="card transaction-card" data-id="${tx.id}" data-table="Transactions">
             <div class="tx-main-info">
               <p class="tx-category">
                 ${(() => {
-                  const cat = Cache.categories[
-                    tx.type === 'Расход' ? 'expense' : 'income'
-                  ].find(c => c.name === tx.category);
-
-                  return cat
-                    ? `<span class="tx-category__icon">${cat.icon}</span>`
-                    : '';
+                  const catList = Cache.categories[tx.type === 'Расход' ? 'expense' : 'income'] || [];
+                  const cat = catList.find(c => c.name === tx.category);
+                  return cat ? `<span class="tx-category__icon">${cat.icon}</span>` : '';
                 })()}
                 <span>${escapeHtml(tx.category)}</span>
               </p>
-
               <p class="tx-meta">
                 ${tx.formattedDate}${tx.comment ? ' • ' + escapeHtml(tx.comment) : ''}
               </p>
@@ -711,11 +693,12 @@ function renderTransactions() {
               ${isExp ? '-' : '+'}${formatMoney(tx.amount)}
             </p>
 
-            <button
-              onclick="editTx('${tx.id}','${tx.type}',${tx.amount},'${escapeHtml(tx.category)}','${escapeHtml(tx.comment)}','${tx.rawDate}')"
-              class="tx-edit-btn"
-              aria-label="Редактировать">✎</button>
+            <div class="card-actions">
+              <button onclick="deleteRecord('Transactions','${tx.id}')" class="card-action-btn delete-btn" title="Удалить">✕</button>
+              <button onclick="editTx('${tx.id}','${tx.type}',${tx.amount},'${escapeHtml(tx.category)}','${escapeHtml(tx.comment)}','${tx.rawDate}')" class="card-action-btn" title="Редактировать">✎</button>
+            </div>
 
+            <input type="checkbox" class="select-checkbox" data-id="${tx.id}">
           </div>
         `;
       }).join('')}
@@ -1237,8 +1220,8 @@ function enableSelectionMode() {
     panel.className = 'selection-panel';
     panel.innerHTML = `
       <span id="selected-count">Выбрано: 0</span>
-      <button id="delete-selected" class="bg-red-600">Удалить</button>
-      <button id="cancel-selection" class="cancel-selection">Отмена</button>
+      <button id="delete-selected" class="btn-delete">Удалить</button>
+      <button id="cancel-selection" class="btn-cancel">Отмена</button>
     `;
     document.body.appendChild(panel);
   }
@@ -1304,56 +1287,41 @@ async function deleteSelectedItems() {
 }
 
 // Обработчики долгого нажатия
-function startLongPress(card) {
+ function startLongPress(card) {
   longPressTriggered = false;
   clearTimeout(longPressTimer);
+  
+  const cancelEvents = ['touchmove', 'touchend', 'touchcancel', 'mousemove', 'mouseup'];
+  const cancelHandler = () => {
+    clearTimeout(longPressTimer);
+    cancelEvents.forEach(ev => document.removeEventListener(ev, cancelHandler));
+  };
+  cancelEvents.forEach(ev => document.addEventListener(ev, cancelHandler, { passive: true }));
+
   longPressTimer = setTimeout(() => {
     longPressTriggered = true;
     suppressClick = true;
     setTimeout(() => { suppressClick = false; }, 400);
     if (!selectionMode) enableSelectionMode();
     toggleItemSelection(card.dataset.id, card.dataset.table);
+    cancelEvents.forEach(ev => document.removeEventListener(ev, cancelHandler));
   }, 500);
 }
 
-function handleTouchStart(e) {
+document.addEventListener('touchstart', (e) => {
   const card = e.target.closest('.card');
-  if (!card) return;
-  startLongPress(card);
-}
-
-function handleTouchEnd(e) {
-  clearTimeout(longPressTimer);
-  if (longPressTriggered) {
-    e.preventDefault(); // предотвращаем последующий click
+  if (card && !e.target.closest('.card-action-btn') && !e.target.closest('input')) {
+    startLongPress(card);
   }
-}
+}, { passive: true });
 
-function handleTouchMove(e) {
-  clearTimeout(longPressTimer);
-}
-
-function handleMouseDown(e) {
+document.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
   const card = e.target.closest('.card');
-  if (!card) return;
-  startLongPress(card);
-}
-
-function handleMouseUp(e) {
-  clearTimeout(longPressTimer);
-}
-
-function handleMouseMove(e) {
-  clearTimeout(longPressTimer);
-}
-
-// Регистрация глобальных обработчиков
-document.addEventListener('touchstart', handleTouchStart, { passive: true });
-document.addEventListener('touchend', handleTouchEnd);
-document.addEventListener('touchmove', handleTouchMove, { passive: true });
-document.addEventListener('mousedown', handleMouseDown);
-document.addEventListener('mouseup', handleMouseUp);
-document.addEventListener('mousemove', handleMouseMove);
+  if (card && !e.target.closest('.card-action-btn') && !e.target.closest('input')) {
+    startLongPress(card);
+  }
+});
 
 document.addEventListener('click', (e) => {
   // Игнорируем первый клик после долгого нажатия
