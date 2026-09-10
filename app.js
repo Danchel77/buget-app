@@ -668,113 +668,141 @@ function renderTransactions() {
       ${month.items.map(tx => {
         const isExp = tx.type === 'Расход';
         return `
-         <div class="card bg-gray-800 p-3 rounded-2xl border border-gray-700 flex justify-between items-center relative" data-id="${tx.id}" data-table="Transactions">
-  <input type="checkbox" class="select-checkbox" data-id="${tx.id}">
-  <button onclick="deleteRecord('Transactions','${tx.id}')" class="delete-btn" title="Удалить">✕</button>
-  <div class="flex-1 min-w-0">
-    <p class="font-medium text-white text-sm">
-      ${(() => {
-        const cat = Cache.categories[tx.type === 'Расход' ? 'expense' : 'income'].find(c => c.name === tx.category);
-        return cat ? `<span class="mr-2">${cat.icon}</span>` : '';
-      })()}${escapeHtml(tx.category)}
-    </p>
-    <p class="text-[11px] text-gray-400">${tx.formattedDate} ${tx.comment ? '• ' + escapeHtml(tx.comment) : ''}</p>
-  </div>
-  <div class="text-right card-actions pt-4">
-    <p class="font-bold text-lg ${tx.type === 'Расход' ? 'text-red-400' : 'text-emerald-400'} mb-1">${tx.type === 'Расход' ? '-' : '+'}${formatMoney(tx.amount)}</p>
-    <button onclick="editTx('${tx.id}','${tx.type}',${tx.amount},'${escapeHtml(tx.category)}','${escapeHtml(tx.comment)}','${tx.rawDate}')" class="text-gray-400 hover:text-blue-400">✎</button>
-  </div>
-</div>
-          </div>`;
+         <div class="card bg-gray-800 p-3 rounded-2xl border border-gray-700 relative" data-id="${tx.id}" data-table="Transactions">
+          <input type="checkbox" class="select-checkbox" data-id="${tx.id}">
+          <button onclick="deleteRecord('Transactions','${tx.id}')" class="delete-btn" title="Удалить" aria-label="Удалить операцию">✕</button>
+          <div class="tx-main-info">
+            <p class="tx-category">
+              ${(() => {
+                const cat = Cache.categories[tx.type === 'Расход' ? 'expense' : 'income'].find(c => c.name === tx.category);
+                return cat ? `<span class="tx-category__icon">${cat.icon}</span>` : '';
+              })()}<span>${escapeHtml(tx.category)}</span>
+            </p>
+            <p class="tx-meta">${tx.formattedDate}${tx.comment ? ' • ' + escapeHtml(tx.comment) : ''}</p>
+          </div>
+          <div class="card-actions tx-actions">
+            <p class="tx-amount ${isExp ? 'text-red-400' : 'text-emerald-400'}">${isExp ? '-' : '+'}${formatMoney(tx.amount)}</p>
+            <button onclick="editTx('${tx.id}','${tx.type}',${tx.amount},'${escapeHtml(tx.category)}','${escapeHtml(tx.comment)}','${tx.rawDate}')" class="tx-edit-btn" aria-label="Редактировать">✎</button>
+          </div>
+        </div>`;
       }).join('')}
     </div>`).join('');
 }
 
 function switchTransactionView(view) {
-  document.getElementById('transactions-list').classList.toggle('hidden', view !== 'list');
-  document.getElementById('transactions-chart').classList.toggle('hidden', view !== 'chart');
-  document.getElementById('view-list-btn').classList.toggle('bg-blue-600', view === 'list');
-  document.getElementById('view-list-btn').classList.toggle('text-white', view === 'list');
-  document.getElementById('view-list-btn').classList.toggle('bg-gray-700', view !== 'list');
-  document.getElementById('view-list-btn').classList.toggle('text-gray-300', view !== 'list');
-  document.getElementById('view-chart-btn').classList.toggle('bg-blue-600', view === 'chart');
-  document.getElementById('view-chart-btn').classList.toggle('text-white', view === 'chart');
-  document.getElementById('view-chart-btn').classList.toggle('bg-gray-700', view !== 'chart');
-  document.getElementById('view-chart-btn').classList.toggle('text-gray-300', view !== 'chart');
-  if (view === 'chart') buildCharts();
+  const isChart = view === 'chart';
+  const list = document.getElementById('transactions-list');
+  const chart = document.getElementById('transactions-chart');
+  const listBtn = document.getElementById('view-list-btn');
+  const chartBtn = document.getElementById('view-chart-btn');
+
+  list.classList.toggle('hidden', isChart);
+  chart.classList.toggle('hidden', !isChart);
+  listBtn.classList.toggle('is-active', !isChart);
+  chartBtn.classList.toggle('is-active', isChart);
+  listBtn.setAttribute('aria-selected', String(!isChart));
+  chartBtn.setAttribute('aria-selected', String(isChart));
+
+  if (isChart) {
+    requestAnimationFrame(() => buildCharts());
+  }
 }
 
 function buildCharts() {
   if (!Cache || !Cache.transactions) return;
   const months = Cache.transactions;
-  const lastMonths = months.slice().reverse().slice(-12);
+  if (!months.length) return;
+
+  const chronological = months.slice().reverse();
+  const lastMonths = chronological.slice(-8);
   const labels = lastMonths.map(m => m.label);
-  const expenses = lastMonths.map(m => m.expense);
-  const incomes = lastMonths.map(m => m.income);
+  const expenses = lastMonths.map(m => Number(m.expense) || 0);
+  const incomes = lastMonths.map(m => Number(m.income) || 0);
+  const net = lastMonths.map((m, i) => incomes[i] - expenses[i]);
 
   const select = document.getElementById('chart-month-select');
   select.innerHTML = months.map(m => `<option value="${m.id}">${m.label}</option>`).join('');
-  if (months.length > 0) {
-    select.value = months[0].id;
-    updateCategoryChart(months[0].id);
-  }
+  const currentSelected = select.dataset.selectedMonth;
+  select.value = months.some(m => m.id === currentSelected) ? currentSelected : months[0].id;
+  select.onchange = () => {
+    select.dataset.selectedMonth = select.value;
+    updateAnalyticsForMonth(select.value);
+  };
+  updateAnalyticsForMonth(select.value);
 
   const ctx = document.getElementById('monthlyExpensesChart').getContext('2d');
   if (monthlyChartObj) monthlyChartObj.destroy();
+
   monthlyChartObj = new Chart(ctx, {
-    type: 'line',
+    type: 'bar',
     data: {
       labels,
       datasets: [
         {
-          label: 'Доходы', data: incomes,
-          borderColor: '#36d69b', backgroundColor: 'rgba(54,214,155,.10)',
-          borderWidth: 2.5, pointRadius: 3.5, pointHoverRadius: 5,
-          pointBackgroundColor: '#36d69b', pointBorderWidth: 0,
-          tension: .35, fill: true
+          label: 'Доходы',
+          data: incomes,
+          backgroundColor: 'rgba(54,214,155,.88)',
+          borderColor: '#36d69b',
+          borderWidth: 0,
+          borderRadius: 7,
+          borderSkipped: false,
+          barPercentage: .72,
+          categoryPercentage: .62
         },
         {
-          label: 'Расходы', data: expenses,
-          borderColor: '#ff6f7d', backgroundColor: 'rgba(255,111,125,.07)',
-          borderWidth: 2.5, pointRadius: 3.5, pointHoverRadius: 5,
-          pointBackgroundColor: '#ff6f7d', pointBorderWidth: 0,
-          tension: .35, fill: true
+          label: 'Расходы',
+          data: expenses,
+          backgroundColor: 'rgba(255,111,125,.88)',
+          borderColor: '#ff6f7d',
+          borderWidth: 0,
+          borderRadius: 7,
+          borderSkipped: false,
+          barPercentage: .72,
+          categoryPercentage: .62
         }
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: { duration: 450, easing: 'easeOutQuart' },
       interaction: { mode: 'index', intersect: false },
       scales: {
         x: {
+          stacked: false,
           grid: { display: false },
           border: { display: false },
-          ticks: { color: '#737d89', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 6 }
+          ticks: { color: '#737d89', font: { size: 10, weight: '600' }, maxRotation: 0, autoSkip: true, maxTicksLimit: 6 }
         },
         y: {
           beginAtZero: true,
-          grid: { color: 'rgba(255,255,255,.06)' },
+          grid: { color: 'rgba(255,255,255,.055)' },
           border: { display: false },
-          ticks: { color: '#737d89', font: { size: 10 }, padding: 6, callback: v => formatCompactChartMoney(v) }
+          ticks: { color: '#737d89', font: { size: 10 }, padding: 7, maxTicksLimit: 6, callback: v => formatCompactChartMoney(v) }
         }
       },
       plugins: {
         legend: {
           position: 'top', align: 'start',
-          labels: { color: '#aeb6c1', usePointStyle: true, pointStyle: 'circle', boxWidth: 7, boxHeight: 7, padding: 16, font: { size: 11, weight: '600' } }
+          labels: { color: '#aeb6c1', usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 16, font: { size: 11, weight: '650' } }
         },
         datalabels: { display: false },
         tooltip: {
           backgroundColor: '#1b222a', borderColor: 'rgba(255,255,255,.10)', borderWidth: 1,
           titleColor: '#fff', bodyColor: '#c9ced5', padding: 11, cornerRadius: 12,
-          displayColors: true, callbacks: { label: context => `${context.dataset.label}: ${formatMoney(context.raw)}` }
+          displayColors: true,
+          callbacks: { label: context => `${context.dataset.label}: ${formatMoney(context.raw)}` }
         }
       }
     }
   });
 
-  select.onchange = () => updateCategoryChart(select.value);
+  const netEl = document.getElementById('analytics-net');
+  if (netEl) {
+    const current = net[net.length - 1] || 0;
+    netEl.textContent = `${current >= 0 ? '+' : ''}${formatMoney(current)}`;
+    netEl.classList.toggle('is-negative', current < 0);
+  }
 }
 
 function formatCompactChartMoney(value) {
@@ -783,28 +811,48 @@ function formatCompactChartMoney(value) {
   return value;
 }
 
-function updateCategoryChart(monthId) {
+function updateAnalyticsForMonth(monthId) {
   const month = Cache.transactions.find(m => m.id === monthId);
   if (!month) return;
+
+  const income = Number(month.income) || 0;
+  const expense = Number(month.expense) || 0;
+  const balance = income - expense;
+  const rate = income > 0 ? Math.round((expense / income) * 100) : 0;
+
+  const incomeEl = document.getElementById('analytics-income');
+  const expenseEl = document.getElementById('analytics-expense');
+  const balanceEl = document.getElementById('analytics-month-balance');
+  const rateEl = document.getElementById('analytics-rate');
+  if (incomeEl) incomeEl.textContent = formatMoney(income);
+  if (expenseEl) expenseEl.textContent = formatMoney(expense);
+  if (balanceEl) {
+    balanceEl.textContent = `${balance >= 0 ? '+' : ''}${formatMoney(balance)}`;
+    balanceEl.classList.toggle('is-negative', balance < 0);
+  }
+  if (rateEl) rateEl.textContent = income > 0 ? `${rate}% дохода` : 'Нет дохода';
+
   const catMap = {};
   month.items.filter(tx => tx.type === 'Расход').forEach(tx => {
-    catMap[tx.category] = (catMap[tx.category] || 0) + tx.amount;
+    catMap[tx.category] = (catMap[tx.category] || 0) + (Number(tx.amount) || 0);
   });
-  const labels = Object.keys(catMap);
-  const data = Object.values(catMap);
-  const colors = ['#7180ff', '#36d69b', '#f3b65a', '#ff6f7d', '#a878ff', '#ef79b4', '#36bfc0', '#f58b55'];
+  const entries = Object.entries(catMap).sort((a,b) => b[1] - a[1]);
+  const labels = entries.map(([label]) => label);
+  const data = entries.map(([,value]) => value);
+  const colors = ['#7b83ff', '#36d69b', '#f3b65a', '#ff6f7d', '#a878ff', '#ef79b4', '#36bfc0', '#f58b55'];
   const total = data.reduce((sum, value) => sum + value, 0);
+
   const totalEl = document.getElementById('category-total');
   const legendEl = document.getElementById('category-legend');
   if (totalEl) totalEl.textContent = formatMoney(total);
-
   if (legendEl) {
-    legendEl.innerHTML = labels.map((label, i) => `
+    legendEl.innerHTML = entries.length ? entries.slice(0, 6).map(([label, value], i) => `
       <div class="category-legend__item">
         <span class="category-legend__dot" style="background:${colors[i % colors.length]}"></span>
         <span class="category-legend__name">${escapeHtml(label)}</span>
-        <span class="category-legend__value">${formatMoney(data[i])}</span>
-      </div>`).join('');
+        <span class="category-legend__value">${formatMoney(value)}</span>
+        <span class="category-legend__percent">${total ? Math.round(value / total * 100) : 0}%</span>
+      </div>`).join('') : '<div class="analytics-empty">Нет расходов за выбранный месяц</div>';
   }
 
   const ctx = document.getElementById('categoryExpensesChart').getContext('2d');
@@ -818,13 +866,14 @@ function updateCategoryChart(monthId) {
         backgroundColor: data.length ? colors.slice(0, data.length) : ['#303740'],
         borderColor: '#171d24',
         borderWidth: 3,
-        hoverOffset: 4
+        hoverOffset: 5
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      cutout: '70%',
+      cutout: '72%',
+      animation: { duration: 450 },
       plugins: {
         legend: { display: false },
         datalabels: { display: false },
@@ -836,23 +885,10 @@ function updateCategoryChart(monthId) {
       }
     }
   });
-}
 
-function renderBroker() {
-  const br = Cache.broker;
-  if (!br) return;
-  document.getElementById('broker-balance').innerText = formatMoney(br.balance);
-  document.getElementById('broker-deposits').innerText = formatMoney(br.totalDeposits);
-  const p = document.getElementById('broker-profit');
-  p.innerText = (br.profit > 0 ? '+' : '') + formatMoney(br.profit);
-  p.className = `text-xs font-bold ${br.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
-  const b = document.getElementById('broker-goal-badge');
-  if (br.goalName) {
-    b.innerText = 'Цель: ' + br.goalName;
-    b.classList.remove('hidden');
-  } else {
-    b.classList.add('hidden');
-  }
+  const top = entries[0];
+  const topEl = document.getElementById('analytics-top-category');
+  if (topEl) topEl.textContent = top ? `${top[0]} · ${formatMoney(top[1])}` : 'Нет данных';
 }
 
 function drawBrokerChart() {

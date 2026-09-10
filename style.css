@@ -118,3 +118,67 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
   .chart-canvas--trend { height:220px; }
   .chart-canvas--donut { height:225px; }
 }
+
+/* ==================== v6 ANALYTICS + CARD FIXES ==================== */
+.view-switcher__btn.is-active { background:linear-gradient(135deg,#727cff,#6269ef) !important; color:#fff !important; box-shadow:0 5px 16px rgba(102,111,255,.22); }
+.view-switcher__btn:not(.is-active) { background:transparent !important; color:var(--muted) !important; box-shadow:none !important; }
+
+/* Transaction cards: reserve a dedicated top-right zone for delete */
+#transactions-list .card { min-height:104px; padding:20px 18px !important; grid-template-columns:minmax(0,1fr) minmax(110px,auto); gap:14px; }
+#transactions-list .tx-main-info { min-width:0; padding-right:4px; }
+#transactions-list .tx-category { display:flex; align-items:center; gap:8px; min-width:0; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:16px !important; font-weight:650 !important; line-height:1.25; }
+#transactions-list .tx-category > span:last-child { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+#transactions-list .tx-category__icon { flex:0 0 auto; font-size:17px; }
+#transactions-list .tx-meta { margin:7px 0 0; color:var(--muted) !important; font-size:11px !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#transactions-list .tx-actions { align-self:center; padding:0 30px 0 0 !important; min-width:0; }
+#transactions-list .tx-amount { margin:0 !important; font-size:17px !important; line-height:1.15; white-space:nowrap; }
+#transactions-list .tx-edit-btn { width:30px; height:30px; border:1px solid var(--line); border-radius:10px; color:var(--muted) !important; background:rgba(255,255,255,.025); font-size:14px; }
+#transactions-list .delete-btn { top:10px !important; right:10px !important; width:25px !important; height:25px !important; display:flex; align-items:center; justify-content:center; border-radius:8px !important; background:rgba(255,255,255,.025) !important; border:1px solid rgba(255,255,255,.06) !important; }
+#transactions-list .delete-btn:hover { background:rgba(255,111,125,.10) !important; }
+body.selection-mode #transactions-list .tx-actions { padding-right:0 !important; }
+
+/* ---------- Full analytics composition ---------- */
+.chart-screen { padding:2px 0 22px; }
+.analytics-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:14px; margin:2px 0 12px; }
+.analytics-heading h2 { margin:0; font-size:25px; line-height:1.05; letter-spacing:-.045em; }
+.analytics-heading .chart-select { width:152px; min-height:44px; }
+.analytics-summary { display:grid; grid-template-columns:1.15fr .85fr; gap:0; overflow:hidden; margin-bottom:12px; background:linear-gradient(145deg,#1a2028,#141a20); border:1px solid var(--line-strong); border-radius:22px; }
+.analytics-summary__main { padding:20px; border-right:1px solid var(--line); }
+.analytics-summary__label { display:block; color:var(--muted-2); text-transform:uppercase; letter-spacing:.09em; font-size:9px; font-weight:750; }
+.analytics-summary__main strong { display:block; margin:7px 0 4px; color:var(--green); font-size:25px; line-height:1.1; letter-spacing:-.035em; }
+.analytics-summary__main strong.is-negative { color:var(--red); }
+.analytics-summary__sub { color:var(--muted); font-size:11px; }
+.analytics-summary__rows { display:flex; flex-direction:column; justify-content:center; gap:13px; padding:17px 16px; }
+.analytics-summary__rows div { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.analytics-summary__rows span { display:flex; align-items:center; gap:7px; color:#aeb6c1; font-size:11px; }
+.analytics-summary__rows strong { color:var(--text); font-size:12px; white-space:nowrap; }
+.analytics-dot { display:inline-block; width:7px; height:7px; border-radius:50%; }
+.analytics-dot--income { background:var(--green); box-shadow:0 0 9px rgba(54,214,155,.35); }
+.analytics-dot--expense { background:var(--red); box-shadow:0 0 9px rgba(255,111,125,.30); }
+.chart-card { margin-bottom:12px; padding:19px 16px 16px; }
+.chart-card__header { margin-bottom:13px; }
+.chart-card__header h3 { font-size:18px; }
+.chart-card__hint { max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; }
+.chart-canvas--trend { height:270px; }
+.chart-card--structure { padding-bottom:17px; }
+.category-chart-wrap { grid-template-columns:minmax(0,1fr); gap:13px; }
+.chart-canvas--donut { height:230px; max-width:300px; }
+.donut-center span { color:var(--muted-2); font-size:10px; text-transform:uppercase; letter-spacing:.08em; }
+.donut-center strong { font-size:19px; }
+.category-legend { gap:6px; }
+.category-legend__item { display:grid; grid-template-columns:9px minmax(0,1fr) auto auto; gap:8px; padding:9px 10px; border:1px solid rgba(255,255,255,.035); background:rgba(255,255,255,.022); }
+.category-legend__percent { color:var(--muted-2); font-size:10px; min-width:31px; text-align:right; }
+.analytics-empty { padding:13px; color:var(--muted-2); font-size:12px; text-align:center; border:1px dashed var(--line); border-radius:12px; }
+
+@media (max-width:420px) {
+  #transactions-list .card { grid-template-columns:minmax(0,1fr) minmax(96px,auto); padding:19px 14px !important; }
+  #transactions-list .tx-actions { padding-right:27px !important; }
+  #transactions-list .tx-amount { font-size:15px !important; }
+  .analytics-heading h2 { font-size:22px; }
+  .analytics-heading .chart-select { width:142px; font-size:12px; }
+  .analytics-summary__main { padding:18px 15px; }
+  .analytics-summary__main strong { font-size:21px; }
+  .analytics-summary__rows { padding:15px 12px; }
+  .chart-canvas--trend { height:245px; }
+  .chart-canvas--donut { height:215px; }
+}

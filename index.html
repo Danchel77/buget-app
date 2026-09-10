@@ -26,8 +26,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
 
   <!-- Подключаем файлы с версией ?v=3 для сброса кэша -->
-  <link rel="stylesheet" href="style.css?v=5">
-  <script defer src="app.js?v=5"></script>
+  <link rel="stylesheet" href="style.css?v=6">
+  <script defer src="app.js?v=6"></script>
 </head>
 <body class="pb-24 bg-[#121212] text-[#e5e7eb]">
 
@@ -129,15 +129,27 @@
         <button id="view-chart-btn" onclick="switchTransactionView('chart')" class="view-switcher__btn">Графики</button>
       </div>
 
-      <!-- Графики -->
+      <!-- АНАЛИТИКА -->
       <div id="transactions-chart" class="hidden chart-screen">
-        <div class="chart-filter">
+        <section class="analytics-heading">
           <div>
-            <p class="chart-filter__eyebrow">Детализация</p>
-            <label for="chart-month-select" class="chart-filter__label">Месяц</label>
+            <p class="chart-card__eyebrow">Аналитика</p>
+            <h2>Финансовая картина</h2>
           </div>
-          <select id="chart-month-select" class="chart-select"></select>
-        </div>
+          <select id="chart-month-select" class="chart-select" aria-label="Выберите месяц"></select>
+        </section>
+
+        <section class="analytics-summary">
+          <div class="analytics-summary__main">
+            <span class="analytics-summary__label">Результат месяца</span>
+            <strong id="analytics-month-balance">+0 ₽</strong>
+            <span id="analytics-rate" class="analytics-summary__sub">0% дохода</span>
+          </div>
+          <div class="analytics-summary__rows">
+            <div><span><i class="analytics-dot analytics-dot--income"></i>Доходы</span><strong id="analytics-income">0 ₽</strong></div>
+            <div><span><i class="analytics-dot analytics-dot--expense"></i>Расходы</span><strong id="analytics-expense">0 ₽</strong></div>
+          </div>
+        </section>
 
         <section class="chart-card chart-card--trend">
           <div class="chart-card__header">
@@ -145,17 +157,18 @@
               <p class="chart-card__eyebrow">Динамика</p>
               <h3>Доходы и расходы</h3>
             </div>
-            <span class="chart-card__hint">по месяцам</span>
+            <span class="chart-card__hint">последние 8 мес.</span>
           </div>
           <div class="chart-canvas chart-canvas--trend"><canvas id="monthlyExpensesChart"></canvas></div>
         </section>
 
-        <section class="chart-card">
+        <section class="chart-card chart-card--structure">
           <div class="chart-card__header">
             <div>
               <p class="chart-card__eyebrow">Структура</p>
-              <h3>Расходы по категориям</h3>
+              <h3>Куда уходят деньги</h3>
             </div>
+            <span id="analytics-top-category" class="chart-card__hint">Нет данных</span>
           </div>
           <div class="category-chart-wrap">
             <div class="chart-canvas chart-canvas--donut"><canvas id="categoryExpensesChart"></canvas><div class="donut-center"><span>Расходы</span><strong id="category-total">0 ₽</strong></div></div>
