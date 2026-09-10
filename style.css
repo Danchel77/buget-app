@@ -32,26 +32,202 @@ header > div { color:var(--muted) !important; font-size:12px !important; }
 header button { background:var(--surface) !important; border:1px solid var(--line) !important; color:var(--muted) !important; border-radius:16px !important; padding:10px 16px !important; }
 #app-content { width:100%; max-width:760px !important; margin:0 auto; padding:22px 18px 116px !important; }
 
+
 /* ---------- cards / transaction layout ---------- */
-.card { position:relative !important; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
-#transactions-list { display:flex; flex-direction:column; gap:0 !important; }
-#transactions-list > .pt-2 { margin-top:12px; padding:8px 2px 10px !important; border-color:var(--line) !important; }
-#transactions-list > .pt-2 h3 { color:#aeb6c1 !important; font-size:12px !important; letter-spacing:.08em; }
-#transactions-list > .pt-2 span { color:var(--muted-2) !important; font-size:11px !important; }
-#transactions-list > .space-y-3 { display:flex; flex-direction:column; gap:10px !important; margin-top:10px !important; }
-#transactions-list .card { min-height:94px; width:100%; padding:18px 20px !important; display:grid !important; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:18px; background:linear-gradient(145deg,var(--surface-2),var(--surface)) !important; border:1px solid var(--line-strong) !important; border-radius:22px !important; box-shadow:0 8px 24px rgba(0,0,0,.12) !important; }
-#transactions-list .card > .flex-1 { min-width:0; padding-right:10px; }
-#transactions-list .card > .flex-1 p:first-child { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:16px !important; font-weight:650 !important; line-height:1.25; }
-#transactions-list .card > .flex-1 p:last-child { margin-top:7px; color:var(--muted) !important; font-size:11px !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-#transactions-list .card-actions { padding-top:0 !important; margin:0 !important; display:flex; flex-direction:column; align-items:flex-end; gap:5px; }
-#transactions-list .card-actions p { margin:0 !important; font-size:18px !important; line-height:1.1; white-space:nowrap; }
-#transactions-list .card-actions button { width:30px; height:30px; border:1px solid var(--line); border-radius:10px; color:var(--muted) !important; background:rgba(255,255,255,.025); font-size:14px; }
-.delete-btn { position:absolute !important; top:12px !important; right:12px !important; z-index:5; width:24px !important; height:24px !important; padding:0 !important; border:0 !important; background:transparent !important; color:var(--muted-2) !important; font-size:12px !important; }
-.delete-btn:hover { color:var(--red) !important; }
-.select-checkbox { display:none !important; position:absolute !important; top:14px !important; right:14px !important; width:22px !important; height:22px !important; z-index:8; accent-color:var(--accent); }
-body.selection-mode .select-checkbox { display:block !important; }
-body.selection-mode .delete-btn, body.selection-mode .card-actions { display:none !important; }
-.card.selected { outline:2px solid var(--accent) !important; background:rgba(123,131,255,.10) !important; }
+.card {
+  position:relative !important;
+  -webkit-touch-callout:none;
+  -webkit-user-select:none;
+  user-select:none;
+}
+
+#transactions-list {
+  display:flex;
+  flex-direction:column;
+  gap:0 !important;
+}
+
+#transactions-list > .pt-2 {
+  margin-top:12px;
+  padding:8px 2px 10px !important;
+  border-color:var(--line) !important;
+}
+
+#transactions-list > .pt-2 h3 {
+  color:#aeb6c1 !important;
+  font-size:12px !important;
+  letter-spacing:.08em;
+}
+
+#transactions-list > .pt-2 span {
+  color:var(--muted-2) !important;
+  font-size:11px !important;
+}
+
+#transactions-list > .space-y-3 {
+  display:flex;
+  flex-direction:column;
+  gap:10px !important;
+  margin-top:10px !important;
+}
+
+/*
+   Transaction card uses three real grid columns:
+   1. information
+   2. amount
+   3. actions
+*/
+#transactions-list .card {
+  min-height:104px;
+  width:100%;
+  padding:16px 14px 16px 18px !important;
+
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) max-content 36px;
+  grid-template-rows:1fr 1fr;
+  column-gap:14px;
+  row-gap:0;
+  align-items:center;
+
+  background:linear-gradient(145deg,var(--surface-2),var(--surface)) !important;
+  border:1px solid var(--line-strong) !important;
+  border-radius:22px !important;
+  box-shadow:0 8px 24px rgba(0,0,0,.12) !important;
+}
+
+/* Left column: category, date and comment */
+#transactions-list .card > .flex-1 {
+  grid-column:1;
+  grid-row:1 / span 2;
+  min-width:0;
+  padding-right:0 !important;
+  align-self:center;
+}
+
+#transactions-list .card > .flex-1 p:first-child {
+  display:block;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  font-size:16px !important;
+  font-weight:650 !important;
+  line-height:1.25;
+}
+
+#transactions-list .card > .flex-1 p:last-child {
+  margin-top:7px;
+  color:var(--muted) !important;
+  font-size:11px !important;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* Let the amount and edit button become grid items of the card itself. */
+#transactions-list .card-actions {
+  display:contents !important;
+}
+
+/* Middle column: amount, vertically centered. */
+#transactions-list .card-actions p {
+  grid-column:2;
+  grid-row:1 / span 2;
+  align-self:center;
+  justify-self:end;
+
+  margin:0 !important;
+  padding:0 !important;
+  font-size:17px !important;
+  line-height:1.1;
+  white-space:nowrap;
+  text-align:right;
+}
+
+/* Right column: edit button only. */
+#transactions-list .card-actions button {
+  grid-column:3;
+  grid-row:2;
+  align-self:end;
+  justify-self:center;
+
+  width:36px;
+  height:32px;
+  padding:0;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  border:1px solid var(--line);
+  border-radius:10px;
+  color:var(--muted) !important;
+  background:rgba(255,255,255,.025);
+  font-size:14px;
+}
+
+#transactions-list .card-actions button:hover {
+  color:var(--accent) !important;
+  border-color:rgba(123,131,255,.3);
+}
+
+/* Right column: delete button only. */
+#transactions-list .card > .delete-btn {
+  grid-column:3;
+  grid-row:1;
+
+  position:static !important;
+  top:auto !important;
+  right:auto !important;
+  z-index:1;
+
+  align-self:start;
+  justify-self:center;
+
+  width:36px !important;
+  height:32px !important;
+  padding:0 !important;
+
+  display:flex !important;
+  align-items:center;
+  justify-content:center;
+
+  border:1px solid var(--line) !important;
+  border-radius:10px !important;
+  background:rgba(255,255,255,.025) !important;
+  color:var(--muted) !important;
+  font-size:16px !important;
+  line-height:1 !important;
+}
+
+#transactions-list .card > .delete-btn:hover {
+  color:var(--red) !important;
+  background:rgba(255,111,125,.10) !important;
+}
+
+.select-checkbox {
+  display:none !important;
+  position:absolute !important;
+  top:14px !important;
+  right:14px !important;
+  width:22px !important;
+  height:22px !important;
+  z-index:8;
+  accent-color:var(--accent);
+}
+
+body.selection-mode .select-checkbox {
+  display:block !important;
+}
+
+body.selection-mode #transactions-list .card > .delete-btn,
+body.selection-mode #transactions-list .card-actions {
+  display:none !important;
+}
+
+.card.selected {
+  outline:2px solid var(--accent) !important;
+  background:rgba(123,131,255,.10) !important;
+}
 
 /* ---------- top transaction controls ---------- */
 #transactions-tab { gap:14px !important; }
@@ -65,24 +241,24 @@ body.selection-mode .delete-btn, body.selection-mode .card-actions { display:non
 .view-switcher__btn.is-active { background:linear-gradient(135deg,#727cff,#6269ef) !important; color:#fff !important; box-shadow:0 5px 16px rgba(102,111,255,.22); }
 
 /* ---------- charts ---------- */
-.chart-screen { padding:2px 0 18px; }
+.chart-screen { padding:2px 0 22px; }
 .chart-filter { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:13px 15px; margin:2px 0 12px; background:var(--surface); border:1px solid var(--line); border-radius:18px; }
 .chart-filter__eyebrow,.chart-card__eyebrow { margin:0 0 2px; text-transform:uppercase; letter-spacing:.10em; font-size:9px; font-weight:750; color:var(--muted-2); }
 .chart-filter__label { font-size:14px; font-weight:650; color:var(--text); }
 .chart-select { width:150px; min-height:42px; padding:0 12px; color:var(--text); background:var(--surface-2); border:1px solid var(--line-strong); border-radius:13px; outline:none; font-size:13px; }
-.chart-card { background:linear-gradient(145deg,var(--surface-2),var(--surface)); border:1px solid var(--line); border-radius:22px; padding:18px 16px 16px; margin-bottom:12px; overflow:hidden; }
-.chart-card__header { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:10px; }
-.chart-card__header h3 { margin:0; font-size:17px; line-height:1.25; letter-spacing:-.02em; }
-.chart-card__hint { color:var(--muted-2); font-size:11px; padding-top:3px; }
+.chart-card { background:linear-gradient(145deg,var(--surface-2),var(--surface)); border:1px solid var(--line); border-radius:22px; padding:19px 16px 16px; margin-bottom:12px; overflow:hidden; }
+.chart-card__header { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:13px; }
+.chart-card__header h3 { margin:0; font-size:18px; line-height:1.25; letter-spacing:-.02em; }
+.chart-card__hint { color:var(--muted-2); font-size:11px; padding-top:3px; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; }
 .chart-canvas { position:relative; width:100%; }
-.chart-canvas--trend { height:250px; }
-.category-chart-wrap { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; }
-.chart-canvas--donut { height:245px; max-width:320px; margin:0 auto; }
+.chart-canvas--trend { height:270px; }
+.category-chart-wrap { display:grid; grid-template-columns:minmax(0,1fr); gap:13px; }
+.chart-canvas--donut { height:230px; max-width:300px; margin:0 auto; }
 .donut-center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none; transform:translateY(-2px); }
-.donut-center span { color:var(--muted); font-size:10px; }
-.donut-center strong { color:var(--text); font-size:17px; margin-top:3px; }
-.category-legend { display:grid; grid-template-columns:1fr; gap:7px; padding:2px 2px 0; }
-.category-legend__item { display:flex; align-items:center; gap:9px; min-width:0; padding:8px 9px; border-radius:11px; background:rgba(255,255,255,.025); }
+.donut-center span { color:var(--muted-2); font-size:10px; text-transform:uppercase; letter-spacing:.08em; }
+.donut-center strong { color:var(--text); font-size:19px; margin-top:3px; }
+.category-legend { display:grid; grid-template-columns:1fr; gap:6px; padding:2px 2px 0; }
+.category-legend__item { display:grid; grid-template-columns:9px minmax(0,1fr) auto auto; align-items:center; gap:8px; min-width:0; padding:9px 10px; border:1px solid rgba(255,255,255,.035); border-radius:11px; background:rgba(255,255,255,.022); }
 .category-legend__dot { width:9px; height:9px; flex:0 0 9px; border-radius:50%; }
 .category-legend__name { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#c6ccd4; font-size:12px; }
 .category-legend__value { color:#eef0f3; font-size:12px; font-weight:650; white-space:nowrap; }
@@ -103,274 +279,37 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
 .spinner { border-color:#39414b !important; border-top-color:var(--accent) !important; }
 .selection-panel { bottom:92px !important; background:var(--surface-3) !important; border:1px solid var(--line-strong) !important; border-radius:18px !important; box-shadow:0 14px 35px rgba(0,0,0,.4) !important; }
 
+
 @media (min-width:768px) {
   #app-content { padding-left:24px !important; padding-right:24px !important; }
   header { padding-left:28px !important; padding-right:28px !important; }
   nav { max-width:760px; left:50%; transform:translateX(-50%); border:1px solid var(--line) !important; border-bottom:0 !important; border-radius:22px 22px 0 0; }
   #transactions-list .card:hover { border-color:rgba(123,131,255,.20) !important; transform:translateY(-1px); }
 }
+
 @media (max-width:420px) {
   #app-content { padding-left:14px !important; padding-right:14px !important; }
   header { padding-left:16px !important; padding-right:16px !important; }
   header > div > span { display:none; }
-  #transactions-list .card { padding:17px 16px !important; }
-  #transactions-list .card-actions p { font-size:16px !important; }
-  .chart-canvas--trend { height:220px; }
-  .chart-canvas--donut { height:225px; }
+  #transactions-list .card {
+    grid-template-columns:minmax(0,1fr) max-content 34px;
+    padding:15px 10px 15px 14px !important;
+    column-gap:9px;
+  }
+  #transactions-list .card-actions p { font-size:15px !important; }
+  #transactions-list .card-actions button,
+  #transactions-list .card > .delete-btn { width:34px !important; }
+  #transactions-list .card > .flex-1 p:first-child { font-size:15px !important; }
+  .analytics-heading h2 { font-size:22px; }
+  .analytics-heading .chart-select { width:142px; font-size:12px; }
+  .analytics-summary__main { padding:18px 15px; }
+  .analytics-summary__main strong { font-size:21px; }
+  .analytics-summary__rows { padding:15px 12px; }
+  .chart-canvas--trend { height:245px; }
+  .chart-canvas--donut { height:215px; }
 }
 
-
-/* ==================== v7 TRANSACTION CARD LAYOUT ==================== */
-
-/* Переключатель списка / графиков */
-.view-switcher__btn.is-active {
-    background: linear-gradient(135deg, #727cff, #6269ef) !important;
-    color: #fff !important;
-    box-shadow: 0 5px 16px rgba(102,111,255,.22);
-}
-
-.view-switcher__btn:not(.is-active) {
-    background: transparent !important;
-    color: var(--muted) !important;
-    box-shadow: none !important;
-}
-
-#transactions-list .card {
-    min-height: 104px;
-    width: 100%;
-
-    padding: 18px 14px 18px 18px !important;
-
-    display: grid !important;
-
-    grid-template-columns:
-        minmax(0, 1fr)
-        max-content
-        36px;
-
-    column-gap: 14px;
-
-    align-items: center;
-
-    position: relative !important;
-}
-
-
-/* ============================================================
-   ЛЕВАЯ КОЛОНКА — ИНФОРМАЦИЯ
-   ============================================================ */
-
-#transactions-list .tx-main-info {
-    grid-column: 1;
-
-    min-width: 0;
-    padding: 0 !important;
-
-    align-self: center;
-}
-
-#transactions-list .tx-category {
-    display: flex;
-    align-items: center;
-
-    gap: 8px;
-
-    min-width: 0;
-    margin: 0;
-
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-
-    font-size: 16px !important;
-    font-weight: 650 !important;
-    line-height: 1.25;
-}
-
-#transactions-list .tx-category > span:last-child {
-    min-width: 0;
-
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-#transactions-list .tx-category__icon {
-    flex: 0 0 auto;
-    font-size: 17px;
-}
-
-#transactions-list .tx-meta {
-    margin: 7px 0 0 !important;
-
-    color: var(--muted) !important;
-    font-size: 11px !important;
-
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-
-/* ============================================================
-   СРЕДНЯЯ КОЛОНКА — СУММА
-   ============================================================ */
-
-#transactions-list .tx-amount {
-    grid-column: 2;
-
-    align-self: center;
-    justify-self: end;
-
-    margin: 0 !important;
-    padding: 0 !important;
-
-    font-size: 17px !important;
-    font-weight: 650 !important;
-    line-height: 1.15;
-
-    white-space: nowrap;
-    text-align: right;
-}
-
-
-/* ============================================================
-   ПРАВАЯ КОЛОНКА — ТОЛЬКО КНОПКИ
-   ============================================================ */
-
-#transactions-list .tx-actions {
-    grid-column: 3;
-
-    position: static !important;
-
-    width: 36px;
-    height: 100%;
-
-    margin: 0 !important;
-    padding: 0 !important;
-
-    display: flex !important;
-    flex-direction: column !important;
-
-    align-items: center !important;
-    justify-content: space-between !important;
-
-    gap: 8px !important;
-}
-
-
-/* Крестик удаления */
-
-#transactions-list .tx-actions .delete-btn {
-    position: static !important;
-
-    width: 36px !important;
-    height: 32px !important;
-
-    flex: 0 0 32px;
-
-    margin: 0 !important;
-    padding: 0 !important;
-
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-
-    border-radius: 10px !important;
-
-    background: rgba(255,255,255,.025) !important;
-    border: 1px solid rgba(255,255,255,.06) !important;
-
-    color: var(--muted) !important;
-
-    font-size: 16px !important;
-    line-height: 1 !important;
-}
-
-#transactions-list .tx-actions .delete-btn:hover {
-    color: var(--red) !important;
-    background: rgba(255,111,125,.10) !important;
-}
-
-
-/* Карандаш */
-
-#transactions-list .tx-edit-btn {
-    width: 36px !important;
-    height: 32px !important;
-
-    flex: 0 0 32px;
-
-    margin: 0 !important;
-    padding: 0 !important;
-
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-
-    border-radius: 10px !important;
-
-    background: rgba(255,255,255,.025) !important;
-    border: 1px solid var(--line) !important;
-
-    color: var(--muted) !important;
-
-    font-size: 14px !important;
-    line-height: 1 !important;
-}
-
-#transactions-list .tx-edit-btn:hover {
-    color: var(--accent) !important;
-    border-color: rgba(123,131,255,.3) !important;
-}
-
-
-/* ============================================================
-   РЕЖИМ МНОЖЕСТВЕННОГО ВЫБОРА
-   ============================================================ */
-
-body.selection-mode #transactions-list .tx-actions {
-    display: none !important;
-}
-
-
-/* ============================================================
-   УЗКИЕ ЭКРАНЫ
-   ============================================================ */
-
-@media (max-width: 420px) {
-
-    #transactions-list .card {
-        grid-template-columns:
-            minmax(0, 1fr)
-            max-content
-            34px;
-
-        column-gap: 10px;
-
-        padding: 16px 10px 16px 14px !important;
-    }
-
-    #transactions-list .tx-amount {
-        font-size: 15px !important;
-    }
-
-    #transactions-list .tx-actions {
-        width: 34px;
-    }
-
-    #transactions-list .tx-actions .delete-btn,
-    #transactions-list .tx-edit-btn {
-        width: 34px !important;
-    }
-
-    #transactions-list .tx-category {
-        font-size: 15px !important;
-    }
-}
-
-/* ---------- Full analytics composition ---------- */
-.chart-screen { padding:2px 0 22px; }
+/* ---------- analytics-specific layout ---------- */
 .analytics-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:14px; margin:2px 0 12px; }
 .analytics-heading h2 { margin:0; font-size:25px; line-height:1.05; letter-spacing:-.045em; }
 .analytics-heading .chart-select { width:152px; min-height:44px; }
@@ -387,33 +326,8 @@ body.selection-mode #transactions-list .tx-actions {
 .analytics-dot { display:inline-block; width:7px; height:7px; border-radius:50%; }
 .analytics-dot--income { background:var(--green); box-shadow:0 0 9px rgba(54,214,155,.35); }
 .analytics-dot--expense { background:var(--red); box-shadow:0 0 9px rgba(255,111,125,.30); }
-.chart-card { margin-bottom:12px; padding:19px 16px 16px; }
-.chart-card__header { margin-bottom:13px; }
-.chart-card__header h3 { font-size:18px; }
-.chart-card__hint { max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; }
-.chart-canvas--trend { height:270px; }
 .chart-card--structure { padding-bottom:17px; }
-.category-chart-wrap { grid-template-columns:minmax(0,1fr); gap:13px; }
-.chart-canvas--donut { height:230px; max-width:300px; }
-.donut-center span { color:var(--muted-2); font-size:10px; text-transform:uppercase; letter-spacing:.08em; }
-.donut-center strong { font-size:19px; }
-.category-legend { gap:6px; }
-.category-legend__item { display:grid; grid-template-columns:9px minmax(0,1fr) auto auto; gap:8px; padding:9px 10px; border:1px solid rgba(255,255,255,.035); background:rgba(255,255,255,.022); }
-.category-legend__percent { color:var(--muted-2); font-size:10px; min-width:31px; text-align:right; }
 .analytics-empty { padding:13px; color:var(--muted-2); font-size:12px; text-align:center; border:1px dashed var(--line); border-radius:12px; }
-
-@media (max-width:420px) {
-  #transactions-list .card { grid-template-columns:minmax(0,1fr) minmax(96px,auto); padding:19px 42px 19px 14px !important; }
-  #transactions-list .tx-actions { right:16px !important; }
-  #transactions-list .tx-amount { font-size:15px !important; }
-  .analytics-heading h2 { font-size:22px; }
-  .analytics-heading .chart-select { width:142px; font-size:12px; }
-  .analytics-summary__main { padding:18px 15px; }
-  .analytics-summary__main strong { font-size:21px; }
-  .analytics-summary__rows { padding:15px 12px; }
-  .chart-canvas--trend { height:245px; }
-  .chart-canvas--donut { height:215px; }
-}
 
 
 /* ---------- deposits ---------- */
