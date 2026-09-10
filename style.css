@@ -1,153 +1,747 @@
-* { -webkit-tap-highlight-color: transparent; color-scheme: dark; }
-body { background-color: #121212; color: #e5e7eb; } 
-input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
 
-#toast-container { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 100; transition: opacity 0.3s; pointer-events: none; }
-.toast { background: #1f2937; border: 1px solid #374151; padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 500; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 8px;}
-.spinner { border: 2px solid #4b5563; border-top-color: #3b82f6; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-.hidden { display: none !important; }
+/* =========================================================
+   PREMIUM UI REDESIGN
+   Logic is unchanged. This file only changes presentation.
+   ========================================================= */
 
-/* Анимация для кастомных окон */
-@keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-.animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
+:root {
+  --bg: #0b0e12;
+  --bg-soft: #0f1318;
+  --surface: #14191f;
+  --surface-2: #191f27;
+  --surface-3: #1d242d;
+  --border: rgba(255,255,255,.075);
+  --border-strong: rgba(255,255,255,.12);
 
-/* ==================== РЕЖИМ МУЛЬТИВЫДЕЛЕНИЯ ==================== */
-.card {
-  -webkit-touch-callout: none;
+  --text: #f3f5f7;
+  --text-2: #a7b0bb;
+  --text-3: #68727e;
+
+  --accent: #7180ff;
+  --accent-strong: #6474f5;
+  --accent-soft: rgba(113,128,255,.12);
+
+  --income: #39d39a;
+  --income-soft: rgba(57,211,154,.11);
+  --expense: #ff6f7d;
+  --expense-soft: rgba(255,111,125,.10);
+  --warning: #f4b95f;
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
+
+  --shadow-sm: 0 6px 20px rgba(0,0,0,.14);
+  --shadow-md: 0 14px 40px rgba(0,0,0,.20);
+}
+
+/* ---------- Base ---------- */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 50% -15%, rgba(113,128,255,.075), transparent 34%),
+    var(--bg);
+  color: var(--text);
+  font-family:
+    Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: .55;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
   -webkit-user-select: none;
   user-select: none;
+}
+
+::selection {
+  background: rgba(113,128,255,.28);
+}
+
+/* ---------- Layout ---------- */
+
+header {
+  background: rgba(11,14,18,.82) !important;
+  border-bottom: 1px solid var(--border) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,.02) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+header h1 {
+  font-size: 18px !important;
+  letter-spacing: -.035em;
+}
+
+header h1::before {
+  content: "◈";
+  display: inline-flex;
+  margin-right: 9px;
+  color: var(--accent);
+  font-size: 14px;
+  transform: translateY(-1px);
+}
+
+#last-sync {
+  color: var(--text-3);
+}
+
+header button {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-2) !important;
+  border-radius: 10px !important;
+}
+
+header button:hover {
+  background: var(--surface-2) !important;
+  color: var(--text) !important;
+}
+
+main#app-content {
+  width: 100%;
+  max-width: 780px !important;
+  padding: 22px 18px 110px !important;
+}
+
+/* ---------- Generic surfaces ---------- */
+
+.bg-gray-900 {
+  background-color: var(--bg-soft) !important;
+}
+
+.bg-gray-800 {
+  background-color: var(--surface) !important;
+}
+
+.bg-gray-700 {
+  background-color: var(--surface-2) !important;
+}
+
+.border-gray-800,
+.border-gray-700,
+.border-gray-600 {
+  border-color: var(--border) !important;
+}
+
+.shadow-sm {
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.rounded-xl {
+  border-radius: var(--radius-md) !important;
+}
+
+.rounded-2xl {
+  border-radius: var(--radius-lg) !important;
+}
+
+.rounded-3xl {
+  border-radius: var(--radius-xl) !important;
+}
+
+/* ---------- Typography ---------- */
+
+.text-gray-300 { color: #c7cdd4 !important; }
+.text-gray-400 { color: var(--text-2) !important; }
+.text-gray-500 { color: var(--text-3) !important; }
+.text-gray-600 { color: #4d5864 !important; }
+
+.text-white { color: var(--text) !important; }
+
+.text-blue-300,
+.text-blue-400 {
+  color: #9ca7ff !important;
+}
+
+.text-emerald-400 {
+  color: var(--income) !important;
+}
+
+.text-red-400 {
+  color: var(--expense) !important;
+}
+
+/* ---------- Dashboard / KPI cards ---------- */
+
+#transactions-tab > .grid > div {
   position: relative;
+  overflow: hidden;
+  min-height: 112px;
+  padding: 18px !important;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.035), transparent 60%),
+    var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow-sm) !important;
 }
 
-/* Скрываем чекбоксы по умолчанию */
-.select-checkbox {
-  display: none;
+#transactions-tab > .grid > div:first-child::after {
+  content: "";
   position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 24px;
-  height: 24px;
-  z-index: 5;
-  pointer-events: none; /* клики по чекбоксу обрабатываются карточкой */
-  accent-color: #3b82f6;
-  cursor: pointer;
+  width: 90px;
+  height: 90px;
+  right: -34px;
+  top: -38px;
+  border-radius: 50%;
+  background: var(--expense-soft);
 }
 
-/* В режиме выбора показываем чекбоксы и скрываем кнопки действий */
-body.selection-mode .select-checkbox {
+#transactions-tab > .grid > div:last-child::after {
+  content: "";
+  position: absolute;
+  width: 90px;
+  height: 90px;
+  right: -34px;
+  top: -38px;
+  border-radius: 50%;
+  background: var(--income-soft);
+}
+
+#month-expense,
+#month-income {
+  position: relative;
+  z-index: 1;
+  font-size: 24px !important;
+  line-height: 1.1;
+  letter-spacing: -.045em;
+}
+
+#transactions-tab > .grid p:first-child {
+  position: relative;
+  z-index: 1;
+  color: var(--text-3) !important;
+  font-size: 10px !important;
+}
+
+/* ---------- Primary actions ---------- */
+
+button.bg-blue-600 {
+  background: linear-gradient(135deg, #7786ff, #6272f3) !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  box-shadow: 0 8px 22px rgba(99,114,243,.20) !important;
+}
+
+button.bg-blue-600:hover {
+  filter: brightness(1.06);
+}
+
+button.bg-blue-900\/40 {
+  background: var(--accent-soft) !important;
+  border-color: rgba(113,128,255,.22) !important;
+  color: #aab2ff !important;
+}
+
+button.bg-blue-900\/40:hover {
+  background: rgba(113,128,255,.17) !important;
+}
+
+#transactions-tab > button,
+#deposits-tab > button,
+#goals-tab > button {
+  min-height: 48px;
+  border-radius: 14px !important;
+  letter-spacing: -.01em;
+}
+
+/* ---------- Bottom navigation ---------- */
+
+nav {
+  height: 76px;
+  padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+  background: rgba(14,18,23,.88) !important;
+  border-top: 1px solid var(--border) !important;
+  box-shadow: 0 -12px 35px rgba(0,0,0,.18);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 40;
+}
+
+nav button {
+  position: relative;
+  height: 100%;
+  padding: 10px 4px !important;
+  color: var(--text-3) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: -.01em;
+  transition: color .18s ease, transform .18s ease;
+}
+
+nav button::before {
   display: block;
+  height: 24px;
+  margin-bottom: 3px;
+  font-size: 18px;
+  line-height: 24px;
+  filter: grayscale(1);
+  opacity: .75;
 }
 
-body.selection-mode .card-actions {
-  display: none;
+#nav-transactions::before { content: "↕"; }
+#nav-deposits::before { content: "▣"; }
+#nav-broker::before { content: "⌁"; }
+#nav-goals::before { content: "◎"; }
+
+nav button.text-blue-400 {
+  color: #9ca7ff !important;
 }
 
-/* Выделенная карточка */
-.card.selected {
-  outline: 2px solid #3b82f6;
-  background-color: rgba(59, 130, 246, 0.1);
-}
-
-/* Панель массовых действий */
-.selection-panel {
-  position: fixed;
-  bottom: 70px; /* над нижней навигацией */
+nav button.text-blue-400::after {
+  content: "";
+  position: absolute;
+  top: 5px;
   left: 50%;
+  width: 28px;
+  height: 3px;
   transform: translateX(-50%);
-  z-index: 80;
-  background: #1f2937;
-  border: 1px solid #374151;
-  border-radius: 20px;
-  padding: 10px 20px;
+  border-radius: 99px;
+  background: var(--accent);
+  box-shadow: 0 0 14px rgba(113,128,255,.45);
+}
+
+nav button.text-blue-400::before {
+  filter: none;
+  opacity: 1;
+}
+
+/* ---------- Forms / controls ---------- */
+
+input:not([type="radio"]):not([type="checkbox"]),
+select {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border-strong) !important;
+  color: var(--text) !important;
+  border-radius: 12px !important;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+input:not([type="radio"]):not([type="checkbox"])::placeholder {
+  color: #59636f !important;
+}
+
+input:not([type="radio"]):not([type="checkbox"]):focus,
+select:focus {
+  border-color: rgba(113,128,255,.65) !important;
+  box-shadow: 0 0 0 4px rgba(113,128,255,.09);
+  outline: none !important;
+}
+
+#tx-form-container,
+#deposit-form-container,
+#broker-form-container,
+#broker-goal-container,
+#goal-form-container {
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.025), transparent 50%),
+    var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow-md) !important;
+  padding: 18px !important;
+}
+
+/* Transaction amount input */
+.tx-amount {
+  background: var(--surface-2) !important;
+  border-radius: 14px !important;
+  font-size: 27px !important;
+  letter-spacing: -.045em;
+  padding: 15px !important;
+}
+
+/* Expense/income switch */
+.tx-item > div:first-child {
+  width: 100% !important;
+  background: var(--surface-2) !important;
+  padding: 4px !important;
+  border: 1px solid var(--border) !important;
+}
+
+.tx-item .peer-checked\:bg-gray-700 {
+  background: #242b35 !important;
+}
+
+.tx-item .peer-checked\:text-white {
+  color: var(--text) !important;
+}
+
+/* ---------- Transaction cards ---------- */
+
+.card {
+  position: relative;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.025), transparent 45%),
+    var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 5px 18px rgba(0,0,0,.10) !important;
+  transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}
+
+.card:hover {
+  border-color: rgba(255,255,255,.12) !important;
+}
+
+#transactions-list .card {
+  min-height: 70px;
+  padding: 14px 16px !important;
+}
+
+#transactions-list .card > div:first-of-type {
   display: flex;
   align-items: center;
-  gap: 15px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-  font-size: 14px;
-  color: #e5e7eb;
+}
+
+#transactions-list .card > div:first-of-type::before {
+  content: "•";
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  margin-right: 11px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 20px;
+}
+
+#transactions-list .card p.text-sm {
+  font-weight: 650 !important;
+}
+
+#transactions-list .card p.text-\[11px\] {
+  margin-top: 3px;
+  color: var(--text-3) !important;
+}
+
+#transactions-list .card .text-lg {
+  font-size: 16px !important;
+  letter-spacing: -.025em;
+}
+
+#transactions-list .card-actions {
+  padding-top: 0 !important;
+}
+
+#transactions-list .card-actions button {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-3) !important;
+  border: 1px solid var(--border);
+}
+
+#transactions-list .card-actions button:hover {
+  color: var(--text) !important;
+  background: var(--surface-3);
+}
+
+/* Month separators */
+#transactions-list > div > h3 {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  color: var(--text-2) !important;
+  border-color: var(--border) !important;
+}
+
+#transactions-list > div > h3 + span {
+  color: var(--text-3) !important;
+}
+
+/* ---------- Deposits ---------- */
+
+#deposits-list .card {
+  padding: 18px !important;
+}
+
+#deposits-list .card h3,
+#goals-list .card h3 {
+  font-size: 16px;
+  letter-spacing: -.025em;
+}
+
+#deposits-list .card .bg-gray-900\/50 {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border);
+}
+
+#deposits-list .card .bg-gray-700,
+#goals-list .card .bg-gray-700 {
+  background: #262e38 !important;
+}
+
+#deposits-list .card .bg-blue-500,
+#goals-list .card .bg-blue-500 {
+  background: linear-gradient(90deg, #6474f5, #8a96ff) !important;
+  box-shadow: 0 0 12px rgba(113,128,255,.22);
+}
+
+/* ---------- Broker ---------- */
+
+#broker-tab > .bg-gray-800 {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(113,128,255,.11), transparent 38%),
+    linear-gradient(145deg, rgba(255,255,255,.03), transparent 50%),
+    var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+#broker-balance {
+  font-size: clamp(32px, 9vw, 42px) !important;
+  letter-spacing: -.055em;
+}
+
+#broker-profit {
+  font-size: 13px !important;
+}
+
+#broker-tab .flex.gap-2.mb-4 button {
+  min-height: 40px;
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 11px !important;
+}
+
+#broker-tab .flex.gap-2.mb-4 button:last-child {
+  background: var(--accent-soft) !important;
+  color: #aab2ff !important;
+  border-color: rgba(113,128,255,.22) !important;
+}
+
+#brokerChart {
+  opacity: .96;
+}
+
+/* ---------- Goals ---------- */
+
+#goals-list .card {
+  padding: 18px !important;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.028), transparent 55%),
+    var(--surface) !important;
+}
+
+#goals-list .card .bg-gray-900\/50 {
+  background: var(--surface-2) !important;
+}
+
+#goals-list .card .text-emerald-400 {
+  color: var(--income) !important;
+}
+
+/* ---------- Charts ---------- */
+
+#transactions-chart > div,
+#transactions-chart .bg-gray-800 {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow-sm);
+}
+
+#chart-month-select {
+  min-height: 46px;
+}
+
+#transactions-chart h3 {
+  font-size: 14px !important;
+  letter-spacing: -.02em;
+}
+
+/* ---------- Dialogs / login ---------- */
+
+#loading-screen,
+#login-screen {
+  background:
+    radial-gradient(circle at 50% 25%, rgba(113,128,255,.09), transparent 30%),
+    var(--bg) !important;
+}
+
+#login-screen > div,
+#custom-dialog > div,
+#category-dialog > div,
+#manage-categories-dialog > div {
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.035), transparent 55%),
+    var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 24px 80px rgba(0,0,0,.42) !important;
+}
+
+#login-screen > div {
+  padding: 28px !important;
+  border-radius: 24px !important;
+}
+
+#login-screen h2 {
+  letter-spacing: -.045em;
+}
+
+#login-btn {
+  min-height: 50px;
+  border-radius: 13px !important;
+}
+
+#custom-dialog,
+#category-dialog,
+#manage-categories-dialog {
+  background: rgba(0,0,0,.66) !important;
+  backdrop-filter: blur(7px);
+}
+
+/* ---------- Toast ---------- */
+
+#toast-container {
+  bottom: 92px;
+}
+
+.toast {
+  background: rgba(25,31,39,.94) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: 13px !important;
+  padding: 11px 15px !important;
+  box-shadow: 0 16px 40px rgba(0,0,0,.32) !important;
+  backdrop-filter: blur(16px);
+}
+
+/* ---------- Selection mode ---------- */
+
+body.selection-mode .card.selected {
+  outline: none !important;
+  border-color: rgba(113,128,255,.75) !important;
+  background: rgba(113,128,255,.08) !important;
+  box-shadow: 0 0 0 3px rgba(113,128,255,.09) !important;
+}
+
+.select-checkbox {
+  accent-color: var(--accent);
+}
+
+.selection-panel {
+  bottom: 88px;
+  background: rgba(25,31,39,.96) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: 15px !important;
+  padding: 10px 12px !important;
+  box-shadow: 0 18px 45px rgba(0,0,0,.35) !important;
+  backdrop-filter: blur(18px);
 }
 
 .selection-panel button {
-  background: #ef4444;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  padding: 8px 15px;
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 0.2s;
+  border-radius: 9px !important;
 }
 
-.selection-panel button:hover {
-  background: #dc2626;
+/* ---------- Icons ---------- */
+
+.icon-option {
+  background: var(--surface-2) !important;
+  border-color: var(--border) !important;
+  border-radius: 10px !important;
 }
 
-.selection-panel .cancel-selection {
-  background: #4b5563;
+.icon-option:hover {
+  background: var(--surface-3) !important;
 }
 
-.selection-panel .cancel-selection:hover {
-  background: #374151;
+.icon-option.selected {
+  border-color: rgba(113,128,255,.75) !important;
+  background: var(--accent-soft) !important;
+  box-shadow: 0 0 0 3px rgba(113,128,255,.08);
 }
-/* Адаптация для планшетов и десктопов */
+
+/* ---------- Delete / edit controls ---------- */
+
+.delete-btn {
+  color: #4e5965 !important;
+  opacity: .7;
+  transition: color .18s ease, opacity .18s ease;
+}
+
+.delete-btn:hover {
+  color: var(--expense) !important;
+  opacity: 1;
+}
+
+/* ---------- Empty states ---------- */
+
+#transactions-list > div.text-center,
+#deposits-list > div.text-center,
+#goals-list > div.text-center {
+  padding: 46px 20px !important;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--text-3) !important;
+  background: rgba(255,255,255,.012);
+}
+
+/* ---------- Animation ---------- */
+
+@keyframes premiumFade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: premiumFade .22s ease-out both !important;
+}
+
+/* ---------- Responsive ---------- */
+
 @media (min-width: 768px) {
   main#app-content {
-    max-width: 720px;
-    margin-left: auto;
-    margin-right: auto;
-    padding-left: 1rem;
-    padding-right: 1rem;
+    max-width: 780px !important;
+    padding-top: 30px !important;
   }
+
   header {
-    padding-left: 2rem;
-    padding-right: 2rem;
+    padding-left: max(24px, calc((100vw - 780px) / 2 + 18px)) !important;
+    padding-right: max(24px, calc((100vw - 780px) / 2 + 18px)) !important;
   }
+
   nav {
-    max-width: 720px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100%;
-    border-radius: 20px 20px 0 0;
-    margin-bottom: 10px;
-    padding-top: env(safe-area-inset-bottom);
+    max-width: 780px !important;
+    margin-bottom: 14px !important;
+    border-radius: 20px 20px 0 0 !important;
   }
 }
-/* Кнопка удаления (крестик) */
-.delete-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: none;
-  border: none;
-  color: #6b7280; /* серый */
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 4px;
-  z-index: 5;
-  transition: color 0.2s;
-}
-.delete-btn:hover {
-  color: #ef4444;
-}
-.card-actions {
-  padding-top: 1rem;
-}
-.icon-option {
-  background: #374151;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 1.2rem;
-  padding: 4px;
-  transition: all 0.2s;
-}
-.icon-option:hover {
-  background: #4b5563;
-}
-.icon-option.selected {
-  border-color: #3b82f6;
-  background: #4b5563;
+
+@media (max-width: 420px) {
+  main#app-content {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+
+  #month-expense,
+  #month-income {
+    font-size: 21px !important;
+  }
+
+  #broker-balance {
+    font-size: 34px !important;
+  }
 }
