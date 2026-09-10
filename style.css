@@ -119,23 +119,255 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
   .chart-canvas--donut { height:225px; }
 }
 
-/* ==================== v6 ANALYTICS + CARD FIXES ==================== */
-.view-switcher__btn.is-active { background:linear-gradient(135deg,#727cff,#6269ef) !important; color:#fff !important; box-shadow:0 5px 16px rgba(102,111,255,.22); }
-.view-switcher__btn:not(.is-active) { background:transparent !important; color:var(--muted) !important; box-shadow:none !important; }
 
-/* Transaction cards: reserve a dedicated top-right zone for delete */
-#transactions-list .card { min-height:104px; padding:20px 50px 20px 18px !important; grid-template-columns:minmax(0,1fr) minmax(110px,auto); gap:14px; }
-#transactions-list .tx-main-info { min-width:0; padding-right:4px; }
-#transactions-list .tx-category { display:flex; align-items:center; gap:8px; min-width:0; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:16px !important; font-weight:650 !important; line-height:1.25; }
-#transactions-list .tx-category > span:last-child { min-width:0; overflow:hidden; text-overflow:ellipsis; }
-#transactions-list .tx-category__icon { flex:0 0 auto; font-size:17px; }
-#transactions-list .tx-meta { margin:7px 0 0; color:var(--muted) !important; font-size:11px !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-#transactions-list .tx-actions { position:absolute !important; top:18px; right:18px; bottom:16px; width:max-content; min-width:0; padding:0 !important; margin:0 !important; display:flex !important; flex-direction:column !important; align-items:flex-end !important; justify-content:space-between !important; gap:8px !important; }
-#transactions-list .tx-amount { margin:0 !important; font-size:17px !important; line-height:1.15; white-space:nowrap; }
-#transactions-list .tx-edit-btn { width:30px; height:30px; flex:0 0 30px; border:1px solid var(--line); border-radius:10px; color:var(--muted) !important; background:rgba(255,255,255,.025); font-size:14px; display:flex; align-items:center; justify-content:center; }
-#transactions-list .delete-btn { top:10px !important; right:10px !important; width:25px !important; height:25px !important; display:flex; align-items:center; justify-content:center; border-radius:8px !important; background:rgba(255,255,255,.025) !important; border:1px solid rgba(255,255,255,.06) !important; }
-#transactions-list .delete-btn:hover { background:rgba(255,111,125,.10) !important; }
-body.selection-mode #transactions-list .tx-actions { right:16px !important; }
+/* ==================== v7 TRANSACTION CARD LAYOUT ==================== */
+
+/* Переключатель списка / графиков */
+.view-switcher__btn.is-active {
+    background: linear-gradient(135deg, #727cff, #6269ef) !important;
+    color: #fff !important;
+    box-shadow: 0 5px 16px rgba(102,111,255,.22);
+}
+
+.view-switcher__btn:not(.is-active) {
+    background: transparent !important;
+    color: var(--muted) !important;
+    box-shadow: none !important;
+}
+
+#transactions-list .card {
+    min-height: 104px;
+    width: 100%;
+
+    padding: 18px 14px 18px 18px !important;
+
+    display: grid !important;
+
+    grid-template-columns:
+        minmax(0, 1fr)
+        max-content
+        36px;
+
+    column-gap: 14px;
+
+    align-items: center;
+
+    position: relative !important;
+}
+
+
+/* ============================================================
+   ЛЕВАЯ КОЛОНКА — ИНФОРМАЦИЯ
+   ============================================================ */
+
+#transactions-list .tx-main-info {
+    grid-column: 1;
+
+    min-width: 0;
+    padding: 0 !important;
+
+    align-self: center;
+}
+
+#transactions-list .tx-category {
+    display: flex;
+    align-items: center;
+
+    gap: 8px;
+
+    min-width: 0;
+    margin: 0;
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    font-size: 16px !important;
+    font-weight: 650 !important;
+    line-height: 1.25;
+}
+
+#transactions-list .tx-category > span:last-child {
+    min-width: 0;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#transactions-list .tx-category__icon {
+    flex: 0 0 auto;
+    font-size: 17px;
+}
+
+#transactions-list .tx-meta {
+    margin: 7px 0 0 !important;
+
+    color: var(--muted) !important;
+    font-size: 11px !important;
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+
+/* ============================================================
+   СРЕДНЯЯ КОЛОНКА — СУММА
+   ============================================================ */
+
+#transactions-list .tx-amount {
+    grid-column: 2;
+
+    align-self: center;
+    justify-self: end;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    font-size: 17px !important;
+    font-weight: 650 !important;
+    line-height: 1.15;
+
+    white-space: nowrap;
+    text-align: right;
+}
+
+
+/* ============================================================
+   ПРАВАЯ КОЛОНКА — ТОЛЬКО КНОПКИ
+   ============================================================ */
+
+#transactions-list .tx-actions {
+    grid-column: 3;
+
+    position: static !important;
+
+    width: 36px;
+    height: 100%;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    display: flex !important;
+    flex-direction: column !important;
+
+    align-items: center !important;
+    justify-content: space-between !important;
+
+    gap: 8px !important;
+}
+
+
+/* Крестик удаления */
+
+#transactions-list .tx-actions .delete-btn {
+    position: static !important;
+
+    width: 36px !important;
+    height: 32px !important;
+
+    flex: 0 0 32px;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    border-radius: 10px !important;
+
+    background: rgba(255,255,255,.025) !important;
+    border: 1px solid rgba(255,255,255,.06) !important;
+
+    color: var(--muted) !important;
+
+    font-size: 16px !important;
+    line-height: 1 !important;
+}
+
+#transactions-list .tx-actions .delete-btn:hover {
+    color: var(--red) !important;
+    background: rgba(255,111,125,.10) !important;
+}
+
+
+/* Карандаш */
+
+#transactions-list .tx-edit-btn {
+    width: 36px !important;
+    height: 32px !important;
+
+    flex: 0 0 32px;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    border-radius: 10px !important;
+
+    background: rgba(255,255,255,.025) !important;
+    border: 1px solid var(--line) !important;
+
+    color: var(--muted) !important;
+
+    font-size: 14px !important;
+    line-height: 1 !important;
+}
+
+#transactions-list .tx-edit-btn:hover {
+    color: var(--accent) !important;
+    border-color: rgba(123,131,255,.3) !important;
+}
+
+
+/* ============================================================
+   РЕЖИМ МНОЖЕСТВЕННОГО ВЫБОРА
+   ============================================================ */
+
+body.selection-mode #transactions-list .tx-actions {
+    display: none !important;
+}
+
+
+/* ============================================================
+   УЗКИЕ ЭКРАНЫ
+   ============================================================ */
+
+@media (max-width: 420px) {
+
+    #transactions-list .card {
+        grid-template-columns:
+            minmax(0, 1fr)
+            max-content
+            34px;
+
+        column-gap: 10px;
+
+        padding: 16px 10px 16px 14px !important;
+    }
+
+    #transactions-list .tx-amount {
+        font-size: 15px !important;
+    }
+
+    #transactions-list .tx-actions {
+        width: 34px;
+    }
+
+    #transactions-list .tx-actions .delete-btn,
+    #transactions-list .tx-edit-btn {
+        width: 34px !important;
+    }
+
+    #transactions-list .tx-category {
+        font-size: 15px !important;
+    }
+}
 
 /* ---------- Full analytics composition ---------- */
 .chart-screen { padding:2px 0 22px; }
