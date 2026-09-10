@@ -181,10 +181,9 @@ header button { background:var(--surface) !important; border:1px solid var(--lin
   align-items:center;
   justify-content:center;
 
-  border:1px solid var(--line) !important;
-  border-radius:9px !important;
-
-  background:rgba(255,255,255,.025) !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
   color:var(--muted) !important;
 
   font-size:15px !important;
@@ -209,10 +208,9 @@ header button { background:var(--surface) !important; border:1px solid var(--lin
   align-items:center;
   justify-content:center;
 
-  border:1px solid var(--line) !important;
-  border-radius:9px !important;
-
-  background:rgba(255,255,255,.025) !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
   color:var(--muted) !important;
 
   font-size:13px !important;
@@ -221,12 +219,10 @@ header button { background:var(--surface) !important; border:1px solid var(--lin
 
 #transactions-list .tx-delete-btn:hover {
   color:var(--red) !important;
-  background:rgba(255,111,125,.10) !important;
 }
 
 #transactions-list .tx-edit-btn:hover {
   color:var(--accent) !important;
-  background:var(--accent-soft) !important;
 }
 
 /* Selection mode */
@@ -447,10 +443,9 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
   align-items:center;
   justify-content:center;
 
-  border:1px solid var(--line) !important;
-  border-radius:9px !important;
-
-  background:rgba(255,255,255,.025) !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
   color:var(--muted) !important;
 
   font-size:13px !important;
@@ -459,7 +454,6 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
 
 #deposits-list .deposit-edit-btn:hover {
   color:var(--accent) !important;
-  background:var(--accent-soft) !important;
 }
 
 /* Delete button */
@@ -478,10 +472,9 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
   align-items:center;
   justify-content:center;
 
-  border:1px solid var(--line) !important;
-  border-radius:9px !important;
-
-  background:rgba(255,255,255,.025) !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
   color:var(--muted) !important;
 
   font-size:15px !important;
@@ -490,7 +483,6 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
 
 #deposits-list .deposit-delete-btn:hover {
   color:var(--red) !important;
-  background:rgba(255,111,125,.10) !important;
 }
 
 /* Goal badge */
