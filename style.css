@@ -300,8 +300,118 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
 /* ---------- dialogs / toast ---------- */
 .toast { background:var(--surface-3) !important; border:1px solid var(--line-strong) !important; border-radius:16px !important; box-shadow:0 14px 35px rgba(0,0,0,.35) !important; }
 .spinner { border-color:#39414b !important; border-top-color:var(--accent) !important; }
-.selection-panel { bottom:92px !important; background:var(--surface-3) !important; border:1px solid var(--line-strong) !important; border-radius:18px !important; box-shadow:0 14px 35px rgba(0,0,0,.4) !important; }
+/* ---------- selection panel (плавающая панель мультивыбора) ---------- */
+.selection-panel {
+  position: fixed !important;
+  bottom: calc(92px + env(safe-area-inset-bottom, 0px)) !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: calc(100% - 32px) !important;
+  max-width: 500px !important;
+  z-index: 50 !important;
 
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px;
+  padding: 10px 14px !important;
+
+  background: rgba(28, 35, 44, 0.94) !important;
+  border: 1px solid var(--line-strong) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 16px 40px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+
+  animation: selection-panel-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes selection-panel-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.selection-panel__info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.selection-panel__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(123, 131, 255, 0.6);
+  flex-shrink: 0;
+}
+
+#selected-count {
+  color: var(--text) !important;
+  font-size: 13px !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.selection-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Кнопки панели */
+#delete-selected,
+#cancel-selection {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 38px !important;
+  padding: 0 16px !important;
+  border-radius: 13px !important;
+  font-size: 13px !important;
+  font-weight: 650 !important;
+  cursor: pointer;
+  transition: transform 0.1s ease, opacity 0.15s ease, background 0.15s ease;
+  white-space: nowrap;
+}
+
+#delete-selected:active,
+#cancel-selection:active {
+  transform: scale(0.95);
+}
+
+/* Кнопка «Удалить» */
+#delete-selected {
+  border: 0 !important;
+  background: linear-gradient(135deg, #ff6f7d, #e6505f) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 14px rgba(255, 111, 125, 0.3) !important;
+}
+
+#delete-selected:hover {
+  background: linear-gradient(135deg, #ff7f8c, #ea5a69) !important;
+}
+
+/* Кнопка «Отмена» */
+#cancel-selection {
+  border: 1px solid var(--line-strong) !important;
+  background: var(--surface-2) !important;
+  color: var(--muted) !important;
+}
+
+#cancel-selection:hover {
+  color: var(--text) !important;
+  background: var(--surface) !important;
+}
 
 @media (min-width:768px) {
   #app-content { padding-left:24px !important; padding-right:24px !important; }
