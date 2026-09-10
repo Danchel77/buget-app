@@ -1162,29 +1162,40 @@ function renderGoals() {
     return;
   }
   document.getElementById('goals-list').innerHTML = data.map(g => `
-    <div class="card bg-gray-800 p-4 rounded-2xl border border-gray-700 shadow-sm relative" data-id="${g.id}" data-table="Goals">
+        <div class="card goal-card" data-id="${g.id}" data-table="Goals">
       <input type="checkbox" class="select-checkbox" data-id="${g.id}">
-      <button onclick="deleteRecord('Goals','${g.id}')" class="delete-btn" title="Удалить">✕</button>
-      <div class="flex justify-between items-start mb-3">
-        <div>
-          <h3 class="font-bold text-white">${escapeHtml(g.name)}</h3>
-          ${g.isAchieved
-            ? '<span class="text-emerald-400 text-[10px] font-bold uppercase">Достигнута</span>'
-            : `<span class="text-xs text-gray-400">До ${escapeHtml(g.deadlineStr)}</span>`}
-        </div>
-        <div class="text-right">
-          <p class="font-bold text-white">${g.progress}%</p>
-          <div class="card-actions flex space-x-3 justify-end text-xs opacity-60 mt-1">
-            <button onclick="editGoal('${g.id}','${escapeHtml(g.name)}',${g.target},'${escapeHtml(g.rawDeadline)}')" class="text-gray-400 hover:text-blue-400">✎</button>
-          </div>
-        </div>
+
+      <button
+        onclick="deleteRecord('Goals','${g.id}')"
+        class="goal-delete-btn"
+        title="Удалить"
+      >✕</button>
+
+      <div class="goal-main">
+        <h3>${escapeHtml(g.name)}</h3>
+        ${g.isAchieved
+          ? '<span class="goal-status goal-status--achieved">Достигнута</span>'
+          : `<span class="goal-date">До ${escapeHtml(g.deadlineStr)}</span>`}
       </div>
-      <div class="w-full bg-gray-700 rounded-full h-3 mb-2">
-        <div class="${g.isAchieved ? 'bg-emerald-500' : 'bg-blue-500'} h-3 rounded-full" style="width:${g.progress}%"></div>
+
+      <div class="goal-progress-value">${g.progress}%</div>
+
+      <button
+        onclick="editGoal('${g.id}','${escapeHtml(g.name)}',${g.target},'${escapeHtml(g.rawDeadline)}')"
+        class="goal-edit-btn"
+        title="Редактировать"
+      >✎</button>
+
+      <div class="goal-progress">
+        <div
+          class="${g.isAchieved ? 'goal-progress-fill goal-progress-fill--achieved' : 'goal-progress-fill'}"
+          style="width:${g.progress}%"
+        ></div>
       </div>
-      <div class="flex justify-between items-center text-sm">
-        <span class="text-gray-300 font-medium">${formatMoney(g.saved)}</span>
-        <span class="text-gray-500">из ${formatMoney(g.target)}</span>
+
+      <div class="goal-amounts">
+        <span>${formatMoney(g.saved)}</span>
+        <span>из ${formatMoney(g.target)}</span>
       </div>
     </div>`).join('');
 }
