@@ -304,12 +304,12 @@
       <input type="text" inputmode="decimal" oninput="formatSumInput(this)" required class="tx-amount w-full text-2xl font-bold bg-gray-800 border border-gray-600 focus:border-blue-500 text-white rounded-lg p-3 outline-none" placeholder="0 ₽">
     </div>
 
-    <div class="flex gap-2 mb-3">
-      <input type="date" required class="tx-date flex-1 bg-gray-800 border border-gray-600 text-white rounded-lg p-2 outline-none text-xs">
-      <div class="flex-1 flex gap-1">
-        <select required class="tx-category flex-1 bg-gray-800 border border-gray-600 text-white rounded-lg p-2 outline-none text-xs"></select>
-<button type="button" class="manage-categories-btn bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-2 text-xs" title="Управление категориями">✎</button>
-<button type="button" class="add-category-btn bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-2 text-xs" title="Добавить категорию">+</button>
+      <div class="grid grid-cols-2 gap-2 mb-3">
+      <input type="date" required class="tx-date w-full min-w-0 bg-gray-800 border border-gray-600 text-white rounded-lg p-2 outline-none text-xs">
+      <div class="flex items-center gap-1 min-w-0">
+        <select required class="tx-category flex-1 min-w-0 bg-gray-800 border border-gray-600 text-white rounded-lg p-2 outline-none text-xs"></select>
+        <button type="button" class="manage-categories-btn" title="Управление категориями">✎</button>
+        <button type="button" class="add-category-btn" title="Добавить категорию">+</button>
       </div>
     </div>
 
