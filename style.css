@@ -301,7 +301,9 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
 .toast { background:var(--surface-3) !important; border:1px solid var(--line-strong) !important; border-radius:16px !important; box-shadow:0 14px 35px rgba(0,0,0,.35) !important; }
 .spinner { border-color:#39414b !important; border-top-color:var(--accent) !important; }
 /* ---------- selection panel (плавающая панель мультивыбора) ---------- */
+/* По умолчанию панель скрыта */
 .selection-panel {
+  display: none !important;
   position: fixed !important;
   bottom: calc(92px + env(safe-area-inset-bottom, 0px)) !important;
   left: 50% !important;
@@ -310,7 +312,6 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
   max-width: 500px !important;
   z-index: 50 !important;
 
-  display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
   gap: 12px;
@@ -322,7 +323,11 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
   box-shadow: 0 16px 40px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+}
 
+/* Показываем панель ТОЛЬКО тогда, когда включен режим выбора */
+body.selection-mode .selection-panel {
+  display: flex !important;
   animation: selection-panel-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
