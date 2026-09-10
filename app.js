@@ -526,6 +526,7 @@ function processGoals(goals, deps, br) {
 
 // --- НАВИГАЦИЯ, ФОРМЫ, РЕНДЕР ---
 function switchTab(tab) {
+  if (selectionMode) disableSelectionMode();
   ['transactions', 'deposits', 'broker', 'goals'].forEach(t => {
     document.getElementById(t + '-tab').classList.add('hidden');
     document.getElementById('nav-' + t).classList.replace('text-blue-400', 'text-gray-500');
@@ -1395,7 +1396,9 @@ document.addEventListener('click', (e) => {
   if (!selectionMode) return;
   const card = e.target.closest('.card');
   if (!card) return;
-  if (e.target.classList.contains('select-checkbox')) return;
+  if (!selectionMode) return;
+  const card = e.target.closest('.card');
+  if (!card) return;
 
   e.preventDefault();
   toggleItemSelection(card.dataset.id, card.dataset.table);
