@@ -648,7 +648,21 @@ function addTxRow() {
   radios[1].name = uid;
 
   const row = clone.querySelector('.tx-item');
-  row.querySelector('.tx-date').value = new Date().toISOString().split('T')[0];
+
+  // Проверяем, есть ли уже добавленные строки транзакций
+  const existingRows = document.querySelectorAll('#tx-items-list .tx-item');
+  const prevRow = existingRows.length > 0 ? existingRows[existingRows.length - 1] : null;
+
+  // Дата: берем из предыдущей строки, иначе ставим сегодняшнюю
+  const prevDate = prevRow ? prevRow.querySelector('.tx-date').value : '';
+  row.querySelector('.tx-date').value = prevDate || new Date().toISOString().split('T')[0];
+
+  // Тип (Расход/Доход): копируем из предыдущей строки
+  const prevType = prevRow ? prevRow.querySelector('.tx-type:checked')?.value : null;
+  if (prevType) {
+    const radioToSelect = row.querySelector(`.tx-type[value="${prevType}"]`);
+    if (radioToSelect) radioToSelect.checked = true;
+  }
 
   // Обработчики переключения типа для обновления категорий
   row.querySelectorAll('.tx-type').forEach(input => {
@@ -658,9 +672,16 @@ function addTxRow() {
     });
   });
 
-  // Инициализация категорий для выбранного по умолчанию типа
-  const initialType = row.querySelector('.tx-type:checked').value;
-  updateCategorySelect(row.querySelector('.tx-category'), initialType);
+  // Инициализация категорий
+  const currentType = row.querySelector('.tx-type:checked').value;
+  const select = row.querySelector('.tx-category');
+  updateCategorySelect(select, currentType);
+
+  // Категория: копируем из предыдущей строки
+  if (prevRow && prevType === currentType) {
+    const prevCat = prevRow.querySelector('.tx-category').value;
+    if (prevCat) select.value = prevCat;
+  }
 
   document.getElementById('tx-items-list').appendChild(row);
 }
@@ -765,7 +786,7 @@ function renderTransactions() {
               </p>
             </div>
 
-            <p class="tx-amount ${isExp ? 'text-red-400' : 'text-emerald-400'}">
+            <p class="tx-amount ${isExp ? 'text-white' : 'text-emerald-400'}">
               ${isExp ? '-' : '+'}${formatMoney(tx.amount)}
             </p>
 
