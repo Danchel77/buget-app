@@ -557,7 +557,6 @@ function toggleForm(containerId, btnId, btnText, formId, type) {
       if (firstGoal) {
         document.getElementById('dep-goal').value = firstGoal.id;
       }
-    }
     } else if (type === 'broker-add') {
       document.getElementById('broker-type').value = 'Пополнение';
       document.getElementById('broker-date').value = today;
