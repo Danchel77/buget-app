@@ -424,3 +424,190 @@ body.selection-mode #transactions-list .tx-actions {
 #deposits-list .card-actions { display:flex; justify-content:flex-end; margin-top:4px; }
 #deposits-list .card-actions button { color:var(--muted) !important; }
 #deposits-list > h3 { margin:8px 2px 0 !important; color:var(--muted-2) !important; font-size:10px !important; letter-spacing:.10em; }
+
+/* ============================================================
+   LOADING SCREEN
+   Небольшая анимация запуска приложения
+   ============================================================ */
+
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  background:
+    radial-gradient(
+      circle at 50% 42%,
+      rgba(123,131,255,.09),
+      transparent 28%
+    ),
+    #0b0e12;
+
+  color: var(--text);
+
+  transition:
+    opacity .25s ease,
+    visibility .25s ease;
+}
+
+/* Центральный знак */
+.loading-mark {
+  position: relative;
+
+  width: 56px;
+  height: 56px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-bottom: 18px;
+}
+
+/* Ромб */
+.loading-mark__diamond {
+  width: 28px;
+  height: 28px;
+
+  border: 2px solid var(--accent);
+
+  transform: rotate(45deg);
+
+  animation:
+    loading-diamond 1.5s ease-in-out infinite;
+}
+
+/* Светящийся импульс вокруг */
+.loading-mark__pulse {
+  position: absolute;
+  inset: 5px;
+
+  border: 1px solid rgba(123,131,255,.35);
+  border-radius: 50%;
+
+  animation:
+    loading-pulse 1.5s ease-out infinite;
+}
+
+/* Название */
+.loading-title {
+  font-size: 18px;
+  font-weight: 700;
+
+  letter-spacing: .12em;
+
+  color: var(--text);
+
+  animation:
+    loading-title 1.5s ease-in-out infinite;
+}
+
+/* Статус */
+.loading-status {
+  display: flex;
+  align-items: center;
+
+  margin-top: 9px;
+
+  color: var(--muted);
+  font-size: 11px;
+
+  letter-spacing: .08em;
+}
+
+/* Три точки */
+.loading-dots {
+  display: inline-flex;
+  gap: 4px;
+
+  margin-left: 5px;
+}
+
+.loading-dots i {
+  display: block;
+
+  width: 3px;
+  height: 3px;
+
+  border-radius: 50%;
+
+  background: var(--accent);
+
+  animation: loading-dot 1.2s ease-in-out infinite;
+}
+
+.loading-dots i:nth-child(2) {
+  animation-delay: .15s;
+}
+
+.loading-dots i:nth-child(3) {
+  animation-delay: .30s;
+}
+
+/* Анимация ромба */
+@keyframes loading-diamond {
+
+  0%,
+  100% {
+    transform: rotate(45deg) scale(.88);
+    opacity: .55;
+  }
+
+  50% {
+    transform: rotate(45deg) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Импульс */
+@keyframes loading-pulse {
+
+  0% {
+    transform: scale(.65);
+    opacity: .7;
+  }
+
+  70% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+
+/* Название */
+@keyframes loading-title {
+
+  0%,
+  100% {
+    opacity: .65;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Точки */
+@keyframes loading-dot {
+
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: .35;
+  }
+
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
