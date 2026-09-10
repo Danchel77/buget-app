@@ -479,30 +479,74 @@ function processDeposits(deposits, goals) {
 function processBroker(ops, goals) {
   const goalsMap = {};
   goals.forEach(g => goalsMap[g.id] = g.name || '');
-  let bal = 0, dep = 0, goalId = '', pts = [];
-  ops.map(o => ({ ...o, d: o.date ? new Date(o.date) : new Date() }))
-    .sort((a, b) => a.d - b.d)
-    .forEach(o => {
-      const s = parseFloat(o.amount) || 0;
-      const ds = formatDateStr(o.date, 'dd.MM.yyyy');
-      if (o.type === 'Цель') goalId = o.goalId || '';
-      else if (o.type === 'Пополнение') {
-        dep += s;
-        bal += s;
-        pts.push({ x: ds, y: bal });
-      }
-      else if (o.type === 'Баланс') {
-        bal = s;
-        pts.push({ x: ds, y: bal });
-      }
-    });
+  let goalId = '';
+  let totalDeposits = 0;
+  const depositList = [];
+  const points = [];
+
+  ops.forEach(o => {
+    if (o.type === 'Цель') {
+      goalId = o.goalId || '';
+      return;
+    }
+    const rawDate = o.date || new Date().toISOString().split('T')[0];
+    const ds = formatDateStr(rawDate, 'dd.MM');
+    const fullDate = formatDateStr(rawDate, 'dd.MM.yyyy');
+    const timestamp = new Date(rawDate).getTime();
+
+    if (o.type === 'Пополнение') {
+      const depAmount = parseFloat(o.amount) || 0;
+      const balAfter = parseFloat(o.balance !== undefined ? o.balance : o.amount) || 0;
+      totalDeposits += depAmount;
+
+      depositList.push({
+        id: o.id,
+        date: rawDate,
+        formattedDate: fullDate,
+        amount: depAmount,
+        balance: balAfter,
+        timestamp
+      });
+
+      points.push({
+        x: ds,
+        fullDate,
+        y: balAfter,
+        type: 'Пополнение',
+        depositAmount: depAmount,
+        timestamp
+      });
+    } else if (o.type === 'Баланс') {
+      const bal = parseFloat(o.balance !== undefined ? o.balance : o.amount) || 0;
+      points.push({
+        x: ds,
+        fullDate,
+        y: bal,
+        type: 'Баланс',
+        depositAmount: 0,
+        timestamp
+      });
+    }
+  });
+
+  // Точки на графике сортируем строго от старых к новым
+  points.sort((a, b) => a.timestamp - b.timestamp);
+
+  // Карточки пополнений сортируем от новых к старым
+  depositList.sort((a, b) => b.timestamp - a.timestamp);
+
+  // Текущий баланс — это последняя точка по времени
+  const currentBalance = points.length > 0 ? points[points.length - 1].y : 0;
+  const profit = currentBalance - totalDeposits;
+
   return {
-    balance: bal,
-    totalDeposits: dep,
-    profit: bal - dep,
+    balance: currentBalance,
+    totalDeposits,
+    profit,
     goalId,
     goalName: goalsMap[goalId] || '',
-    chartData: pts
+    chartData: points,
+    deposits: depositList
   };
 }
 
@@ -560,9 +604,17 @@ function toggleForm(containerId, btnId, btnText, formId, type) {
     } else if (type === 'broker-add') {
       document.getElementById('broker-type').value = 'Пополнение';
       document.getElementById('broker-date').value = today;
+      document.getElementById('broker-form-title').innerText = 'Пополнение счета';
+      document.getElementById('broker-deposit-group').classList.remove('hidden');
+      document.getElementById('broker-amount').required = true;
+      document.getElementById('broker-balance-label').innerText = 'Баланс после пополнения (₽)';
     } else if (type === 'broker-bal') {
       document.getElementById('broker-type').value = 'Баланс';
       document.getElementById('broker-date').value = today;
+      document.getElementById('broker-form-title').innerText = 'Отметка баланса';
+      document.getElementById('broker-deposit-group').classList.add('hidden');
+      document.getElementById('broker-amount').required = false;
+      document.getElementById('broker-balance-label').innerText = 'Баланс на дату (₽)';
     }
   }
 }
@@ -933,46 +985,89 @@ function updateAnalyticsForMonth(monthId) {
 }
 
 function drawBrokerChart() {
-  const data = Cache.broker.chartData;
-  if (!data || data.length === 0) return;
-  const ctx = document.getElementById('brokerChart').getContext('2d');
-  if (brokerChartObj) brokerChartObj.destroy();
+  const br = Cache?.broker;
+  const canvas = document.getElementById('brokerChart');
+  if (!canvas) return;
+
+  const data = br?.chartData || [];
+  const ctx = canvas.getContext('2d');
+
+  if (brokerChartObj) {
+    brokerChartObj.destroy();
+    brokerChartObj = null;
+  }
+
+  if (data.length === 0) return;
+
   brokerChartObj = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: data.map(d => d.x.substring(0, 5)),
+      labels: data.map(d => d.x),
       datasets: [{
         label: 'Баланс',
         data: data.map(d => d.y),
-        borderColor: '#3b82f6',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderColor: '#7b83ff',
+        backgroundColor: 'rgba(123, 131, 255, 0.12)',
         borderWidth: 2,
-        pointRadius: 3,
         fill: true,
-        tension: 0.1
+        tension: 0.2,
+        // Точки пополнения делаем крупнее и зелёными
+        pointRadius: data.map(d => d.type === 'Пополнение' ? 6 : 4),
+        pointHoverRadius: data.map(d => d.type === 'Пополнение' ? 8 : 6),
+        pointBackgroundColor: data.map(d => d.type === 'Пополнение' ? '#36d69b' : '#7b83ff'),
+        pointBorderColor: data.map(d => d.type === 'Пополнение' ? '#ffffff' : '#171d24'),
+        pointBorderWidth: 2
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: {
+        mode: 'nearest',
+        intersect: false
+      },
+      events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
       plugins: {
         legend: { display: false },
-        zoom: {
-          pan: { enabled: true, mode: 'x' },
-          zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
+        datalabels: { display: false },
+        tooltip: {
+          backgroundColor: '#1b222a',
+          borderColor: 'rgba(255, 255, 255, 0.12)',
+          borderWidth: 1,
+          titleColor: '#ffffff',
+          bodyColor: '#c9ced5',
+          padding: 10,
+          cornerRadius: 12,
+          displayColors: false,
+          callbacks: {
+            title: (items) => {
+              if (!items.length) return '';
+              const pt = data[items[0].dataIndex];
+              return pt ? pt.fullDate : '';
+            },
+            label: (context) => {
+              const pt = data[context.dataIndex];
+              if (!pt) return '';
+              const lines = [`Баланс: ${formatMoney(pt.y)}`];
+              if (pt.type === 'Пополнение' && pt.depositAmount > 0) {
+                lines.push(`Пополнение: +${formatMoney(pt.depositAmount)}`);
+              }
+              return lines;
+            }
+          }
         }
       },
       scales: {
         x: {
-          grid: { color: '#374151' },
-          ticks: { color: '#9ca3af', font: { size: 10 } }
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#8d97a4', font: { size: 10 } }
         },
         y: {
-          grid: { color: '#374151' },
+          grid: { color: 'rgba(255,255,255,0.05)' },
           ticks: {
-            color: '#9ca3af',
+            color: '#8d97a4',
             font: { size: 10 },
-            callback: v => (v / 1000) + 'k'
+            callback: v => formatCompactChartMoney(v)
           }
         }
       }
@@ -1105,10 +1200,18 @@ function renderDeposits() {
 
 function submitBrokerOperation(e) {
   e.preventDefault();
+  const type = document.getElementById('broker-type').value;
+  const date = document.getElementById('broker-date').value;
+  const balance = getUnformattedVal(document.getElementById('broker-balance-input'));
+  const amount = type === 'Пополнение' 
+    ? getUnformattedVal(document.getElementById('broker-amount')) 
+    : balance;
+
   submitAction('broker-submit-btn', 'Broker', {
-    type: document.getElementById('broker-type').value,
-    date: document.getElementById('broker-date').value,
-    amount: getUnformattedVal(document.getElementById('broker-amount'))
+    type,
+    date,
+    amount,
+    balance
   });
 }
 
@@ -1124,7 +1227,7 @@ function submitBrokerGoal(e) {
 }
 
 function renderBroker() {
-  const br = Cache.broker;
+  const br = Cache?.broker;
   if (!br) return;
   document.getElementById('broker-balance').innerText = formatMoney(br.balance);
   document.getElementById('broker-deposits').innerText = formatMoney(br.totalDeposits);
@@ -1137,6 +1240,36 @@ function renderBroker() {
     b.classList.remove('hidden');
   } else {
     b.classList.add('hidden');
+  }
+
+  // Отрисовка карточек пополнений под графиком
+  const list = document.getElementById('broker-deposits-list');
+  if (list) {
+    const deps = br.deposits || [];
+    if (deps.length === 0) {
+      list.innerHTML = '<div class="text-center text-gray-500 py-3 text-xs">Пополнений пока нет</div>';
+    } else {
+      list.innerHTML = `
+        <h3 class="text-xs uppercase font-bold tracking-wider text-gray-400 mt-4 mb-2">История пополнений</h3>
+        <div class="space-y-2.5">
+          ${deps.map(d => `
+            <div class="card bg-gray-800 rounded-2xl border border-gray-700 p-3.5 flex justify-between items-center" data-id="${d.id}" data-table="Broker">
+              <div>
+                <p class="text-sm font-bold text-emerald-400">+${formatMoney(d.amount)}</p>
+                <p class="text-[11px] text-gray-400 mt-0.5">${d.formattedDate} • Баланс: ${formatMoney(d.balance)}</p>
+              </div>
+              <button onclick="deleteRecord('Broker','${d.id}')" class="delete-btn text-gray-500 hover:text-red-400 p-2 text-sm leading-none" title="Удалить" aria-label="Удалить пополнение">✕</button>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+  }
+
+  // Обновляем график, если вкладка открыта
+  const brokerTab = document.getElementById('broker-tab');
+  if (brokerTab && !brokerTab.classList.contains('hidden')) {
+    drawBrokerChart();
   }
 }
 
