@@ -552,6 +552,12 @@ function toggleForm(containerId, btnId, btnText, formId, type) {
       addTxRow();
     } else if (type === 'dep') {
       document.getElementById('dep-start').value = today;
+      // Автоматически выбираем первую незавершенную цель
+      const firstGoal = Cache?.goals?.find(g => !g.isAchieved);
+      if (firstGoal) {
+        document.getElementById('dep-goal').value = firstGoal.id;
+      }
+    }
     } else if (type === 'broker-add') {
       document.getElementById('broker-type').value = 'Пополнение';
       document.getElementById('broker-date').value = today;
