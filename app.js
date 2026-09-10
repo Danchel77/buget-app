@@ -766,7 +766,8 @@ function buildCharts() {
       responsive: true,
       maintainAspectRatio: false,
       animation: { duration: 450, easing: 'easeOutQuart' },
-      interaction: { mode: 'index', intersect: false },
+      interaction: { mode: 'index', intersect: true },
+      events: ['mousemove', 'mouseout', 'click'],
       scales: {
         x: {
           stacked: false,
@@ -937,6 +938,89 @@ function drawBrokerChart() {
       }
     }
   });
+}
+
+function renderDeposits() {
+  const data = Cache.deposits || [];
+  if (data.length === 0) {
+    document.getElementById('deposits-list').innerHTML = '<div class="text-center text-gray-500 py-4">Вкладов нет</div>';
+    return;
+  }
+
+  const active = data.filter(d => !d.isClosed);
+  const closed = data.filter(d => d.isClosed);
+  let html = '';
+
+  const renderCard = (dep, isCls) => `
+    <div class="card bg-gray-800 p-4 rounded-2xl border border-gray-700 relative overflow-hidden mb-4 ${isCls ? 'opacity-60 grayscale' : ''}" data-id="${dep.id}" data-table="Deposits">
+  <input type="checkbox" class="select-checkbox" data-id="${dep.id}">
+  <button onclick="deleteRecord('Deposits','${dep.id}')" class="delete-btn" title="Удалить">✕</button>
+  ${dep.goalName ? `<div class="absolute top-0 right-0 bg-blue-600/20 text-blue-300 text-[9px] px-3 py-1 rounded-bl-lg font-bold uppercase tracking-wide border-b border-l border-blue-600/30">Цель: ${escapeHtml(dep.goalName)}</div>` : ''}
+      <div class="flex justify-between items-start mb-2 ${dep.goalName ? 'pt-2' : ''}">
+        <div>
+          <h3 class="font-bold text-white">${escapeHtml(dep.name)}</h3>
+          <p class="text-xs ${isCls ? 'text-gray-500' : 'text-gray-400'}">${isCls ? 'Закрыт ' : 'До '}${dep.endDateStr} • ${dep.rate}%</p>
+        </div>
+        <div class="text-right">
+          <p class="font-bold text-lg text-white">${formatMoney(dep.amount)}</p>
+          <div class="card-actions flex space-x-3 justify-end text-xs opacity-60 mt-1">
+            ${!isCls ? `<button onclick="editDep('${dep.id}','${escapeHtml(dep.name)}',${dep.amount},${dep.rate},'${dep.rawStart}','${dep.rawEnd}','${dep.goalId}')" class="text-gray-400 hover:text-blue-400">✎</button>` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="bg-gray-900/50 rounded-lg p-3 mb-3 flex justify-between">
+        <p class="font-bold text-emerald-400">+${formatMoney(dep.currentInterest)}</p>
+        <p class="font-medium text-gray-300">+${formatMoney(dep.expectedInterest)}</p>
+      </div>
+      <div class="w-full bg-gray-700 rounded-full h-1.5">
+        <div class="bg-blue-500 h-1.5 rounded-full" style="width:${dep.progress}%"></div>
+      </div>
+    </div>`;
+
+  if (active.length > 0) {
+    html += `<h3 class="text-xs text-gray-400 uppercase font-bold tracking-wider mb-3">Активные</h3>` + active.map(d => renderCard(d, false)).join('');
+  }
+  if (closed.length > 0) {
+    html += `<h3 class="text-xs text-gray-400 uppercase font-bold tracking-wider mb-3 mt-6">Завершенные</h3>` + closed.map(d => renderCard(d, true)).join('');
+  }
+  document.getElementById('deposits-list').innerHTML = html;
+}
+
+function submitBrokerOperation(e) {
+  e.preventDefault();
+  submitAction('broker-submit-btn', 'Broker', {
+    type: document.getElementById('broker-type').value,
+    date: document.getElementById('broker-date').value,
+    amount: getUnformattedVal(document.getElementById('broker-amount'))
+  });
+}
+
+function submitBrokerGoal(e) {
+  e.preventDefault();
+  const g = document.getElementById('broker-goal-select').value;
+  if (!g) return showDialog('Внимание', 'Выберите цель', false);
+  submitAction('broker-goal-btn', 'Broker', {
+    type: 'Цель',
+    date: new Date().toISOString().split('T')[0],
+    goalId: g
+  });
+}
+
+function renderBroker() {
+  const br = Cache.broker;
+  if (!br) return;
+  document.getElementById('broker-balance').innerText = formatMoney(br.balance);
+  document.getElementById('broker-deposits').innerText = formatMoney(br.totalDeposits);
+  const p = document.getElementById('broker-profit');
+  p.innerText = (br.profit > 0 ? '+' : '') + formatMoney(br.profit);
+  p.className = `text-xs font-bold ${br.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
+  const b = document.getElementById('broker-goal-badge');
+  if (br.goalName) {
+    b.innerText = 'Цель: ' + br.goalName;
+    b.classList.remove('hidden');
+  } else {
+    b.classList.add('hidden');
+  }
 }
 
 function submitGoal(e) {
