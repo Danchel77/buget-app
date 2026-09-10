@@ -31,11 +31,23 @@
 </head>
 <body class="pb-24 bg-[#121212] text-[#e5e7eb]">
 
-  <!-- ЭКРАН ЗАГРУЗКИ (показывается при старте, пока Firebase определяет авторизацию) -->
-<div id="loading-screen" class="fixed inset-0 bg-gray-900 z-50 flex flex-col justify-center items-center">
-  <div class="spinner" style="width: 40px; height: 40px; border-width: 4px;"></div>
-  <p class="text-gray-400 mt-4 text-sm">Загрузка...</p>
-</div>
+ <div id="loading-screen" class="loading-screen">
+  <div class="loading-mark">
+    <div class="loading-mark__diamond"></div>
+    <div class="loading-mark__pulse"></div>
+  </div>
+
+  <div class="loading-title">БЮДЖЕТ</div>
+
+  <div class="loading-status">
+    <span>Загрузка</span>
+    <span class="loading-dots">
+      <i></i>
+      <i></i>
+      <i></i>
+    </span>
+  </div>
+</div> 
 
 <div id="login-screen" class="fixed inset-0 bg-gray-900 z-50 hidden flex flex-col justify-center items-center p-6">
     <div class="bg-gray-800 p-6 rounded-2xl border border-gray-700 w-full max-w-sm shadow-lg">
