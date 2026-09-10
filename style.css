@@ -130,12 +130,12 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
 #transactions-list .tx-category > span:last-child { min-width:0; overflow:hidden; text-overflow:ellipsis; }
 #transactions-list .tx-category__icon { flex:0 0 auto; font-size:17px; }
 #transactions-list .tx-meta { margin:7px 0 0; color:var(--muted) !important; font-size:11px !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-#transactions-list .tx-actions { align-self:center; padding:0 !important; min-width:0; justify-self:end; align-items:flex-end; }
+#transactions-list .tx-actions { position:absolute !important; top:18px; right:18px; bottom:16px; width:max-content; min-width:0; padding:0 !important; margin:0 !important; display:flex !important; flex-direction:column !important; align-items:flex-end !important; justify-content:space-between !important; gap:8px !important; }
 #transactions-list .tx-amount { margin:0 !important; font-size:17px !important; line-height:1.15; white-space:nowrap; }
-#transactions-list .tx-edit-btn { width:30px; height:30px; border:1px solid var(--line); border-radius:10px; color:var(--muted) !important; background:rgba(255,255,255,.025); font-size:14px; }
+#transactions-list .tx-edit-btn { width:30px; height:30px; flex:0 0 30px; border:1px solid var(--line); border-radius:10px; color:var(--muted) !important; background:rgba(255,255,255,.025); font-size:14px; display:flex; align-items:center; justify-content:center; }
 #transactions-list .delete-btn { top:10px !important; right:10px !important; width:25px !important; height:25px !important; display:flex; align-items:center; justify-content:center; border-radius:8px !important; background:rgba(255,255,255,.025) !important; border:1px solid rgba(255,255,255,.06) !important; }
 #transactions-list .delete-btn:hover { background:rgba(255,111,125,.10) !important; }
-body.selection-mode #transactions-list .tx-actions { padding-right:0 !important; }
+body.selection-mode #transactions-list .tx-actions { right:16px !important; }
 
 /* ---------- Full analytics composition ---------- */
 .chart-screen { padding:2px 0 22px; }
@@ -172,7 +172,7 @@ body.selection-mode #transactions-list .tx-actions { padding-right:0 !important;
 
 @media (max-width:420px) {
   #transactions-list .card { grid-template-columns:minmax(0,1fr) minmax(96px,auto); padding:19px 42px 19px 14px !important; }
-  #transactions-list .tx-actions { padding-right:0 !important; }
+  #transactions-list .tx-actions { right:16px !important; }
   #transactions-list .tx-amount { font-size:15px !important; }
   .analytics-heading h2 { font-size:22px; }
   .analytics-heading .chart-select { width:142px; font-size:12px; }

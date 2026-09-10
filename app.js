@@ -940,6 +940,33 @@ function drawBrokerChart() {
   });
 }
 
+function submitDeposit(e) {
+  e.preventDefault();
+  submitAction('dep-submit-btn', 'Deposits', {
+    name: document.getElementById('dep-name').value,
+    amount: getUnformattedVal(document.getElementById('dep-amount')),
+    rate: getUnformattedVal(document.getElementById('dep-rate')),
+    startDate: document.getElementById('dep-start').value,
+    endDate: document.getElementById('dep-end').value,
+    goalId: document.getElementById('dep-goal').value,
+    status: 'Активен'
+  });
+}
+
+function editDep(id, name, amount, rate, start, end, goalId) {
+  currentEditId = id;
+  currentEditTable = 'Deposits';
+  document.getElementById('dep-name').value = name;
+  setFormattedVal('dep-amount', amount);
+  setFormattedVal('dep-rate', rate);
+  document.getElementById('dep-start').value = start;
+  document.getElementById('dep-end').value = end;
+  document.getElementById('dep-goal').value = goalId || '';
+  document.getElementById('dep-submit-btn').innerText = 'Сохранить изменения';
+  document.getElementById('deposit-form-container').classList.remove('hidden');
+  window.scrollTo(0, 0);
+}
+
 function renderDeposits() {
   const data = Cache.deposits || [];
   if (data.length === 0) {
