@@ -1236,9 +1236,14 @@ function enableSelectionMode() {
     panel.id = 'selection-panel';
     panel.className = 'selection-panel';
     panel.innerHTML = `
-      <span id="selected-count">Выбрано: 0</span>
-      <button id="delete-selected" class="bg-red-600">Удалить</button>
-      <button id="cancel-selection" class="cancel-selection">Отмена</button>
+      <div class="selection-panel__info">
+        <span class="selection-panel__dot"></span>
+        <span id="selected-count">Выбрано: 0</span>
+      </div>
+      <div class="selection-panel__actions">
+        <button id="cancel-selection" type="button">Отмена</button>
+        <button id="delete-selected" type="button">Удалить</button>
+      </div>
     `;
     document.body.appendChild(panel);
   }
@@ -1377,11 +1382,11 @@ document.addEventListener('click', (e) => {
   }
 
   // Обработка кнопок панели выбора
-  if (e.target.id === 'delete-selected') {
+  if (e.target.id === 'delete-selected' || e.target.closest('#delete-selected')) {
     deleteSelectedItems();
     return;
   }
-  if (e.target.id === 'cancel-selection') {
+  if (e.target.id === 'cancel-selection' || e.target.closest('#cancel-selection')) {
     cancelSelection();
     return;
   }
