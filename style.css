@@ -33,7 +33,6 @@ header button { background:var(--surface) !important; border:1px solid var(--lin
 #app-content { width:100%; max-width:760px !important; margin:0 auto; padding:22px 18px 116px !important; }
 
 /* ---------- cards / transaction layout ---------- */
-
 .card {
   position: relative !important;
   width: 100%;
