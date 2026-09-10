@@ -286,6 +286,25 @@ body.selection-mode #transactions-list .tx-amount {
 .category-legend__name { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#c6ccd4; font-size:12px; }
 .category-legend__value { color:#eef0f3; font-size:12px; font-weight:650; white-space:nowrap; }
 
+/* Кнопки управления категориями в форме транзакции */
+.manage-categories-btn,
+.add-category-btn {
+  background: transparent !important;
+  border: 0 !important;
+  color: var(--muted) !important;
+  padding: 4px 6px !important;
+  font-size: 14px !important;
+  line-height: 1 !important;
+  cursor: pointer;
+  border-radius: 8px !important;
+  transition: color 0.15s ease;
+}
+
+.manage-categories-btn:hover,
+.add-category-btn:hover {
+  color: var(--accent) !important;
+}
+
 /* ---------- forms / generic UI ---------- */
 input, select, textarea { color:var(--text) !important; background:var(--surface-2) !important; border-color:var(--line-strong) !important; border-radius:14px !important; }
 input:focus, select:focus, textarea:focus { border-color:rgba(123,131,255,.6) !important; box-shadow:0 0 0 3px rgba(123,131,255,.10) !important; }
