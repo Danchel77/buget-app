@@ -35,88 +35,126 @@ header button { background:var(--surface) !important; border:1px solid var(--lin
 /* ---------- cards / transaction layout ---------- */
 
 .card {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  position: relative !important;
   width: 100%;
   min-height: 0;
-  padding: 12px 14px;
-  background: linear-gradient(145deg, var(--surface-2), var(--surface));
-  border: 1px solid var(--line-strong);
-  border-radius: 20px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  background: linear-gradient(145deg, var(--surface-2), var(--surface)) !important;
+  border: 1px solid var(--line-strong) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12) !important;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
-  transition: transform 0.15s ease, border-color 0.15s ease;
+  transition: border-color 0.15s ease;
 }
 
 .card:hover {
-  border-color: rgba(123,131,255,.20);
+  border-color: rgba(123,131,255,.20) !important;
 }
-
-.card-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-.card-action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 28px;
-  padding: 0;
-  margin: 0;
-  background: transparent;
-  border: 0;
-  color: var(--muted);
-  font-size: 14px;
-  cursor: pointer;
-  transition: color 0.15s ease;
-}
-
-.card-action-btn:hover { color: var(--accent); }
-.card-action-btn.delete-btn:hover { color: var(--red); }
 
 /* Списки */
 #transactions-list, #deposits-list, #goals-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 10px !important;
 }
 
 #transactions-list > .pt-2 {
   margin-top: 12px;
-  padding: 8px 2px 10px;
-  border-bottom: 1px solid var(--line);
+  padding: 8px 2px 10px !important;
+  border-bottom: 1px solid var(--line) !important;
 }
 
 #transactions-list > .pt-2 h3 {
-  color: #aeb6c1;
-  font-size: 12px;
+  color: #aeb6c1 !important;
+  font-size: 12px !important;
   letter-spacing: .08em;
 }
 
 #transactions-list > .pt-2 span {
-  color: var(--muted-2);
-  font-size: 11px;
+  color: var(--muted-2) !important;
+  font-size: 11px !important;
 }
 
 #transactions-list > .space-y-3 {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 6px;
+  gap: 10px !important;
+  margin-top: 6px !important;
 }
 
-/* Карточка транзакции */
+/* ---------- Кнопки удаления и редактирования во всех карточках ---------- */
+
+/* Удаление — правый верхний угол */
+.tx-delete-btn,
+.deposit-delete-btn,
+.goal-delete-btn {
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  width: 32px !important;
+  height: 30px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  border: 0 !important;
+  color: var(--muted) !important;
+  font-size: 15px !important;
+  line-height: 1 !important;
+  cursor: pointer;
+  z-index: 2;
+  transition: color 0.15s ease;
+}
+
+.tx-delete-btn:hover,
+.deposit-delete-btn:hover,
+.goal-delete-btn:hover {
+  color: var(--red) !important;
+}
+
+/* Редактирование — правый нижний угол */
+.tx-edit-btn,
+.deposit-edit-btn,
+.goal-edit-btn {
+  position: absolute !important;
+  bottom: 8px !important;
+  right: 8px !important;
+  width: 32px !important;
+  height: 30px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  border: 0 !important;
+  color: var(--muted) !important;
+  font-size: 13px !important;
+  line-height: 1 !important;
+  cursor: pointer;
+  z-index: 2;
+  transition: color 0.15s ease;
+}
+
+.tx-edit-btn:hover,
+.deposit-edit-btn:hover,
+.goal-edit-btn:hover {
+  color: var(--accent) !important;
+}
+
+/* ---------- Карточка транзакции ---------- */
+.transaction-card {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 64px;
+  padding: 12px 48px 12px 14px !important;
+}
+
 .transaction-card .tx-main-info {
   flex: 1;
   min-width: 0;
@@ -126,96 +164,130 @@ header button { background:var(--surface) !important; border:1px solid var(--lin
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 0;
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 650;
+  margin: 0 !important;
+  color: var(--text) !important;
+  font-size: 15px !important;
+  font-weight: 650 !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.transaction-card .tx-category__icon { flex-shrink: 0; }
+.transaction-card .tx-category__icon {
+  flex-shrink: 0;
+}
 
 .transaction-card .tx-meta {
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 12px;
+  margin: 4px 0 0 !important;
+  color: var(--muted) !important;
+  font-size: 12px !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .transaction-card .tx-amount {
-  margin: 0 4px;
-  font-size: 16px;
-  font-weight: 600;
+  margin: 0 !important;
+  font-size: 17px !important;
+  font-weight: 600 !important;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-/* Карточки вкладов и целей */
-.deposit-card, .goal-card {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-  padding: 14px 16px;
+/* ---------- Карточка вклада ---------- */
+.deposit-card {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-rows: auto auto auto;
+  column-gap: 12px;
+  row-gap: 8px;
+  align-items: center;
+  padding: 14px 48px 14px 16px !important;
 }
 
-.card-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+.deposit-card .deposit-main {
+  grid-column: 1;
+  grid-row: 1;
   min-width: 0;
 }
 
-.card-header-row h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 650;
+.deposit-card .deposit-main h3 {
+  margin: 0 !important;
+  color: var(--text) !important;
+  font-size: 16px !important;
+  font-weight: 650 !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--text);
 }
 
-.deposit-info-sub {
-  margin: 3px 0 0;
-  font-size: 12px;
-  color: var(--muted);
+.deposit-card .deposit-main p {
+  margin: 3px 0 0 !important;
+  color: var(--muted) !important;
+  font-size: 12px !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.deposit-goal-badge {
-  display: inline-block;
-  align-self: flex-start;
-  padding: 2px 8px;
+.deposit-card .deposit-amount {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0 !important;
+  color: var(--text) !important;
+  font-size: 17px !important;
+  font-weight: 650 !important;
+  white-space: nowrap;
+}
+
+.deposit-card .deposit-goal-badge {
+  position: absolute;
+  top: 0;
+  right: 42px;
+  padding: 3px 8px;
   color: #aeb4ff;
   background: var(--accent-soft);
-  border: 1px solid rgba(123,131,255,.25);
-  border-radius: 6px;
-  font-size: 9px;
+  border-left: 1px solid rgba(123,131,255,.25);
+  border-bottom: 1px solid rgba(123,131,255,.25);
+  border-radius: 0 0 8px 8px;
+  font-size: 8px;
   font-weight: 700;
   letter-spacing: .04em;
   text-transform: uppercase;
+  z-index: 1;
 }
 
-.deposit-interest, .goal-amounts {
+.deposit-card .deposit-interest {
+  grid-column: 1 / -1;
+  grid-row: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 8px 10px;
+  margin: 0 !important;
+  padding: 7px 10px !important;
   background: rgba(0,0,0,.22);
   border-radius: 10px;
-  font-size: 13px;
 }
 
-.deposit-current-interest { color: var(--green); font-weight: 650; }
-.deposit-expected-interest { color: #c7ccd4; }
+.deposit-card .deposit-interest p {
+  margin: 0 !important;
+  font-size: 13px !important;
+  white-space: nowrap;
+}
 
-.progress-bar-bg {
+.deposit-current-interest {
+  color: var(--green) !important;
+  font-weight: 650;
+}
+
+.deposit-expected-interest {
+  color: #c7ccd4 !important;
+}
+
+.deposit-card .deposit-progress {
+  grid-column: 1 / -1;
+  grid-row: 3;
   width: 100%;
   height: 6px;
   background: rgba(255,255,255,.08);
@@ -223,73 +295,152 @@ header button { background:var(--surface) !important; border:1px solid var(--lin
   overflow: hidden;
 }
 
-.progress-bar-fill {
+.deposit-card .deposit-progress > div {
   height: 100%;
   background: #6570f5;
   border-radius: 999px;
-  transition: width 0.3s ease;
 }
 
-.progress-bar-fill--achieved { background: var(--green); }
-
 .deposit-section-title {
-  margin: 14px 2px 4px;
-  color: var(--muted-2);
-  font-size: 10px;
-  font-weight: 700;
+  margin: 14px 2px 4px !important;
+  color: var(--muted-2) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
   letter-spacing: .10em;
   text-transform: uppercase;
 }
 
-/* Режим мультивыбора */
-.select-checkbox {
-  display: none;
-  width: 20px;
-  height: 20px;
-  margin-left: auto;
-  accent-color: var(--accent);
-  cursor: pointer;
-  flex-shrink: 0;
+.deposit-section-title--closed {
+  margin-top: 18px !important;
 }
 
-body.selection-mode .select-checkbox { display: block; }
-body.selection-mode .card-actions,
-body.selection-mode .tx-amount { display: none; }
-
-.card.selected {
-  outline: 2px solid var(--accent);
-  background: rgba(123,131,255,.12);
+/* ---------- Карточка цели ---------- */
+.goal-card {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-rows: auto auto auto;
+  column-gap: 12px;
+  row-gap: 8px;
+  align-items: center;
+  padding: 14px 48px 14px 16px !important;
 }
 
-.selection-panel {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 96px;
-  z-index: 50;
+.goal-card .goal-main {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.goal-card .goal-main h3 {
+  margin: 0 !important;
+  color: var(--text) !important;
+  font-size: 16px !important;
+  font-weight: 650 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.goal-card .goal-date {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted) !important;
+  font-size: 12px !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.goal-card .goal-status--achieved {
+  display: block;
+  margin-top: 3px;
+  color: var(--green) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.goal-card .goal-progress-value {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0 !important;
+  color: var(--text) !important;
+  font-size: 17px !important;
+  font-weight: 650 !important;
+  white-space: nowrap;
+}
+
+.goal-card .goal-progress {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: 100%;
+  height: 6px;
+  background: rgba(255,255,255,.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.goal-card .goal-progress-fill {
+  height: 100%;
+  background: #6570f5;
+  border-radius: 999px;
+}
+
+.goal-card .goal-progress-fill--achieved {
+  background: var(--green);
+}
+
+.goal-card .goal-amounts {
+  grid-column: 1 / -1;
+  grid-row: 3;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 18px;
-  background: var(--surface-3);
-  border: 1px solid var(--line-strong);
-  border-radius: 18px;
-  box-shadow: 0 14px 35px rgba(0,0,0,.4);
-  color: var(--text);
-  font-size: 13px;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px !important;
 }
 
-.selection-panel button {
-  padding: 6px 14px;
-  border-radius: 10px;
-  font-size: 12px;
+.goal-card .goal-amounts span:first-child {
+  color: var(--text) !important;
   font-weight: 600;
-  cursor: pointer;
-  border: 0;
 }
 
-.selection-panel .btn-delete { background: var(--red); color: #fff; }
-.selection-panel .btn-cancel { background: var(--surface-2); color: var(--muted); }
+.goal-card .goal-amounts span:last-child {
+  color: var(--muted) !important;
+}
+
+/* ---------- Режим мультивыбора ---------- */
+.select-checkbox {
+  display: none !important;
+  position: absolute !important;
+  top: 12px !important;
+  right: 12px !important;
+  width: 22px !important;
+  height: 22px !important;
+  z-index: 10;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+body.selection-mode .select-checkbox {
+  display: block !important;
+}
+
+body.selection-mode .tx-delete-btn,
+body.selection-mode .tx-edit-btn,
+body.selection-mode .deposit-delete-btn,
+body.selection-mode .deposit-edit-btn,
+body.selection-mode .goal-delete-btn,
+body.selection-mode .goal-edit-btn,
+body.selection-mode .tx-amount {
+  display: none !important;
+}
+
+.card.selected {
+  outline: 2px solid var(--accent) !important;
+  background: rgba(123,131,255,.12) !important;
+}
 
 /* ============================================================
    LOADING SCREEN
