@@ -651,42 +651,76 @@ function editTx(id, type, amount, cat, comment, rawDate) {
 function renderTransactions() {
   const data = Cache.transactions || [];
   const curMonth = data.find(m => m.id === formatDateStr(new Date(), 'yyyy-MM')) || { expense: 0, income: 0 };
+
   document.getElementById('month-expense').innerText = formatMoney(curMonth.expense);
   document.getElementById('month-income').innerText = formatMoney(curMonth.income);
 
   if (data.length === 0) {
-    document.getElementById('transactions-list').innerHTML = '<div class="text-center text-gray-500 py-4">Операций нет</div>';
+    document.getElementById('transactions-list').innerHTML =
+      '<div class="text-center text-gray-500 py-4">Операций нет</div>';
     return;
   }
 
   document.getElementById('transactions-list').innerHTML = data.map(month => `
     <div class="pt-2 pb-1 border-b border-gray-800 flex justify-between items-end">
       <h3 class="font-bold text-gray-400 text-xs uppercase tracking-wider">${month.label}</h3>
-      <span class="text-[10px] text-gray-500">Доход: ${formatMoney(month.income)} | Расход: ${formatMoney(month.expense)}</span>
+      <span class="text-[10px] text-gray-500">
+        Доход: ${formatMoney(month.income)} | Расход: ${formatMoney(month.expense)}
+      </span>
     </div>
+
     <div class="space-y-3 mt-3">
       ${month.items.map(tx => {
         const isExp = tx.type === 'Расход';
+
         return `
-         <div class="card bg-gray-800 p-3 rounded-2xl border border-gray-700 relative" data-id="${tx.id}" data-table="Transactions">
-          <input type="checkbox" class="select-checkbox" data-id="${tx.id}">
-          <button onclick="deleteRecord('Transactions','${tx.id}')" class="delete-btn" title="Удалить" aria-label="Удалить операцию">✕</button>
-          <div class="tx-main-info">
-            <p class="tx-category">
-              ${(() => {
-                const cat = Cache.categories[tx.type === 'Расход' ? 'expense' : 'income'].find(c => c.name === tx.category);
-                return cat ? `<span class="tx-category__icon">${cat.icon}</span>` : '';
-              })()}<span>${escapeHtml(tx.category)}</span>
+          <div class="card transaction-card bg-gray-800 rounded-2xl border border-gray-700 relative"
+               data-id="${tx.id}"
+               data-table="Transactions">
+
+            <input type="checkbox"
+                   class="select-checkbox"
+                   data-id="${tx.id}">
+
+            <button
+              onclick="deleteRecord('Transactions','${tx.id}')"
+              class="delete-btn tx-delete-btn"
+              title="Удалить"
+              aria-label="Удалить операцию">✕</button>
+
+            <div class="tx-main-info">
+              <p class="tx-category">
+                ${(() => {
+                  const cat = Cache.categories[
+                    tx.type === 'Расход' ? 'expense' : 'income'
+                  ].find(c => c.name === tx.category);
+
+                  return cat
+                    ? `<span class="tx-category__icon">${cat.icon}</span>`
+                    : '';
+                })()}
+                <span>${escapeHtml(tx.category)}</span>
+              </p>
+
+              <p class="tx-meta">
+                ${tx.formattedDate}${tx.comment ? ' • ' + escapeHtml(tx.comment) : ''}
+              </p>
+            </div>
+
+            <p class="tx-amount ${isExp ? 'text-red-400' : 'text-emerald-400'}">
+              ${isExp ? '-' : '+'}${formatMoney(tx.amount)}
             </p>
-            <p class="tx-meta">${tx.formattedDate}${tx.comment ? ' • ' + escapeHtml(tx.comment) : ''}</p>
+
+            <button
+              onclick="editTx('${tx.id}','${tx.type}',${tx.amount},'${escapeHtml(tx.category)}','${escapeHtml(tx.comment)}','${tx.rawDate}')"
+              class="tx-edit-btn"
+              aria-label="Редактировать">✎</button>
+
           </div>
-          <div class="card-actions tx-actions">
-            <p class="tx-amount ${isExp ? 'text-red-400' : 'text-emerald-400'}">${isExp ? '-' : '+'}${formatMoney(tx.amount)}</p>
-            <button onclick="editTx('${tx.id}','${tx.type}',${tx.amount},'${escapeHtml(tx.category)}','${escapeHtml(tx.comment)}','${tx.rawDate}')" class="tx-edit-btn" aria-label="Редактировать">✎</button>
-          </div>
-        </div>`;
+        `;
       }).join('')}
-    </div>`).join('');
+    </div>
+  `).join('');
 }
 
 function switchTransactionView(view) {
@@ -969,47 +1003,97 @@ function editDep(id, name, amount, rate, start, end, goalId) {
 
 function renderDeposits() {
   const data = Cache.deposits || [];
+
   if (data.length === 0) {
-    document.getElementById('deposits-list').innerHTML = '<div class="text-center text-gray-500 py-4">Вкладов нет</div>';
+    document.getElementById('deposits-list').innerHTML =
+      '<div class="text-center text-gray-500 py-4">Вкладов нет</div>';
     return;
   }
 
   const active = data.filter(d => !d.isClosed);
   const closed = data.filter(d => d.isClosed);
+
   let html = '';
 
   const renderCard = (dep, isCls) => `
-    <div class="card bg-gray-800 p-4 rounded-2xl border border-gray-700 relative overflow-hidden mb-4 ${isCls ? 'opacity-60 grayscale' : ''}" data-id="${dep.id}" data-table="Deposits">
-  <input type="checkbox" class="select-checkbox" data-id="${dep.id}">
-  <button onclick="deleteRecord('Deposits','${dep.id}')" class="delete-btn" title="Удалить">✕</button>
-  ${dep.goalName ? `<div class="absolute top-0 right-0 bg-blue-600/20 text-blue-300 text-[9px] px-3 py-1 rounded-bl-lg font-bold uppercase tracking-wide border-b border-l border-blue-600/30">Цель: ${escapeHtml(dep.goalName)}</div>` : ''}
-      <div class="flex justify-between items-start mb-2 ${dep.goalName ? 'pt-2' : ''}">
-        <div>
-          <h3 class="font-bold text-white">${escapeHtml(dep.name)}</h3>
-          <p class="text-xs ${isCls ? 'text-gray-500' : 'text-gray-400'}">${isCls ? 'Закрыт ' : 'До '}${dep.endDateStr} • ${dep.rate}%</p>
+    <div
+      class="card deposit-card ${isCls ? 'opacity-60 grayscale' : ''}"
+      data-id="${dep.id}"
+      data-table="Deposits">
+
+      <input
+        type="checkbox"
+        class="select-checkbox"
+        data-id="${dep.id}">
+
+      <button
+        onclick="deleteRecord('Deposits','${dep.id}')"
+        class="delete-btn deposit-delete-btn"
+        title="Удалить"
+        aria-label="Удалить вклад">✕</button>
+
+      ${dep.goalName ? `
+        <div class="deposit-goal-badge">
+          Цель: ${escapeHtml(dep.goalName)}
         </div>
-        <div class="text-right">
-          <p class="font-bold text-lg text-white">${formatMoney(dep.amount)}</p>
-          <div class="card-actions flex space-x-3 justify-end text-xs opacity-60 mt-1">
-            ${!isCls ? `<button onclick="editDep('${dep.id}','${escapeHtml(dep.name)}',${dep.amount},${dep.rate},'${dep.rawStart}','${dep.rawEnd}','${dep.goalId}')" class="text-gray-400 hover:text-blue-400">✎</button>` : ''}
-          </div>
-        </div>
+      ` : ''}
+
+      <div class="deposit-main">
+        <h3>${escapeHtml(dep.name)}</h3>
+        <p>
+          ${isCls ? 'Закрыт ' : 'До '}
+          ${dep.endDateStr} • ${dep.rate}%
+        </p>
       </div>
-      <div class="bg-gray-900/50 rounded-lg p-3 mb-3 flex justify-between">
-        <p class="font-bold text-emerald-400">+${formatMoney(dep.currentInterest)}</p>
-        <p class="font-medium text-gray-300">+${formatMoney(dep.expectedInterest)}</p>
+
+      <p class="deposit-amount">
+        ${formatMoney(dep.amount)}
+      </p>
+
+      ${!isCls ? `
+        <button
+          onclick="editDep('${dep.id}','${escapeHtml(dep.name)}',${dep.amount},${dep.rate},'${dep.rawStart}','${dep.rawEnd}','${dep.goalId}')"
+          class="deposit-edit-btn"
+          aria-label="Редактировать">✎</button>
+      ` : ''}
+
+      <div class="deposit-interest">
+        <p class="deposit-current-interest">
+          +${formatMoney(dep.currentInterest)}
+        </p>
+
+        <p class="deposit-expected-interest">
+          +${formatMoney(dep.expectedInterest)}
+        </p>
       </div>
-      <div class="w-full bg-gray-700 rounded-full h-1.5">
-        <div class="bg-blue-500 h-1.5 rounded-full" style="width:${dep.progress}%"></div>
+
+      <div class="deposit-progress">
+        <div style="width:${dep.progress}%"></div>
       </div>
-    </div>`;
+
+    </div>
+  `;
 
   if (active.length > 0) {
-    html += `<h3 class="text-xs text-gray-400 uppercase font-bold tracking-wider mb-3">Активные</h3>` + active.map(d => renderCard(d, false)).join('');
+    html += `
+      <h3 class="deposit-section-title">
+        Активные
+      </h3>
+    `;
+
+    html += active.map(d => renderCard(d, false)).join('');
   }
+
   if (closed.length > 0) {
-    html += `<h3 class="text-xs text-gray-400 uppercase font-bold tracking-wider mb-3 mt-6">Завершенные</h3>` + closed.map(d => renderCard(d, true)).join('');
+    html += `
+      <h3 class="deposit-section-title deposit-section-title--closed">
+        Завершенные
+      </h3>
+    `;
+
+    html += closed.map(d => renderCard(d, true)).join('');
   }
+
   document.getElementById('deposits-list').innerHTML = html;
 }
 
