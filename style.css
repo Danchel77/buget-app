@@ -147,7 +147,7 @@ header button { background:var(--surface) !important; border:1px solid var(--lin
 #transactions-list .card-actions button {
   grid-column:3;
   grid-row:2;
-  align-self:end;
+  align-self:center;
   justify-self:center;
 
   width:36px;
@@ -180,7 +180,7 @@ header button { background:var(--surface) !important; border:1px solid var(--lin
   right:auto !important;
   z-index:1;
 
-  align-self:start;
+  align-self:center;
   justify-self:center;
 
   width:36px !important;
@@ -332,12 +332,81 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
 
 /* ---------- deposits ---------- */
 #deposits-list { display:flex; flex-direction:column; gap:10px !important; }
-#deposits-list .card { margin-bottom:0 !important; padding:18px !important; background:linear-gradient(145deg,var(--surface-2),var(--surface)) !important; border:1px solid var(--line-strong) !important; border-radius:22px !important; box-shadow:0 8px 24px rgba(0,0,0,.12) !important; }
+#deposits-list .card {
+  margin-bottom:0 !important;
+  padding:16px 14px 16px 18px !important;
+
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) max-content 36px;
+  grid-template-rows:32px 32px auto auto;
+  column-gap:14px;
+  row-gap:10px;
+  align-items:center;
+
+  background:linear-gradient(145deg,var(--surface-2),var(--surface)) !important;
+  border:1px solid var(--line-strong) !important;
+  border-radius:22px !important;
+  box-shadow:0 8px 24px rgba(0,0,0,.12) !important;
+}
 #deposits-list .card h3 { font-size:16px !important; }
-#deposits-list .card .delete-btn { top:10px !important; right:10px !important; }
-#deposits-list .card-actions { display:flex; justify-content:flex-end; margin-top:4px; }
-#deposits-list .card-actions button { color:var(--muted) !important; }
+#deposits-list .card .delete-btn {
+  position:static !important;
+  grid-column:3;
+  grid-row:1;
+
+  width:36px !important;
+  height:32px !important;
+
+  margin:0 !important;
+  padding:0 !important;
+
+  display:flex !important;
+  align-items:center;
+  justify-content:center;
+
+  border:1px solid var(--line) !important;
+  border-radius:10px !important;
+  background:rgba(255,255,255,.025) !important;
+  color:var(--muted) !important;
+}
+#deposits-list .card-actions {
+  display:contents !important;
+}
+
+#deposits-list .card-actions button {
+  grid-column:3;
+  grid-row:2;
+
+  align-self:center;
+  justify-self:center;
+
+  width:36px;
+  height:32px;
+
+  margin:0 !important;
+  padding:0;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  border:1px solid var(--line);
+  border-radius:10px;
+
+  color:var(--muted) !important;
+  background:rgba(255,255,255,.025);
+}
 #deposits-list > h3 { margin:8px 2px 0 !important; color:var(--muted-2) !important; font-size:10px !important; letter-spacing:.10em; }
+#deposits-list .card > .flex.justify-between.items-start > div:last-child > p {
+  grid-column:2;
+  grid-row:1 / span 2;
+
+  align-self:center;
+  justify-self:end;
+
+  margin:0 !important;
+  white-space:nowrap;
+}
 
 /* ============================================================
    LOADING SCREEN
