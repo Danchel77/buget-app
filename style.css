@@ -583,6 +583,217 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
   margin-top:14px !important;
 }
 
+/* ---------- goals ---------- */
+
+#goals-list {
+  display:flex;
+  flex-direction:column;
+  gap:10px !important;
+}
+
+/* Goal card */
+#goals-list .card {
+  position:relative !important;
+
+  width:100%;
+  min-height:0;
+
+  margin:0 !important;
+  padding:15px 15px 14px !important;
+
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) max-content;
+  grid-template-rows:auto auto auto;
+  column-gap:14px;
+  row-gap:10px;
+
+  align-items:center;
+
+  background:linear-gradient(145deg,var(--surface-2),var(--surface)) !important;
+  border:1px solid var(--line-strong) !important;
+  border-radius:20px !important;
+  box-shadow:0 8px 24px rgba(0,0,0,.12) !important;
+}
+
+/* Name + deadline */
+#goals-list .card > .flex.justify-between.items-start {
+  grid-column:1 / -1;
+  grid-row:1;
+
+  min-width:0;
+
+  margin:0 !important;
+  padding-right:38px;
+
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+#goals-list .card h3 {
+  margin:0 !important;
+
+  color:var(--text) !important;
+  font-size:17px !important;
+  font-weight:650 !important;
+  line-height:1.25;
+
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+#goals-list .card h3 + span {
+  display:block;
+
+  margin-top:4px;
+
+  color:var(--muted) !important;
+  font-size:12px !important;
+  line-height:1.2;
+}
+
+/* Achieved state */
+#goals-list .card h3 + .text-emerald-400 {
+  color:var(--green) !important;
+  font-size:10px !important;
+  font-weight:700 !important;
+  letter-spacing:.06em;
+}
+
+/* Percentage */
+#goals-list .card > .flex.justify-between.items-start > div:last-child {
+  flex:0 0 auto;
+
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+#goals-list .card > .flex.justify-between.items-start > div:last-child > p {
+  margin:0 !important;
+
+  color:var(--text) !important;
+  font-size:18px !important;
+  font-weight:650 !important;
+  line-height:1.1;
+
+  white-space:nowrap;
+}
+
+/* Edit button */
+#goals-list .card-actions {
+  display:block !important;
+
+  margin:0 !important;
+  opacity:1 !important;
+}
+
+#goals-list .card-actions button {
+  width:32px !important;
+  height:28px !important;
+
+  margin:0 !important;
+  padding:0 !important;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+
+  color:var(--muted) !important;
+  font-size:13px !important;
+  line-height:1 !important;
+}
+
+#goals-list .card-actions button:hover {
+  color:var(--accent) !important;
+}
+
+/* Delete button */
+#goals-list .card > .delete-btn {
+  position:absolute !important;
+  top:12px !important;
+  right:12px !important;
+
+  width:32px !important;
+  height:30px !important;
+
+  margin:0 !important;
+  padding:0 !important;
+
+  display:flex !important;
+  align-items:center;
+  justify-content:center;
+
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+
+  color:var(--muted) !important;
+  font-size:15px !important;
+  line-height:1 !important;
+}
+
+#goals-list .card > .delete-btn:hover {
+  color:var(--red) !important;
+}
+
+/* Progress bar */
+#goals-list .card > .w-full {
+  grid-column:1 / -1;
+  grid-row:2;
+
+  width:100% !important;
+  height:6px !important;
+
+  margin:0 !important;
+
+  background:rgba(255,255,255,.08) !important;
+  border-radius:999px !important;
+
+  overflow:hidden;
+}
+
+#goals-list .card > .w-full > div {
+  height:100% !important;
+
+  border-radius:999px !important;
+}
+
+/* Saved / target amount */
+#goals-list .card > .flex.justify-between.items-center {
+  grid-column:1 / -1;
+  grid-row:3;
+
+  margin:0 !important;
+}
+
+#goals-list .card > .flex.justify-between.items-center span:first-child {
+  color:var(--text) !important;
+  font-size:12px !important;
+  font-weight:600 !important;
+}
+
+#goals-list .card > .flex.justify-between.items-center span:last-child {
+  color:var(--muted) !important;
+  font-size:12px !important;
+}
+
+/* Selection mode */
+body.selection-mode #goals-list .card > .delete-btn,
+body.selection-mode #goals-list .card-actions {
+  display:none !important;
+}
+
+#goals-list .card.selected {
+  outline:2px solid var(--accent) !important;
+  background:rgba(123,131,255,.10) !important;
+}
+
 /* ============================================================
    LOADING SCREEN
    Небольшая анимация запуска приложения
