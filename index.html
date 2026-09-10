@@ -240,7 +240,19 @@
         <form id="broker-form" onsubmit="submitBrokerOperation(event)">
           <input type="hidden" id="broker-type">
           <input type="date" id="broker-date" required class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none mb-4 text-sm">
-          <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="broker-amount" placeholder="Сумма (₽)" required class="w-full text-2xl font-bold bg-transparent border-b-2 border-gray-700 focus:border-blue-500 text-white outline-none py-1 mb-6">
+          
+          <!-- Поле суммы пополнения (будет скрываться при выборе "Баланс") -->
+          <div id="broker-deposit-group" class="mb-4">
+            <label class="block text-xs text-gray-400 mb-1">Сумма пополнения (₽)</label>
+            <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="broker-amount" placeholder="0 ₽" class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none text-sm">
+          </div>
+
+          <!-- Поле баланса -->
+          <div class="mb-6">
+            <label id="broker-balance-label" class="block text-xs text-gray-400 mb-1">Баланс счета (₽)</label>
+            <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="broker-balance-input" placeholder="0 ₽" required class="w-full text-2xl font-bold bg-transparent border-b-2 border-gray-700 focus:border-blue-500 text-white outline-none py-1">
+          </div>
+
           <div class="flex gap-2">
             <button type="button" onclick="closeForm('broker-form-container', 'broker-submit-btn', 'Сохранить', 'broker-form')" class="w-1/3 bg-gray-700 text-white font-semibold rounded-xl px-4 py-4">Отмена</button>
             <button type="submit" id="broker-submit-btn" class="w-2/3 bg-blue-600 text-white font-semibold rounded-xl px-5 py-4">Сохранить</button>
@@ -258,6 +270,8 @@
           </div>
         </form>
       </div>
+      <!-- Контейнер для карточек пополнений брокера -->
+      <div id="broker-deposits-list" class="space-y-3 pb-6"></div>
     </div>
 
     <!-- ЭКРАН ЦЕЛЕЙ -->
