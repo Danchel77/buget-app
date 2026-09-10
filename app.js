@@ -706,7 +706,7 @@ function switchTransactionView(view) {
 
 function buildCharts() {
   if (!Cache || !Cache.transactions) return;
-  const months = Cache.transactions; // уже отсортированы по убыванию
+  const months = Cache.transactions;
   const lastMonths = months.slice().reverse().slice(-12);
   const labels = lastMonths.map(m => m.label);
   const expenses = lastMonths.map(m => m.expense);
@@ -722,35 +722,65 @@ function buildCharts() {
   const ctx = document.getElementById('monthlyExpensesChart').getContext('2d');
   if (monthlyChartObj) monthlyChartObj.destroy();
   monthlyChartObj = new Chart(ctx, {
-    type: 'bar',
+    type: 'line',
     data: {
-      labels: labels,
+      labels,
       datasets: [
-        { label: 'Расходы', data: expenses, backgroundColor: '#ef4444', borderRadius: 5 },
-        { label: 'Доходы', data: incomes, backgroundColor: '#10b981', borderRadius: 5 }
+        {
+          label: 'Доходы', data: incomes,
+          borderColor: '#36d69b', backgroundColor: 'rgba(54,214,155,.10)',
+          borderWidth: 2.5, pointRadius: 3.5, pointHoverRadius: 5,
+          pointBackgroundColor: '#36d69b', pointBorderWidth: 0,
+          tension: .35, fill: true
+        },
+        {
+          label: 'Расходы', data: expenses,
+          borderColor: '#ff6f7d', backgroundColor: 'rgba(255,111,125,.07)',
+          borderWidth: 2.5, pointRadius: 3.5, pointHoverRadius: 5,
+          pointBackgroundColor: '#ff6f7d', pointBorderWidth: 0,
+          tension: .35, fill: true
+        }
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
       scales: {
-        x: { grid: { display: false }, ticks: { color: '#9ca3af' } },
-        y: { grid: { color: '#374151' }, ticks: { color: '#9ca3af', callback: v => (v/1000)+'k' } }
+        x: {
+          grid: { display: false },
+          border: { display: false },
+          ticks: { color: '#737d89', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 6 }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(255,255,255,.06)' },
+          border: { display: false },
+          ticks: { color: '#737d89', font: { size: 10 }, padding: 6, callback: v => formatCompactChartMoney(v) }
+        }
       },
       plugins: {
-        legend: { labels: { color: '#e5e7eb' } },
-        datalabels: {
-          anchor: 'end',
-          align: 'end',
-          color: '#e5e7eb',
-          font: { weight: 'bold', size: 10 },
-          formatter: (value) => formatMoney(value)
+        legend: {
+          position: 'top', align: 'start',
+          labels: { color: '#aeb6c1', usePointStyle: true, pointStyle: 'circle', boxWidth: 7, boxHeight: 7, padding: 16, font: { size: 11, weight: '600' } }
+        },
+        datalabels: { display: false },
+        tooltip: {
+          backgroundColor: '#1b222a', borderColor: 'rgba(255,255,255,.10)', borderWidth: 1,
+          titleColor: '#fff', bodyColor: '#c9ced5', padding: 11, cornerRadius: 12,
+          displayColors: true, callbacks: { label: context => `${context.dataset.label}: ${formatMoney(context.raw)}` }
         }
       }
     }
   });
 
   select.onchange = () => updateCategoryChart(select.value);
+}
+
+function formatCompactChartMoney(value) {
+  if (Math.abs(value) >= 1000000) return (value / 1000000).toFixed(value % 1000000 ? 1 : 0) + ' млн';
+  if (Math.abs(value) >= 1000) return Math.round(value / 1000) + 'k';
+  return value;
 }
 
 function updateCategoryChart(monthId) {
@@ -762,148 +792,49 @@ function updateCategoryChart(monthId) {
   });
   const labels = Object.keys(catMap);
   const data = Object.values(catMap);
+  const colors = ['#7180ff', '#36d69b', '#f3b65a', '#ff6f7d', '#a878ff', '#ef79b4', '#36bfc0', '#f58b55'];
+  const total = data.reduce((sum, value) => sum + value, 0);
+  const totalEl = document.getElementById('category-total');
+  const legendEl = document.getElementById('category-legend');
+  if (totalEl) totalEl.textContent = formatMoney(total);
+
+  if (legendEl) {
+    legendEl.innerHTML = labels.map((label, i) => `
+      <div class="category-legend__item">
+        <span class="category-legend__dot" style="background:${colors[i % colors.length]}"></span>
+        <span class="category-legend__name">${escapeHtml(label)}</span>
+        <span class="category-legend__value">${formatMoney(data[i])}</span>
+      </div>`).join('');
+  }
 
   const ctx = document.getElementById('categoryExpensesChart').getContext('2d');
   if (categoryChartObj) categoryChartObj.destroy();
-  if (data.length === 0) {
-    categoryChartObj = new Chart(ctx, {
-      type: 'doughnut',
-      data: { labels: ['Нет расходов'], datasets: [{ data: [1], backgroundColor: ['#374151'] }] },
-      options: {
-        plugins: {
-          legend: {
-            labels: {
-              color: '#e5e7eb' // светлый цвет текста легенды
-            }
-          }
+  categoryChartObj = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: data.length ? labels : ['Нет расходов'],
+      datasets: [{
+        data: data.length ? data : [1],
+        backgroundColor: data.length ? colors.slice(0, data.length) : ['#303740'],
+        borderColor: '#171d24',
+        borderWidth: 3,
+        hoverOffset: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '70%',
+      plugins: {
+        legend: { display: false },
+        datalabels: { display: false },
+        tooltip: {
+          backgroundColor: '#1b222a', borderColor: 'rgba(255,255,255,.10)', borderWidth: 1,
+          titleColor: '#fff', bodyColor: '#c9ced5', padding: 10, cornerRadius: 11,
+          callbacks: { label: context => `${context.label}: ${formatMoney(context.raw)}` }
         }
       }
-    });
-  } else {
-    categoryChartObj = new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels: labels,
-        datasets: [{
-          data: data,
-          backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316']
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: {
-              color: '#e5e7eb', // добавлено: светлый цвет
-              generateLabels: (chart) => {
-                const dataset = chart.data.datasets[0];
-                return chart.data.labels.map((label, i) => ({
-                  text: `${label}: ${formatMoney(dataset.data[i])}`,
-                  fillStyle: dataset.backgroundColor[i],
-                  hidden: false,
-                  index: i
-                }));
-              }
-            }
-          }
-        }
-      }
-    });
-  }
-}
-
-function submitDeposit(e) {
-  e.preventDefault();
-  submitAction('dep-submit-btn', 'Deposits', {
-    name: document.getElementById('dep-name').value,
-    amount: getUnformattedVal(document.getElementById('dep-amount')),
-    rate: getUnformattedVal(document.getElementById('dep-rate')),
-    startDate: document.getElementById('dep-start').value,
-    endDate: document.getElementById('dep-end').value,
-    goalId: document.getElementById('dep-goal').value,
-    status: 'Активен'
-  });
-}
-
-function editDep(id, name, amount, rate, start, end, goalId) {
-  currentEditId = id;
-  currentEditTable = 'Deposits';
-  document.getElementById('dep-name').value = name;
-  setFormattedVal('dep-amount', amount);
-  setFormattedVal('dep-rate', rate);
-  document.getElementById('dep-start').value = start;
-  document.getElementById('dep-end').value = end;
-  document.getElementById('dep-goal').value = goalId || '';
-  document.getElementById('dep-submit-btn').innerText = 'Сохранить изменения';
-  document.getElementById('deposit-form-container').classList.remove('hidden');
-  window.scrollTo(0, 0);
-}
-
-function renderDeposits() {
-  const data = Cache.deposits || [];
-  if (data.length === 0) {
-    document.getElementById('deposits-list').innerHTML = '<div class="text-center text-gray-500 py-4">Вкладов нет</div>';
-    return;
-  }
-
-  const active = data.filter(d => !d.isClosed);
-  const closed = data.filter(d => d.isClosed);
-  let html = '';
-
-  const renderCard = (dep, isCls) => `
-    <div class="card bg-gray-800 p-4 rounded-2xl border border-gray-700 relative overflow-hidden mb-4 ${isCls ? 'opacity-60 grayscale' : ''}" data-id="${dep.id}" data-table="Deposits">
-  <input type="checkbox" class="select-checkbox" data-id="${dep.id}">
-  <button onclick="deleteRecord('Deposits','${dep.id}')" class="delete-btn" title="Удалить">✕</button>
-  ${dep.goalName ? `<div class="absolute top-0 right-0 bg-blue-600/20 text-blue-300 text-[9px] px-3 py-1 rounded-bl-lg font-bold uppercase tracking-wide border-b border-l border-blue-600/30">Цель: ${escapeHtml(dep.goalName)}</div>` : ''}
-      <div class="flex justify-between items-start mb-2 ${dep.goalName ? 'pt-2' : ''}">
-        <div>
-          <h3 class="font-bold text-white">${escapeHtml(dep.name)}</h3>
-          <p class="text-xs ${isCls ? 'text-gray-500' : 'text-gray-400'}">${isCls ? 'Закрыт ' : 'До '}${dep.endDateStr} • ${dep.rate}%</p>
-        </div>
-        <div class="text-right">
-          <p class="font-bold text-lg text-white">${formatMoney(dep.amount)}</p>
-          <div class="card-actions flex space-x-3 justify-end text-xs opacity-60 mt-1">
-            ${!isCls ? `<button onclick="editDep('${dep.id}','${escapeHtml(dep.name)}',${dep.amount},${dep.rate},'${dep.rawStart}','${dep.rawEnd}','${dep.goalId}')" class="text-gray-400 hover:text-blue-400">✎</button>` : ''}
-          </div>
-        </div>
-      </div>
-      <div class="bg-gray-900/50 rounded-lg p-3 mb-3 flex justify-between">
-        <p class="font-bold text-emerald-400">+${formatMoney(dep.currentInterest)}</p>
-        <p class="font-medium text-gray-300">+${formatMoney(dep.expectedInterest)}</p>
-      </div>
-      <div class="w-full bg-gray-700 rounded-full h-1.5">
-        <div class="bg-blue-500 h-1.5 rounded-full" style="width:${dep.progress}%"></div>
-      </div>
-    </div>`;
-
-  if (active.length > 0) {
-    html += `<h3 class="text-xs text-gray-400 uppercase font-bold tracking-wider mb-3">Активные</h3>` + active.map(d => renderCard(d, false)).join('');
-  }
-  if (closed.length > 0) {
-    html += `<h3 class="text-xs text-gray-400 uppercase font-bold tracking-wider mb-3 mt-6">Завершенные</h3>` + closed.map(d => renderCard(d, true)).join('');
-  }
-  document.getElementById('deposits-list').innerHTML = html;
-}
-
-function submitBrokerOperation(e) {
-  e.preventDefault();
-  submitAction('broker-submit-btn', 'Broker', {
-    type: document.getElementById('broker-type').value,
-    date: document.getElementById('broker-date').value,
-    amount: getUnformattedVal(document.getElementById('broker-amount'))
-  });
-}
-
-function submitBrokerGoal(e) {
-  e.preventDefault();
-  const g = document.getElementById('broker-goal-select').value;
-  if (!g) return showDialog('Внимание', 'Выберите цель', false);
-  submitAction('broker-goal-btn', 'Broker', {
-    type: 'Цель',
-    date: new Date().toISOString().split('T')[0],
-    goalId: g
+    }
   });
 }
 
