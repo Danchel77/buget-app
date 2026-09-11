@@ -348,30 +348,56 @@ function isTransactionDuplicate(tx) {
   return false;
 }
 
-/**
- * Отрисовывает аккуратные карточки операций и селекты категорий
- */
+
+// -------------------------------------------------------------
+// ОБНОВЛЕННЫЙ РЕНДЕР КАРТОЧЕК И ВЫБОРА КАТЕГОРИЙ
+// -------------------------------------------------------------
+
+// Единый справочник иконок для быстрого переключения
+const CATEGORY_ICONS = {
+  'Продукты': '🍔',
+  'Кафе и рестораны': '🍽️',
+  'Маркетплейсы': '🛍️',
+  'Транспорт': '🚗',
+  'Жилье': '🏠',
+  'Развлечения': '🎬',
+  'Зарплата': '💼',
+  'Другое': '📦'
+};
+
 function renderParsedTransactionsView(fileName, transactions) {
   const dialog = document.getElementById('pdf-debug-dialog');
   const info = document.getElementById('pdf-debug-info');
   const output = document.getElementById('pdf-debug-output');
 
-  // Помечаем дубликаты и подготавливаем состояние
+  // Полный список категорий с гарантией наличия новых
+  const expenseCategories = [
+    'Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Развлечения', 'Другое'
+  ];
+  const incomeCategories = ['Зарплата', 'Другое'];
+
+  // Добавляем любые пользовательские категории, если они были созданы в приложении
+  if (window.Cache?.categories?.expense) {
+    window.Cache.categories.expense.forEach(c => {
+      if (!expenseCategories.includes(c.name)) expenseCategories.push(c.name);
+      if (c.icon) CATEGORY_ICONS[c.name] = c.icon;
+    });
+  }
+
+  // Подготовка и принудительная категоризация
   transactions.forEach((tx, idx) => {
     tx._id = 'tx_parsed_' + idx;
+    
+    // Принудительно определяем категорию, если она не была определена ранее
+    if (!tx.category || tx.category === 'Не определено') {
+      tx.category = StatementCategorizer.categorize(tx.merchant, tx.rawDetails, tx.type);
+    }
+
     tx.isDuplicate = isTransactionDuplicate(tx);
     tx.selected = !tx.isDuplicate; // дубликаты по умолчанию выключены
   });
 
   window._lastParsedTransactions = transactions;
-
-  // Доступные категории из приложения
-  const expenseCategories = window.Cache?.categories?.expense?.map(c => c.name) || [
-    'Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Развлечения', 'Другое'
-  ];
-  const incomeCategories = window.Cache?.categories?.income?.map(c => c.name) || [
-    'Зарплата', 'Другое'
-  ];
 
   function updateHeaderSummary() {
     const selectedTxs = transactions.filter(t => t.selected);
@@ -391,55 +417,57 @@ function renderParsedTransactionsView(fileName, transactions) {
     }
   }
 
-  let html = `<div class="space-y-2">`;
+  let html = `<div class="space-y-2.5">`;
 
   transactions.forEach(tx => {
     const isExp = tx.type === 'Расход';
     const amountSign = isExp ? '-' : '+';
     const amountColor = isExp ? 'text-white' : 'text-emerald-400';
     const cats = isExp ? expenseCategories : incomeCategories;
+    const currentIcon = CATEGORY_ICONS[tx.category] || '📦';
 
     const optionsHtml = cats.map(cat => 
-      `<option value="${escapeHtml(cat)}" ${cat === tx.category ? 'selected' : ''}>${escapeHtml(cat)}</option>`
+      `<option value="${escapeHtml(cat)}" ${cat === tx.category ? 'selected' : ''}>${CATEGORY_ICONS[cat] || '📦'} ${escapeHtml(cat)}</option>`
     ).join('');
 
     html += `
-      <div class="bg-gray-900 border ${tx.isDuplicate ? 'border-gray-800 opacity-60' : 'border-gray-700'} p-3 rounded-2xl transition-all">
-        <!-- СТРОКА 1: Чекбокс, Дата, Мерчант (с многоточием), Сумма -->
-        <div class="flex items-center justify-between gap-2.5">
-          <label class="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer">
-            <input type="checkbox" 
-                   class="w-4 h-4 rounded accent-blue-600 bg-gray-800 border-gray-700 flex-shrink-0 cursor-pointer"
-                   data-tx-id="${tx._id}"
-                   ${tx.selected ? 'checked' : ''}
-                   onchange="toggleTxSelection('${tx._id}', this.checked)">
-            
-            <span class="text-xs text-gray-400 font-mono flex-shrink-0">${tx.displayDate}</span>
-            
-            <!-- Название мерчанта обрезается точками без переноса -->
-            <span class="text-sm font-semibold text-gray-100 truncate" title="${escapeHtml(tx.merchant)}">
-              ${escapeHtml(tx.merchant)}
-            </span>
-          </label>
+      <div class="bg-gray-900 border ${tx.isDuplicate ? 'border-gray-800 opacity-60' : 'border-gray-700/80'} p-3 rounded-2xl">
+        
+        <!-- СТРОКА 1: Чекбокс, Дата слева, справа от нее название операции (с обрезкой) -->
+        <div class="flex items-center gap-2.5 min-w-0">
+          <input type="checkbox" 
+                 class="w-4 h-4 rounded accent-blue-600 bg-gray-800 border-gray-700 flex-shrink-0 cursor-pointer"
+                 data-tx-id="${tx._id}"
+                 ${tx.selected ? 'checked' : ''}
+                 onchange="toggleTxSelection('${tx._id}', this.checked)">
+          
+          <span class="text-xs text-gray-400 font-mono flex-shrink-0">${tx.displayDate}</span>
+          
+          <span class="text-xs font-semibold text-gray-200 truncate flex-1 min-w-0" title="${escapeHtml(tx.merchant)}">
+            ${escapeHtml(tx.merchant)}
+          </span>
 
-          <div class="text-right flex-shrink-0 pl-2">
-            <span class="text-sm font-bold ${amountColor}">
-              ${amountSign}${formatMoney(tx.amount)}
-            </span>
-          </div>
+          ${tx.isDuplicate ? '<span class="text-[9px] text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded border border-gray-700 flex-shrink-0">В базе</span>' : ''}
         </div>
 
-        <!-- СТРОКА 2: Выбор категории и статус -->
+        <!-- СТРОКА 2: Категория с иконкой слева, Сумма справа по правому краю -->
         <div class="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-gray-800/60 pl-6">
-          <div class="flex items-center gap-2">
-            <span class="text-[11px] text-gray-500">Категория:</span>
-            <select class="bg-gray-800 border border-gray-700 text-xs text-blue-300 rounded-lg px-2 py-1 outline-none cursor-pointer focus:border-blue-500"
+          
+          <!-- Селект категории с живой иконкой -->
+          <div class="flex items-center gap-1.5 min-w-0">
+            <select class="bg-gray-800 border border-gray-700 text-xs text-blue-200 rounded-lg px-2.5 py-1 outline-none cursor-pointer focus:border-blue-500 font-medium"
                     onchange="changeTxCategory('${tx._id}', this.value)">
               ${optionsHtml}
             </select>
           </div>
 
-          ${tx.isDuplicate ? '<span class="text-[10px] text-gray-400 bg-gray-800 px-2 py-0.5 rounded-md border border-gray-700">Уже в базе</span>' : ''}
+          <!-- Сумма по правому краю -->
+          <div class="text-right flex-shrink-0">
+            <span class="text-sm font-bold ${amountColor}">
+              ${amountSign}${formatMoney(tx.amount)}
+            </span>
+          </div>
+
         </div>
       </div>
     `;
@@ -455,6 +483,16 @@ function renderParsedTransactionsView(fileName, transactions) {
 }
 
 /**
+ * Ручное изменение категории в карточке
+ */
+function changeTxCategory(txId, newCat) {
+  const tx = window._lastParsedTransactions.find(t => t._id === txId);
+  if (tx) {
+    tx.category = newCat;
+  }
+}
+
+/**
  * Переключение чекбокса операции
  */
 function toggleTxSelection(txId, isSelected) {
@@ -462,16 +500,6 @@ function toggleTxSelection(txId, isSelected) {
   if (tx) {
     tx.selected = isSelected;
     if (window._updateHeaderSummary) window._updateHeaderSummary();
-  }
-}
-
-/**
- * Ручное изменение категории в карточке
- */
-function changeTxCategory(txId, newCat) {
-  const tx = window._lastParsedTransactions.find(t => t._id === txId);
-  if (tx) {
-    tx.category = newCat;
   }
 }
 
