@@ -158,15 +158,37 @@
 
       <!-- АНАЛИТИКА -->
       <div id="transactions-chart" class="hidden chart-screen">
-        <section class="analytics-heading">
+        <section class="analytics-heading mb-3">
           <div>
             <p class="chart-card__eyebrow">Аналитика</p>
             <h2>Финансовая картина</h2>
           </div>
-          <select id="chart-month-select" class="chart-select" aria-label="Выберите месяц"></select>
         </section>
 
-        <section class="analytics-summary">
+        <!-- 1. СНАЧАЛА ГРАФИК ДИНАМИКИ ПО МЕСЯЦАМ -->
+        <section class="chart-card chart-card--trend mb-4">
+          <div class="chart-card__header">
+            <div>
+              <p class="chart-card__eyebrow">Динамика</p>
+              <h3>Доходы и расходы</h3>
+            </div>
+            <span class="chart-card__hint">последние 8 мес.</span>
+          </div>
+          <div class="chart-canvas chart-canvas--trend"><canvas id="monthlyExpensesChart"></canvas></div>
+        </section>
+
+        <!-- 2. УДОБНЫЙ ПЕРЕКЛЮЧАТЕЛЬ МЕСЯЦА СО СТРЕЛКАМИ И РЕЗУЛЬТАТ -->
+        <div class="flex items-center justify-between bg-gray-800/90 border border-gray-700/80 rounded-2xl px-4 py-2.5 mb-3">
+          <button type="button" id="prev-month-btn" onclick="changeAnalyticsMonth(1)" class="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-700 hover:bg-gray-600 text-gray-200 active:scale-95 transition-all text-lg font-bold cursor-pointer" title="Предыдущий месяц">‹</button>
+          
+          <div class="text-center">
+            <span id="analytics-month-label" class="text-sm font-bold text-white tracking-wide">...</span>
+          </div>
+
+          <button type="button" id="next-month-btn" onclick="changeAnalyticsMonth(-1)" class="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-700 hover:bg-gray-600 text-gray-200 active:scale-95 transition-all text-lg font-bold cursor-pointer" title="Следующий месяц">›</button>
+        </div>
+
+        <section class="analytics-summary mb-4">
           <div class="analytics-summary__main">
             <span class="analytics-summary__label">Результат месяца</span>
             <strong id="analytics-month-balance">+0 ₽</strong>
@@ -178,17 +200,7 @@
           </div>
         </section>
 
-        <section class="chart-card chart-card--trend">
-          <div class="chart-card__header">
-            <div>
-              <p class="chart-card__eyebrow">Динамика</p>
-              <h3>Доходы и расходы</h3>
-            </div>
-            <span class="chart-card__hint">последние 8 мес.</span>
-          </div>
-          <div class="chart-canvas chart-canvas--trend"><canvas id="monthlyExpensesChart"></canvas></div>
-        </section>
-
+        <!-- 3. ДИАГРАММА СТРУКТУРЫ РАСХОДОВ ЗА ВЫБРАННЫЙ МЕСЯЦ -->
         <section class="chart-card chart-card--structure">
           <div class="chart-card__header">
             <div>
@@ -350,11 +362,14 @@
   <!-- Модальное окно предпросмотра сырых данных PDF -->
   <div id="pdf-debug-dialog" class="fixed inset-0 bg-black/80 z-[130] hidden flex flex-col justify-center items-center p-4">
     <div class="bg-gray-800 border border-gray-700 w-full max-w-2xl rounded-3xl p-5 shadow-2xl flex flex-col max-h-[85vh]">
-      <div class="flex items-center pb-3 border-b border-gray-700 w-full min-w-0">
-        <div class="w-full min-w-0">
+      <div class="flex items-center justify-between pb-3 border-b border-gray-700 w-full min-w-0">
+        <div class="min-w-0 flex-1">
           <h3 class="font-bold text-white text-base">Импорт выписки</h3>
           <div id="pdf-debug-info" class="text-xs text-gray-400 mt-1 min-w-0">Файл не выбран</div>
         </div>
+        <button type="button" onclick="openRulesEditorModal()" class="text-gray-400 hover:text-white bg-gray-700/60 hover:bg-gray-700 border border-gray-600/70 p-2 rounded-xl text-sm transition-colors flex-shrink-0 ml-2 cursor-pointer" title="Словарь категорий парсера">
+          ⚙️
+        </button>
       </div>
 
       <div id="pdf-debug-output" class="flex-1 overflow-y-auto mt-4 font-mono text-xs text-gray-300 space-y-2 select-text">
@@ -392,6 +407,35 @@
       <div class="flex gap-2">
         <button type="button" onclick="closeRememberRuleModal()" class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-medium text-sm">Отмена</button>
         <button type="button" onclick="saveCategoryRuleFromModal()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-medium text-sm">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+    <!-- Модальное окно редактора словаря категорий -->
+  <div id="rules-editor-dialog" class="fixed inset-0 bg-black/85 z-[160] hidden flex flex-col justify-center items-center p-4 animate-fade-in">
+    <div class="bg-gray-800 border border-gray-700 w-full max-w-md rounded-3xl p-5 shadow-2xl flex flex-col max-h-[85vh]">
+      <div class="flex items-center justify-between pb-3 border-b border-gray-700">
+        <h3 class="font-bold text-white text-base">Словарь категорий парсера</h3>
+        <button type="button" onclick="closeRulesEditorModal()" class="text-gray-400 hover:text-white text-lg p-1 cursor-pointer">✕</button>
+      </div>
+
+      <!-- Добавление нового слова -->
+      <div class="pt-3 pb-3 border-b border-gray-700/80">
+        <p class="text-[11px] text-gray-400 mb-2">Добавить новое слово / фразу:</p>
+        <div class="flex gap-2 mb-2">
+          <input type="text" id="editor-keyword-input" placeholder="Слово / магазин" class="flex-1 bg-gray-700 border border-gray-600 text-white rounded-xl px-3 py-2 text-xs outline-none focus:border-blue-500">
+          <select id="editor-category-select" class="w-36 bg-gray-700 border border-gray-600 text-white rounded-xl px-2 py-2 text-xs outline-none cursor-pointer focus:border-blue-500"></select>
+        </div>
+        <button type="button" onclick="addRuleFromEditor()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer">+ Добавить в словарь</button>
+      </div>
+
+      <!-- Список слов с группировкой по категориям -->
+      <div id="editor-rules-list" class="flex-1 overflow-y-auto pt-3 space-y-4 pr-1">
+        <!-- Сюда динамически выводятся карточки -->
+      </div>
+
+      <div class="pt-3 border-t border-gray-700 mt-2 flex justify-end">
+        <button type="button" onclick="closeRulesEditorModal()" class="w-full bg-gray-700 text-white py-2.5 rounded-xl text-xs font-semibold cursor-pointer">Закрыть</button>
       </div>
     </div>
   </div>
