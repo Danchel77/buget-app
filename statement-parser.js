@@ -449,9 +449,12 @@ class SberbankParser {
 
   static _extractMerchant(lines, sberCategory) {
     if (lines.length > 1) {
+      // Убираем дату проводки и код авторизации
       let descLine = lines[1].replace(/^\d{2}\.\d{2}\.\d{4}\s+\d+\s*/, '');
-      // Чистим хвостик "Операция по карте..." или "Операция по счету..."
-      descLine = descLine.replace(/\.?\s*Операция\s+по.*$/i, '').trim();
+      // Убираем технические хвосты "Операция по карте...", "Операция по счету..."
+      descLine = descLine.replace(/\.?\s*Операция\s+по.*$/i, '')
+                         .replace(/\.?\s*Перевод\s+по.*$/i, '')
+                         .trim();
       if (descLine) return descLine;
     }
     return sberCategory || 'Операция Сбербанк';
@@ -601,26 +604,35 @@ class OzonBankParser {
 
 class BankDetector {
   static detect(rawLines) {
-    const preview = rawLines.slice(0, 35).join(' ').toLowerCase();
+    // Берем первые 40 строк документа для анализа шапки
+    const preview = rawLines.slice(0, 40).join(' ').toLowerCase();
 
-    // Озон Банк
-    if (preview.includes('озон банк') || preview.includes('ozon банк') || preview.includes('ozon bank')) {
-      return 'OZON';
-    }
-
-    // Яндекс Банк
-    if (preview.includes('яндекс') || preview.includes('yandex') || preview.includes('в рамках договора открыт счёт')) {
-      return 'YANDEX';
-    }
-
-    // Сбербанк
-    if (preview.includes('сбербанк') || preview.includes('sberbank') || preview.includes('сбер')) {
+    // 1. Сбербанк (ищем реквизиты эмитента)
+    if (preview.includes('sberbank.ru') || 
+        preview.includes('сбербанк онлайн') || 
+        preview.includes('пао сбербанк') || 
+        preview.includes('выписка по платёжному счёту')) {
       return 'SBER';
     }
 
-    // Газпромбанк
-    if (preview.includes('газпромбанк') || preview.includes('гпб') || preview.includes('gazprombank') ||
-       (preview.includes('дата отражения') && preview.includes('содержание операции'))) {
+    // 2. Озон Банк (только официальные реквизиты Озона в шапке)
+    if (preview.includes('ооо «озон банк»') || 
+        preview.includes('справка о движении средств') || 
+        (preview.includes('ozon') && preview.includes('лицензия банка россии'))) {
+      return 'OZON';
+    }
+
+    // 3. Яндекс Банк (реквизиты договора и сайта)
+    if (preview.includes('yabank.yandex.ru') || 
+        preview.includes('ао «яндекс банк»') || 
+        (preview.includes('яндекс') && preview.includes('в рамках договора открыт счёт'))) {
+      return 'YANDEX';
+    }
+
+    // 4. Газпромбанк
+    if (preview.includes('газпромбанк') || 
+        preview.includes('банк гпб') || 
+        (preview.includes('дата отражения') && preview.includes('содержание операции'))) {
       return 'GPB';
     }
 
