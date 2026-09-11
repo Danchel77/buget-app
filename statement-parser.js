@@ -486,8 +486,8 @@ class SberbankParser {
 // ПАРСЕР ОЗОН БАНКА
 // -------------------------------------------------------------
 class OzonBankParser {
-  // Начало строки операции: Дата + Время с секундами (05.09.2026 20:21:31)
-  static ROW_START = /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2}:\d{2})/;
+  // Начало операции: любая строка, начинающаяся с даты ДД.ММ.ГГГГ
+  static ROW_START = /^\d{2}\.\d{2}\.\d{4}/;
 
   static parse(rawLines) {
     const rawBlocks = [];
@@ -511,14 +511,14 @@ class OzonBankParser {
 
   static _parseTransactionBlock(lines) {
     const firstLine = lines[0];
-    const dateMatch = firstLine.match(this.ROW_START);
+    const dateMatch = firstLine.match(/(\d{2}\.\d{2}\.\d{4})/);
     if (!dateMatch) return null;
 
     const txDate = dateMatch[1];
     const fullText = lines.join(' ');
 
-    // Суммы в Озоне имеют вид: "- 611.00 ₽" или "+ 563.00 ₽"
-    const amounts = fullText.match(/([+−–—\-\u2012\u2013\u2014\u2212]?\s*[\d\s\xa0]+[.,]\d{2})\s*₽/g) || [];
+    // Ищем сумму: обязательный знак (+ или -), число с копейками, а знак ₽ делаем необязательным
+    const amounts = fullText.match(/([+−–—\-\u2012\u2013\u2014\u2212]\s*[\d\s\xa0]+[.,]\d{2})/g) || [];
     if (amounts.length === 0) return null;
 
     const rawAmount = amounts[0];
