@@ -839,46 +839,45 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
     ).join('');
 
     html += `
-      
-     <div class="bg-gray-900 border ${tx.isDuplicate || tx.isTransfer ? 'border-gray-800 opacity-50' : 'border-gray-700/80'} p-3 rounded-2xl">
+      <div class="bg-gray-900 border ${tx.isDuplicate || tx.isTransfer ? 'border-gray-800 opacity-50' : 'border-gray-700/80'} p-3 rounded-2xl space-y-2">
         
-        <!-- СТРОКА 1: Чекбокс и Наименование операции (на всю доступную ширину) СЛЕВА; Кнопка 📌 и бейджи СПРАВА -->
-        <div class="flex items-start justify-between gap-2 min-w-0">
-          <div class="flex items-center gap-2.5 min-w-0 flex-1 pt-0.5">
+        <!-- СТРОКА 1: Чекбокс, наименование и кнопка запоминания 📌 -->
+        <div class="flex items-center justify-between gap-2 min-w-0">
+          <div class="flex items-center gap-2.5 min-w-0 flex-1">
             <input type="checkbox" 
                    class="w-4 h-4 rounded accent-blue-600 bg-gray-800 border-gray-700 flex-shrink-0 cursor-pointer"
                    data-tx-id="${tx._id}"
                    ${tx.selected ? 'checked' : ''}
                    onchange="toggleTxSelection('${tx._id}', this.checked)">
             
-            <!-- Наименование теперь идет сразу после чекбокса и получает максимум места -->
             <span class="text-xs font-semibold text-gray-100 truncate flex-1 min-w-0" title="${escapeHtml(tx.merchant)}">
               ${escapeHtml(tx.merchant)}
             </span>
           </div>
 
-          <!-- Правый верхний угол: Кнопка 📌 и под ней бейджи -->
-          <div class="flex flex-col items-end gap-1 flex-shrink-0">
-            <button type="button" 
-                    onclick="openRememberRuleModal('${tx._id}')" 
-                    class="text-xs text-gray-400 hover:text-blue-400 bg-gray-800 hover:bg-gray-700 border border-gray-700 px-2 py-0.5 rounded-lg transition-colors cursor-pointer" 
-                    title="Запомнить правило для этой точки">
-              📌
-            </button>
-            
+          <button type="button" 
+                  onclick="openRememberRuleModal('${tx._id}')" 
+                  class="text-xs text-gray-400 hover:text-blue-400 bg-gray-800 hover:bg-gray-700 border border-gray-700 px-2 py-0.5 rounded-lg transition-colors cursor-pointer flex-shrink-0" 
+                  title="Запомнить правило для этой точки">
+            📌
+          </button>
+        </div>
+
+        <!-- СТРОКА 2: Дата слева, бейдж справа -->
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-[11px] text-gray-400 font-mono">${tx.displayDate}</span>
+          
+          <div class="flex items-center gap-1.5 flex-shrink-0">
             ${tx.isTransfer ? '<span class="text-[9px] text-amber-400/90 bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-800/50">Перевод</span>' : ''}
             ${tx.isDuplicate ? '<span class="text-[9px] text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded border border-gray-700">В базе</span>' : ''}
           </div>
         </div>
 
-        <!-- СТРОКА 2: Дата у левого края + Селект категории СЛЕВА, Сумма СПРАВА -->
-        <div class="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-gray-800/60">
-          <div class="flex items-center gap-2 min-w-0">
-            <!-- Дата прижата к левому краю второй строки -->
-            <span class="text-xs text-gray-400 font-mono flex-shrink-0">${tx.displayDate}</span>
-
+        <!-- СТРОКА 3: Категория слева, сумма справа -->
+        <div class="flex items-center justify-between gap-2 pt-2 border-t border-gray-800/60">
+          <div class="flex items-center gap-1.5 min-w-0">
             <select id="cat-select-${tx._id}"
-                    class="w-36 sm:w-44 bg-gray-800 border border-gray-700 text-xs text-blue-200 rounded-lg px-2 py-1 outline-none cursor-pointer focus:border-blue-500 font-medium truncate"
+                    class="w-44 bg-gray-800 border border-gray-700 text-xs text-blue-200 rounded-lg px-2.5 py-1 outline-none cursor-pointer focus:border-blue-500 font-medium truncate"
                     onchange="changeTxCategory('${tx._id}', this.value)">
               ${optionsHtml}
             </select>
@@ -890,7 +889,9 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
             </span>
           </div>
         </div>
+
       </div>
+     
     `;
   });
 
