@@ -1626,7 +1626,11 @@ async function processOrSeedRules(snapshot) {
     { pattern: "wildberries", category: "Маркетплейсы" },
     { pattern: "ozon", category: "Маркетплейсы" },
     { pattern: "озон", category: "Маркетплейсы" },
-    { pattern: "kleekstore", category: "Маркетплейсы" }
+    { pattern: "kleekstore", category: "Маркетплейсы" },
+    // Доходы / Зарплата
+    { pattern: "заработная плата", category: "Зарплата" },
+    { pattern: "salary", category: "Зарплата" },
+    { pattern: "цкбм", category: "Зарплата" }
   ];
 
   try {
