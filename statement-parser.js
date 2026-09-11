@@ -482,9 +482,131 @@ class SberbankParser {
   }
 }
 
+// -------------------------------------------------------------
+// ПАРСЕР ОЗОН БАНКА
+// -------------------------------------------------------------
+class OzonBankParser {
+  // Начало строки операции: Дата + Время с секундами (05.09.2026 20:21:31)
+  static ROW_START = /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2}:\d{2})/;
+
+  static parse(rawLines) {
+    const rawBlocks = [];
+    let currentBlock = null;
+
+    for (let line of rawLines) {
+      line = line.trim();
+      if (!line || this._isServiceLine(line)) continue;
+
+      if (this.ROW_START.test(line)) {
+        if (currentBlock) rawBlocks.push(currentBlock);
+        currentBlock = [line];
+      } else if (currentBlock) {
+        currentBlock.push(line);
+      }
+    }
+    if (currentBlock) rawBlocks.push(currentBlock);
+
+    return rawBlocks.map(block => this._parseTransactionBlock(block)).filter(Boolean);
+  }
+
+  static _parseTransactionBlock(lines) {
+    const firstLine = lines[0];
+    const dateMatch = firstLine.match(this.ROW_START);
+    if (!dateMatch) return null;
+
+    const txDate = dateMatch[1];
+    const fullText = lines.join(' ');
+
+    // Суммы в Озоне имеют вид: "- 611.00 ₽" или "+ 563.00 ₽"
+    const amounts = fullText.match(/([+−–—\-\u2012\u2013\u2014\u2212]?\s*[\d\s\xa0]+[.,]\d{2})\s*₽/g) || [];
+    if (amounts.length === 0) return null;
+
+    const rawAmount = amounts[0];
+    const isIncome = rawAmount.includes('+');
+    const type = isIncome ? 'Доход' : 'Расход';
+
+    const cleanNum = rawAmount.replace(/[^\d.,]/g, '').replace(',', '.');
+    const amount = Math.abs(parseFloat(cleanNum)) || 0;
+
+    // Извлекаем понятное имя мерчанта
+    const merchant = this._extractMerchant(fullText);
+
+    // Проверка на перевод (СБП, пополнение)
+    const isTransfer = this._isTransferOperation(fullText, merchant);
+
+    const [d, m, y] = txDate.split('.');
+    const isoDate = `${y}-${m}-${d}`;
+
+    const category = StatementCategorizer.categorize(merchant, fullText, type);
+
+    return {
+      date: isoDate,
+      displayDate: txDate,
+      type,
+      amount,
+      merchant,
+      category,
+      isTransfer,
+      bank: 'Озон Банк',
+      rawDetails: fullText
+    };
+  }
+
+  static _extractMerchant(fullText) {
+    // 1. Покупки на маркетплейсе Ozon
+    if (/платформе\s+ozon/i.test(fullText) || /оплата.*ozon/i.test(fullText)) {
+      const orderMatch = fullText.match(/заказ\s*№?\s*([0-9-]+)/i);
+      return orderMatch ? `Ozon (${orderMatch[0]})` : 'Ozon';
+    }
+
+    // 2. Переводы через СБП
+    if (/перевод.*сбп/i.test(fullText)) {
+      const senderMatch = fullText.match(/Отправитель:\s*([^.]*?)(?:Без НДС|$)/i);
+      return senderMatch ? `Перевод СБП (${senderMatch[1].trim()})` : 'Перевод через СБП';
+    }
+
+    // 3. Другие покупки: очищаем служебные слова
+    let clean = fullText.replace(/^(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}:\d{2}\s+\d+\s*)/, '')
+                        .replace(/Оплата товаров\/услуг\s*(на\s*)?/i, '')
+                        .replace(/Без НДС\.?/i, '')
+                        .replace(/([+−–—\-\u2012\u2013\u2014\u2212]?\s*[\d\s\xa0]+[.,]\d{2}\s*₽)/g, '')
+                        .trim();
+
+    return clean || 'Операция Озон Банк';
+  }
+
+  static _isTransferOperation(fullText, merchant) {
+    const text = `${fullText} ${merchant}`.toLowerCase();
+    return text.includes('перевод') ||
+           text.includes('сбп') ||
+           text.includes('отправитель:');
+  }
+
+  static _isServiceLine(line) {
+    const l = line.toLowerCase();
+    return l.includes('справка о движении средств') ||
+           l.includes('ооо «озон банк»') ||
+           l.includes('лицензия банка россии') ||
+           l.includes('владелец:') ||
+           l.includes('номер лицевого счёта') ||
+           l.includes('период выписки') ||
+           l.includes('входящий остаток') ||
+           l.includes('дата операции') ||
+           l.includes('назначение платежа') ||
+           l.includes('сумма операции') ||
+           l.includes('российские рубли') ||
+           l.includes('страница');
+  }
+}
+
 class BankDetector {
   static detect(rawLines) {
     const preview = rawLines.slice(0, 35).join(' ').toLowerCase();
+
+    // Озон Банк
+    if (preview.includes('озон банк') || preview.includes('ozon банк') || preview.includes('ozon bank')) {
+      return 'OZON';
+    }
 
     // Яндекс Банк
     if (preview.includes('яндекс') || preview.includes('yandex') || preview.includes('в рамках договора открыт счёт')) {
@@ -511,10 +633,12 @@ class StatementDispatcher {
     const bankCode = BankDetector.detect(rawLines);
 
     if (bankCode === 'UNKNOWN') {
-      throw new Error('Банк не поддерживается. На данный момент доступны: Газпромбанк, Сбербанк и Яндекс Банк.');
+      throw new Error('Банк не поддерживается. На данный момент доступны: Газпромбанк, Сбербанк, Яндекс Банк и Озон Банк.');
     }
 
     switch (bankCode) {
+        case 'OZON':
+        return { bankName: 'Озон Банк', transactions: OzonBankParser.parse(rawLines) };
       case 'YANDEX':
         return { bankName: 'Яндекс Банк', transactions: YandexBankParser.parse(rawLines, { excludeTransfers: true }) };
       case 'SBER':
@@ -679,11 +803,12 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
     ).join('');
 
     html += `
-      <div class="bg-gray-900 border ${tx.isDuplicate || tx.isTransfer ? 'border-gray-800 opacity-60' : 'border-gray-700/80'} p-3 rounded-2xl">
+      
+     <div class="bg-gray-900 border ${tx.isDuplicate || tx.isTransfer ? 'border-gray-800 opacity-50' : 'border-gray-700/80'} p-3 rounded-2xl">
         
-        <!-- СТРОКА 1: Чекбокс, Дата, Мерчант СЛЕВА; Кнопка "Запомнить" СПРАВА ВВЕРХУ -->
-        <div class="flex items-center justify-between gap-2 min-w-0">
-          <div class="flex items-center gap-2 min-w-0 flex-1">
+        <!-- СТРОКА 1: Чекбокс, Дата, Мерчант СЛЕВА; Кнопка 📌 и под ней бейдж СПРАВА -->
+        <div class="flex items-start justify-between gap-2 min-w-0">
+          <div class="flex items-center gap-2 min-w-0 flex-1 pt-0.5">
             <input type="checkbox" 
                    class="w-4 h-4 rounded accent-blue-600 bg-gray-800 border-gray-700 flex-shrink-0 cursor-pointer"
                    data-tx-id="${tx._id}"
@@ -697,38 +822,37 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
             </span>
           </div>
 
-          <div class="flex items-center gap-1.5 flex-shrink-0">
-            ${tx.isTransfer ? '<span class="text-[9px] text-amber-400/90 bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-800/50">Перевод</span>' : ''}
-            ${tx.isDuplicate ? '<span class="text-[9px] text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded border border-gray-700">В базе</span>' : ''}
+          <!-- Правый верхний угол: компактная кнопка 📌 и под ней бейджи -->
+          <div class="flex flex-col items-end gap-1 flex-shrink-0">
             <button type="button" 
                     onclick="openRememberRuleModal('${tx._id}')" 
-                    class="text-[10px] text-gray-400 hover:text-blue-400 bg-gray-800 hover:bg-gray-700 border border-gray-700 px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer">
-              <span>📌</span>
-              <span>Запомнить</span>
+                    class="text-xs text-gray-400 hover:text-blue-400 bg-gray-800 hover:bg-gray-700 border border-gray-700 px-2 py-0.5 rounded-lg transition-colors cursor-pointer" 
+                    title="Запомнить правило для этой точки">
+              📌
             </button>
+            
+            ${tx.isTransfer ? '<span class="text-[9px] text-amber-400/90 bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-800/50">Перевод</span>' : ''}
+            ${tx.isDuplicate ? '<span class="text-[9px] text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded border border-gray-700">В базе</span>' : ''}
           </div>
         </div>
 
-        <!-- СТРОКА 2: Категория с иконкой слева, Сумма справа по правому краю -->
+        <!-- СТРОКА 2: Фиксированный по ширине селект категории СЛЕВА, Сумма СПРАВА -->
         <div class="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-gray-800/60">
-          
-          <!-- Селект категории + кнопка Запомнить -->
           <div class="flex items-center gap-1.5 min-w-0">
             <select id="cat-select-${tx._id}"
-                    class="bg-gray-800 border border-gray-700 text-xs text-blue-200 rounded-lg px-2 py-1 outline-none cursor-pointer focus:border-blue-500 font-medium"
+                    class="w-44 bg-gray-800 border border-gray-700 text-xs text-blue-200 rounded-lg px-2.5 py-1 outline-none cursor-pointer focus:border-blue-500 font-medium truncate"
                     onchange="changeTxCategory('${tx._id}', this.value)">
               ${optionsHtml}
             </select>
           </div>
 
-          <!-- Сумма по правому краю -->
           <div class="text-right flex-shrink-0">
             <span class="text-sm font-bold ${amountColor}">
               ${amountSign}${formatMoney(tx.amount)}
             </span>
           </div>
-
         </div>
+
       </div>
     `;
   });
