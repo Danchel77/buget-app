@@ -546,21 +546,32 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
     html += `
       <div class="bg-gray-900 border ${tx.isDuplicate ? 'border-gray-800 opacity-60' : 'border-gray-700/80'} p-3 rounded-2xl">
         
-        <!-- СТРОКА 1: Чекбокс, Дата слева, справа от нее название операции (с обрезкой) -->
-        <div class="flex items-center gap-2.5 min-w-0">
-          <input type="checkbox" 
-                 class="w-4 h-4 rounded accent-blue-600 bg-gray-800 border-gray-700 flex-shrink-0 cursor-pointer"
-                 data-tx-id="${tx._id}"
-                 ${tx.selected ? 'checked' : ''}
-                 onchange="toggleTxSelection('${tx._id}', this.checked)">
-          
-          <span class="text-xs text-gray-400 font-mono flex-shrink-0">${tx.displayDate}</span>
-          
-          <span class="text-xs font-semibold text-gray-200 truncate flex-1 min-w-0" title="${escapeHtml(tx.merchant)}">
-            ${escapeHtml(tx.merchant)}
-          </span>
+        <!-- СТРОКА 1: Чекбокс, Дата, Мерчант СЛЕВА; Кнопка "Запомнить" СПРАВА ВВЕРХУ -->
+        <div class="flex items-center justify-between gap-2 min-w-0">
+          <div class="flex items-center gap-2 min-w-0 flex-1">
+            <input type="checkbox" 
+                   class="w-4 h-4 rounded accent-blue-600 bg-gray-800 border-gray-700 flex-shrink-0 cursor-pointer"
+                   data-tx-id="${tx._id}"
+                   ${tx.selected ? 'checked' : ''}
+                   onchange="toggleTxSelection('${tx._id}', this.checked)">
+            
+            <span class="text-xs text-gray-400 font-mono flex-shrink-0">${tx.displayDate}</span>
+            
+            <span class="text-xs font-semibold text-gray-200 truncate flex-1 min-w-0" title="${escapeHtml(tx.merchant)}">
+              ${escapeHtml(tx.merchant)}
+            </span>
+          </div>
 
-          ${tx.isDuplicate ? '<span class="text-[9px] text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded border border-gray-700 flex-shrink-0">В базе</span>' : ''}
+          <div class="flex items-center gap-1.5 flex-shrink-0">
+            ${tx.isDuplicate ? '<span class="text-[9px] text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded border border-gray-700">В базе</span>' : ''}
+            
+            <button type="button" 
+                    onclick="openRememberRuleModal('${tx._id}')" 
+                    class="text-[10px] text-gray-400 hover:text-blue-400 bg-gray-800 hover:bg-gray-700 border border-gray-700 px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer">
+              <span>📌</span>
+              <span>Запомнить</span>
+            </button>
+          </div>
         </div>
 
         <!-- СТРОКА 2: Категория с иконкой слева, Сумма справа по правому краю -->
@@ -573,14 +584,6 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
                     onchange="changeTxCategory('${tx._id}', this.value)">
               ${optionsHtml}
             </select>
-
-            <button type="button" 
-                    onclick="openRememberRuleModal('${tx._id}')" 
-                    class="text-[11px] text-gray-400 hover:text-blue-400 bg-gray-800/80 hover:bg-gray-700/80 border border-gray-700 px-2 py-1 rounded-lg transition-colors flex items-center gap-1" 
-                    title="Запомнить для будущих выписок">
-              <span>📌</span>
-              <span class="hidden sm:inline">Запомнить</span>
-            </button>
           </div>
 
           <!-- Сумма по правому краю -->
