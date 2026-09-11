@@ -770,6 +770,8 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
       bankBadgeColor = 'bg-emerald-900/60 text-emerald-300 border-emerald-700/60';
     } else if (bankName === 'Яндекс Банк') {
       bankBadgeColor = 'bg-amber-900/60 text-amber-300 border-amber-700/60'; // Фирменный жёлто-янтарный цвет
+    } else if (bankName === 'Озон Банк') {
+      bankBadgeColor = 'bg-sky-900/60 text-sky-300 border-sky-700/60';
     }
     
     info.innerHTML = `
@@ -951,6 +953,7 @@ function downloadParsedJSON() {
   let bankPrefix = 'gazprombank';
   if (window._lastParsedBankName === 'Сбербанк') bankPrefix = 'sberbank';
   if (window._lastParsedBankName === 'Яндекс Банк') bankPrefix = 'yandexbank';
+  if (window._lastParsedBankName === 'Озон Банк') bankPrefix = 'ozonbank';
   const today = new Date().toISOString().slice(0, 10);
 
   const jsonStr = JSON.stringify(window._lastParsedTransactions, null, 2);
