@@ -451,7 +451,7 @@ function renderParsedTransactionsView(fileName, transactions) {
         </div>
 
         <!-- СТРОКА 2: Категория с иконкой слева, Сумма справа по правому краю -->
-        <div class="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-gray-800/60 pl-6">
+        <div class="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-gray-800/60">
           
           <!-- Селект категории с живой иконкой -->
           <div class="flex items-center gap-1.5 min-w-0">
