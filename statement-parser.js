@@ -335,6 +335,13 @@ class YandexBankParser {
     return fullMerchant || 'Операция Яндекс Банк';
   }
 
+  static _isTransferOperation(fullText, merchant) {
+    const text = `${fullText} ${merchant}`.toLowerCase();
+    return text.includes('перевод') ||
+           text.includes('сбп') ||
+           text.includes('между счетами');
+  }
+
   static _isServiceLine(line) {
     const l = line.toLowerCase();
     return l.includes('выписка по договору') ||
