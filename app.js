@@ -734,6 +734,46 @@ function editTx(id, type, amount, cat, comment, rawDate) {
   window.scrollTo(0, 0);
 }
 
+
+let currentFilterMonth = 'all';
+let currentFilterCategory = 'all';
+
+function toggleCustomFilterMenu(type) {
+  const monthMenu = document.getElementById('menu-filter-month');
+  const catMenu = document.getElementById('menu-filter-cat');
+
+  if (type === 'month') {
+    monthMenu.classList.toggle('hidden');
+    catMenu.classList.add('hidden');
+  } else {
+    catMenu.classList.toggle('hidden');
+    monthMenu.classList.add('hidden');
+  }
+}
+
+// Закрываем меню при клике снаружи
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#wrap-filter-month') && !e.target.closest('#wrap-filter-cat')) {
+    const mm = document.getElementById('menu-filter-month');
+    const cm = document.getElementById('menu-filter-cat');
+    if (mm) mm.classList.add('hidden');
+    if (cm) cm.classList.add('hidden');
+  }
+});
+
+function selectFilterValue(type, value, label) {
+  if (type === 'month') {
+    currentFilterMonth = value;
+    document.getElementById('label-filter-month').textContent = label;
+    document.getElementById('menu-filter-month').classList.add('hidden');
+  } else {
+    currentFilterCategory = value;
+    document.getElementById('label-filter-cat').textContent = label;
+    document.getElementById('menu-filter-cat').classList.add('hidden');
+  }
+  renderTransactions();
+}
+
 function renderTransactions() {
   const data = Cache.transactions || [];
   const curMonth = data.find(m => m.id === formatDateStr(new Date(), 'yyyy-MM')) || { expense: 0, income: 0 };
@@ -741,57 +781,70 @@ function renderTransactions() {
   document.getElementById('month-expense').innerText = formatMoney(curMonth.expense);
   document.getElementById('month-income').innerText = formatMoney(curMonth.income);
 
-  // 1. Наполняем селекторы фильтров, если они пустые
-  const monthFilter = document.getElementById('tx-filter-month');
-  const catFilter = document.getElementById('tx-filter-category');
+  // Наполняем пункты выпадающих меню
+  const monthMenu = document.getElementById('menu-filter-month');
+  const catMenu = document.getElementById('menu-filter-cat');
 
-  if (monthFilter && monthFilter.options.length <= 1) {
+  if (monthMenu && data.length > 0) {
+    let mHtml = `
+      <button type="button" onclick="selectFilterValue('month', 'all', 'Все месяцы')" class="w-full text-left px-3 py-2 text-xs rounded-xl transition-colors ${currentFilterMonth === 'all' ? 'bg-blue-600/20 text-blue-300 font-semibold' : 'text-gray-300 hover:bg-gray-700/60'}">
+        Все месяцы
+      </button>
+    `;
     data.forEach(m => {
-      const opt = document.createElement('option');
-      opt.value = m.id;
-      opt.textContent = m.label;
-      monthFilter.appendChild(opt);
+      const active = (currentFilterMonth === m.id);
+      mHtml += `
+        <button type="button" onclick="selectFilterValue('month', '${m.id}', '${escapeHtml(m.label)}')" class="w-full text-left px-3 py-2 text-xs rounded-xl transition-colors ${active ? 'bg-blue-600/20 text-blue-300 font-semibold' : 'text-gray-300 hover:bg-gray-700/60'}">
+          ${escapeHtml(m.label)}
+        </button>
+      `;
     });
+    monthMenu.innerHTML = mHtml;
   }
 
-  if (catFilter && catFilter.options.length <= 1 && Cache.categories) {
+  if (catMenu && Cache.categories) {
     const allCats = [
-      ...Cache.categories.expense.map(c => ({ name: c.name, type: 'Расход' })),
-      ...Cache.categories.income.map(c => ({ name: c.name, type: 'Доход' }))
+      ...Cache.categories.expense.map(c => ({ name: c.name, icon: c.icon || '📦' })),
+      ...Cache.categories.income.map(c => ({ name: c.name, icon: c.icon || '💼' }))
     ];
-    // Уникальные названия категорий
-    const unique = [...new Set(allCats.map(c => c.name))];
-    unique.sort().forEach(catName => {
-      const opt = document.createElement('option');
-      opt.value = catName;
-      opt.textContent = catName;
-      catFilter.appendChild(opt);
+    // Уникальные категории
+    const map = new Map();
+    allCats.forEach(c => { if (!map.has(c.name)) map.set(c.name, c.icon); });
+
+    let cHtml = `
+      <button type="button" onclick="selectFilterValue('cat', 'all', 'Все категории')" class="w-full text-left px-3 py-2 text-xs rounded-xl transition-colors ${currentFilterCategory === 'all' ? 'bg-blue-600/20 text-blue-300 font-semibold' : 'text-gray-300 hover:bg-gray-700/60'}">
+        Все категории
+      </button>
+    `;
+    Array.from(map.entries()).sort((a,b) => a[0].localeCompare(b[0])).forEach(([name, icon]) => {
+      const active = (currentFilterCategory === name);
+      cHtml += `
+        <button type="button" onclick="selectFilterValue('cat', '${escapeHtml(name)}', '${icon} ${escapeHtml(name)}')" class="w-full text-left px-3 py-2 text-xs rounded-xl transition-colors flex items-center gap-2 ${active ? 'bg-blue-600/20 text-blue-300 font-semibold' : 'text-gray-300 hover:bg-gray-700/60'}">
+          <span>${icon}</span>
+          <span class="truncate">${escapeHtml(name)}</span>
+        </button>
+      `;
     });
+    catMenu.innerHTML = cHtml;
   }
 
-  const selectedMonth = monthFilter ? monthFilter.value : 'all';
-  const selectedCat = catFilter ? catFilter.value : 'all';
-
-  // 2. Фильтруем данные
+  // Фильтруем данные
   let filteredMonths = data.map(m => {
-    if (selectedMonth !== 'all' && m.id !== selectedMonth) return null;
+    if (currentFilterMonth !== 'all' && m.id !== currentFilterMonth) return null;
 
     let items = m.items;
-    if (selectedCat !== 'all') {
-      items = items.filter(tx => tx.category === selectedCat);
+    if (currentFilterCategory !== 'all') {
+      items = items.filter(tx => tx.category === currentFilterCategory);
     }
 
     if (items.length === 0) return null;
 
-    return {
-      ...m,
-      items
-    };
+    return { ...m, items };
   }).filter(Boolean);
 
   if (filteredMonths.length === 0) {
     document.getElementById('transactions-list').innerHTML =
-      '<div class="text-center text-gray-500 py-8 text-xs">Операции не найдены</div>';
+      '<div class="text-center text-gray-500 py-10 text-xs">Операции не найдены</div>';
     return;
   }
 
@@ -859,7 +912,7 @@ function renderTransactions() {
 
 function switchTransactionView(view) {
   const isChart = view === 'chart';
-  const list = document.getElementById('transactions-list');
+  const list = document.getElementById('transactions-list-wrap') || document.getElementById('transactions-list');
   const chart = document.getElementById('transactions-chart');
   const listBtn = document.getElementById('view-list-btn');
   const chartBtn = document.getElementById('view-chart-btn');
