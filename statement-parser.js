@@ -60,29 +60,6 @@ class StatementExtractor {
 // -------------------------------------------------------------
 // 2. ДЕТЕКТОР БАНКА И ПАРСЕРЫ
 // -------------------------------------------------------------
-class BankDetector {
-  /**
-   * Анализирует первые строки выписки и определяет банк
-   */
-  static detect(rawLines) {
-    const preview = rawLines.slice(0, 35).join(' ').toLowerCase();
-
-    if (preview.includes('газпромбанк') || preview.includes('гпб') || preview.includes('gazprombank')) {
-      return 'GPB';
-    }
-    // Сигнатура шапки Газпромбанка: Дата + Дата отражения + Содержание операции
-    if (preview.includes('дата отражения') && preview.includes('содержание операции')) {
-      return 'GPB';
-    }
-
-    // Задел под будущие банки:
-    // if (preview.includes('сбербанк')) return 'SBER';
-    // if (preview.includes('тинькофф') || preview.includes('т-банк')) return 'TBANK';
-
-    return 'GPB'; // По умолчанию для текущей структуры
-  }
-}
-
 class StatementCategorizer {
   static RULES = {
     "Зарплата": [
@@ -109,7 +86,8 @@ class StatementCategorizer {
     ],
     "Развлечения": [
       /muzej/i, /музей/i, /homlins/i, /крендел/i, /krantstrevel/i, /lindenmarkt/i,
-      /shtiglitsa/i, /штиглиц/i, /spghpa/i
+      /shtiglitsa/i, /штиглиц/i, /spghpa/i,
+      /afisha/i, /афиша/i, /teatr/i, /театр/i, /masterskaya/i, /отдых и развлечения/i
     ],
     "Маркетплейсы": [
       /\bwb\b/i, /wildberries/i, /вайлдберриз/i, /ozon/i, /озон/i,
@@ -277,16 +255,162 @@ class GazprombankParser {
   }
 }
 
-// Главный фасад-диспетчер
+// -------------------------------------------------------------
+// ПАРСЕР СБЕРБАНКА
+// -------------------------------------------------------------
+class SberbankParser {
+  // Начало операции: Дата + Время (например: 24.08.2026 18:07)
+  static ROW_START = /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2})\s+(.+)$/;
+
+  static parse(rawLines, options = { excludeTransfers: true }) {
+    const rawBlocks = [];
+    let currentBlock = null;
+
+    for (let line of rawLines) {
+      line = line.trim();
+      if (!line || this._isServiceLine(line)) continue;
+
+      // Вторая строка операции содержит дату и 6-значный код авторизации — не путаем её с началом!
+      const isTxStart = this.ROW_START.test(line) && !/^\d{2}\.\d{2}\.\d{4}\s+\d{6}/.test(line);
+
+      if (isTxStart) {
+        if (currentBlock) rawBlocks.push(currentBlock);
+        currentBlock = [line];
+      } else if (currentBlock) {
+        currentBlock.push(line);
+      }
+    }
+    if (currentBlock) rawBlocks.push(currentBlock);
+
+    const parsed = rawBlocks.map(block => this._parseTransactionBlock(block)).filter(Boolean);
+
+    if (options.excludeTransfers) {
+      return parsed.filter(tx => !tx.isTransfer);
+    }
+    return parsed;
+  }
+
+  static _parseTransactionBlock(lines) {
+    const firstLine = lines[0];
+    const match = firstLine.match(this.ROW_START);
+    if (!match) return null;
+
+    const txDate = match[1];
+    const afterDateTime = match[3];
+
+    // Ищем суммы в конце первой строки (Сумма операции и Остаток средств)
+    const amounts = afterDateTime.match(/([+-]?\s*[\d\s]+[.,]\d{2})/g) || [];
+    if (amounts.length === 0) return null;
+
+    // Сумма операции — это первое найденное число в блоке сумм
+    const rawAmount = amounts[0];
+    const isIncome = rawAmount.includes('+');
+    const type = isIncome ? 'Доход' : 'Расход';
+    const amount = Math.abs(parseFloat(rawAmount.replace(/[^\d.,]/g, '').replace(',', '.'))) || 0;
+
+    // Категория от самого Сбера (например: "Отдых и развлечения", "Перевод СБП")
+    let sberCategory = afterDateTime;
+    amounts.forEach(a => sberCategory = sberCategory.replace(a, ''));
+    sberCategory = sberCategory.trim();
+
+    // Вторая строка обычно содержит дату обработки, код авторизации и описание точки
+    const fullText = lines.join(' ');
+    let merchant = this._extractMerchant(lines, sberCategory);
+
+    // Проверка на перевод
+    const isTransfer = this._isTransferOperation(sberCategory, fullText);
+
+    // Нормализация даты
+    const [d, m, y] = txDate.split('.');
+    const isoDate = `${y}-${m}-${d}`;
+
+    // Определяем категорию через наш категоризатор (учитывая и родную категорию Сбера)
+    const category = StatementCategorizer.categorize(merchant, `${sberCategory} ${fullText}`, type);
+
+    return {
+      date: isoDate,
+      displayDate: txDate,
+      type,
+      amount,
+      merchant,
+      category,
+      isTransfer,
+      bank: 'Сбербанк',
+      rawDetails: fullText
+    };
+  }
+
+  static _extractMerchant(lines, sberCategory) {
+    if (lines.length > 1) {
+      // Убираем дату обработки и код авторизации из начала второй строки
+      let descLine = lines[1].replace(/^\d{2}\.\d{2}\.\d{4}\s+\d+\s*/, '');
+      // Отрезаем хвост "Операция по карте ****XXXX" или "Операция по счету ****XXXX"
+      descLine = descLine.replace(/\.?\s*Операция\s+по\s+(карте|счету)\s+\*{2,4}\d+/i, '').trim();
+      if (descLine) return descLine;
+    }
+    return sberCategory || 'Операция Сбербанк';
+  }
+
+  static _isTransferOperation(sberCategory, fullText) {
+    const text = (sberCategory + ' ' + fullText).toLowerCase();
+    return text.includes('перевод') ||
+           text.includes('сбп') ||
+           text.includes('перевод на карту') ||
+           text.includes('перевод с карты') ||
+           text.includes('перевод для') ||
+           text.includes('перевод от');
+  }
+
+  static _isServiceLine(line) {
+    const l = line.toLowerCase();
+    return l.includes('выписка по платёжному счёту') ||
+           l.includes('расшифровка операций') ||
+           l.includes('дата операции') ||
+           l.includes('сумма в валюте') ||
+           l.includes('остаток средств') ||
+           l.includes('страница') ||
+           l.includes('продолжение на следующей странице') ||
+           l.includes('для проверки подлинности') ||
+           l.includes('действителен до') ||
+           l.includes('итого по операциям');
+  }
+}
+
+class BankDetector {
+  static detect(rawLines) {
+    const preview = rawLines.slice(0, 35).join(' ').toLowerCase();
+
+    // Проверка на Сбербанк
+    if (preview.includes('сбербанк') || preview.includes('sberbank') || preview.includes('сбер')) {
+      return 'SBER';
+    }
+
+    // Проверка на Газпромбанк
+    if (preview.includes('газпромбанк') || preview.includes('гпб') || preview.includes('gazprombank')) {
+      return 'GPB';
+    }
+    if (preview.includes('дата отражения') && preview.includes('содержание операции')) {
+      return 'GPB';
+    }
+
+    return 'UNKNOWN';
+  }
+}
+
 class StatementDispatcher {
   static parse(rawLines) {
-    const bank = BankDetector.detect(rawLines);
-    console.log(`Определен банк выписки: ${bank}`);
+    const bankCode = BankDetector.detect(rawLines);
 
-    switch (bank) {
+    if (bankCode === 'UNKNOWN') {
+      throw new Error('Банк не поддерживается. На данный момент доступны: Газпромбанк и Сбербанк.');
+    }
+
+    switch (bankCode) {
+      case 'SBER':
+        return { bankName: 'Сбербанк', transactions: SberbankParser.parse(rawLines, { excludeTransfers: true }) };
       case 'GPB':
       default:
-        return GazprombankParser.parse(rawLines, { excludeTransfers: true });
+        return { bankName: 'Газпромбанк', transactions: GazprombankParser.parse(rawLines, { excludeTransfers: true }) };
     }
   }
 }
@@ -310,13 +434,13 @@ async function handleStatementUpload(event) {
     const lines = await StatementExtractor.extractLinesFromPDF(file);
 
     // 2. Формируем таблицу операций
-    const transactions = StatementDispatcher.parse(lines);
+    const result = StatementDispatcher.parse(lines);
 
     event.target.value = '';
     document.getElementById('toast-container').classList.add('hidden');
 
     // 3. Отображаем результат Шага 2 в модальном окне
-    renderParsedTransactionsView(file.name, transactions);
+    renderParsedTransactionsView(file.name, result.transactions, result.bankName);
 
   } catch (err) {
     console.error('Ошибка обработки PDF:', err);
@@ -365,7 +489,7 @@ const CATEGORY_ICONS = {
   'Другое': '📦'
 };
 
-function renderParsedTransactionsView(fileName, transactions) {
+function renderParsedTransactionsView(fileName, transactions, bankName = 'Банк') {
   const dialog = document.getElementById('pdf-debug-dialog');
   const info = document.getElementById('pdf-debug-info');
   const output = document.getElementById('pdf-debug-output');
@@ -404,10 +528,16 @@ function renderParsedTransactionsView(fileName, transactions) {
     const totalExp = selectedTxs.filter(t => t.type === 'Расход').reduce((s, t) => s + t.amount, 0);
     const totalInc = selectedTxs.filter(t => t.type === 'Доход').reduce((s, t) => s + t.amount, 0);
 
+    const bankBadgeColor = bankName === 'Сбербанк' ? 'bg-emerald-900/60 text-emerald-300 border-emerald-700/60' : 'bg-blue-900/60 text-blue-300 border-blue-700/60';
+    
     info.innerHTML = `
-      <b>${fileName}</b> • К импорту: <b class="text-white">${selectedTxs.length}</b> из ${transactions.length}<br>
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border ${bankBadgeColor}">${escapeHtml(bankName)}</span>
+        <span class="text-xs text-gray-300 truncate">${fileName}</span>
+      </div>
+      <div>К импорту: <b class="text-white">${selectedTxs.length}</b> из ${transactions.length} | 
       <span class="text-red-400">Расход: ${formatMoney(totalExp)}</span> | 
-      <span class="text-emerald-400">Доход: ${formatMoney(totalInc)}</span>
+      <span class="text-emerald-400">Доход: ${formatMoney(totalInc)}</span></div>
     `;
 
     const importBtn = document.getElementById('btn-import-transactions');
