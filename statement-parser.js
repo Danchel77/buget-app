@@ -557,7 +557,8 @@ class OzonBankParser {
 
  static _extractMerchant(fullText) {
     // 1. Покупки картой в магазинах/терминалах: "в [ТОЧКА] дата [ДАТА]"
-    const posMatch = fullText.match(/в\s+([A-Za-z0-9А-Яа-яЁё\s*._"-]+?)\s+дата\b/i);
+    // Вырезаем название точки между "сумма ... в" и "дата 202X"
+    const posMatch = fullText.match(/(?:сумма\s*[\d.]+\s*в|\bв)\s+([\s\S]+?)\s+дата\s*\d{4}/i);
     if (posMatch && posMatch[1].trim()) {
       let store = posMatch[1].trim();
       // Убираем хвостики страны (RU, RUS) и лишние пробелы
