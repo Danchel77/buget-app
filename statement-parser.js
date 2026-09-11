@@ -259,7 +259,6 @@ class GazprombankParser {
 // ПАРСЕР СБЕРБАНКА
 // -------------------------------------------------------------
 class SberbankParser {
-  // Начало операции: Дата + Время (например: 24.08.2026 18:07)
   static ROW_START = /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2})\s+(.+)$/;
 
   static parse(rawLines, options = { excludeTransfers: true }) {
@@ -270,7 +269,6 @@ class SberbankParser {
       line = line.trim();
       if (!line || this._isServiceLine(line)) continue;
 
-      // Вторая строка операции содержит дату и 6-значный код авторизации — не путаем её с началом!
       const isTxStart = this.ROW_START.test(line) && !/^\d{2}\.\d{2}\.\d{4}\s+\d{6}/.test(line);
 
       if (isTxStart) {
@@ -298,34 +296,30 @@ class SberbankParser {
     const txDate = match[1];
     const afterDateTime = match[3];
 
-    // Ищем суммы в конце первой строки (Сумма операции и Остаток средств)
     const amounts = afterDateTime.match(/([+-]?\s*[\d\s]+[.,]\d{2})/g) || [];
     if (amounts.length === 0) return null;
 
-    // Сумма операции — это первое найденное число в блоке сумм
     const rawAmount = amounts[0];
     const isIncome = rawAmount.includes('+');
     const type = isIncome ? 'Доход' : 'Расход';
     const amount = Math.abs(parseFloat(rawAmount.replace(/[^\d.,]/g, '').replace(',', '.'))) || 0;
 
-    // Категория от самого Сбера (например: "Отдых и развлечения", "Перевод СБП")
+    // Категория от самого Сбербанка (например: "Отдых и развлечения", "Рестораны и кафе")
     let sberCategory = afterDateTime;
     amounts.forEach(a => sberCategory = sberCategory.replace(a, ''));
     sberCategory = sberCategory.trim();
 
-    // Вторая строка обычно содержит дату обработки, код авторизации и описание точки
     const fullText = lines.join(' ');
-    let merchant = this._extractMerchant(lines, sberCategory);
+    const merchant = this._extractMerchant(lines, sberCategory);
 
-    // Проверка на перевод
-    const isTransfer = this._isTransferOperation(sberCategory, fullText);
+    // Проверка: перевод, закрытие вклада или брокерский счет
+    const isTransfer = this._isTransferOperation(sberCategory, fullText, merchant);
 
-    // Нормализация даты
     const [d, m, y] = txDate.split('.');
     const isoDate = `${y}-${m}-${d}`;
 
-    // Определяем категорию через наш категоризатор (учитывая и родную категорию Сбера)
-    const category = StatementCategorizer.categorize(merchant, `${sberCategory} ${fullText}`, type);
+    // Приоритетная категоризация с учетом категорий Сбера
+    const category = this._determineCategory(sberCategory, merchant, fullText, type);
 
     return {
       date: isoDate,
@@ -340,25 +334,38 @@ class SberbankParser {
     };
   }
 
+  static _determineCategory(sberCat, merchant, fullText, type) {
+    const sberLower = sberCat.toLowerCase();
+
+    // 1. Прямой маппинг родных категорий Сбера
+    if (sberLower.includes('отдых и развлечения')) return 'Развлечения';
+    if (sberLower.includes('рестораны и кафе') || sberLower.includes('кафе и рестораны')) return 'Кафе и рестораны';
+    if (sberLower.includes('супермаркеты')) return 'Продукты';
+    if (sberLower.includes('транспорт')) return 'Транспорт';
+    if (sberLower.includes('коммунальные') || sberLower.includes('жилье')) return 'Жилье';
+
+    // 2. Если у Сбера "Прочие операции/расходы" — используем наш общий классификатор
+    return StatementCategorizer.categorize(merchant, `${sberCat} ${fullText}`, type);
+  }
+
   static _extractMerchant(lines, sberCategory) {
     if (lines.length > 1) {
-      // Убираем дату обработки и код авторизации из начала второй строки
       let descLine = lines[1].replace(/^\d{2}\.\d{2}\.\d{4}\s+\d+\s*/, '');
-      // Отрезаем хвост "Операция по карте ****XXXX" или "Операция по счету ****XXXX"
-      descLine = descLine.replace(/\.?\s*Операция\s+по\s+(карте|счету)\s+\*{2,4}\d+/i, '').trim();
+      // Чистим хвостик "Операция по карте..." или "Операция по счету..."
+      descLine = descLine.replace(/\.?\s*Операция\s+по.*$/i, '').trim();
       if (descLine) return descLine;
     }
     return sberCategory || 'Операция Сбербанк';
   }
 
-  static _isTransferOperation(sberCategory, fullText) {
-    const text = (sberCategory + ' ' + fullText).toLowerCase();
+  static _isTransferOperation(sberCategory, fullText, merchant) {
+    const text = `${sberCategory} ${fullText} ${merchant}`.toLowerCase();
     return text.includes('перевод') ||
            text.includes('сбп') ||
-           text.includes('перевод на карту') ||
-           text.includes('перевод с карты') ||
-           text.includes('перевод для') ||
-           text.includes('перевод от');
+           text.includes('vklad-karta') || // Закрытие / выплата вклада
+           text.includes('karta-vklad') ||
+           text.includes('bpwww') ||       // Брокерский счёт Сбера (СберИнвестор)
+           text.includes('брокер');
   }
 
   static _isServiceLine(line) {
@@ -490,6 +497,7 @@ const CATEGORY_ICONS = {
 };
 
 function renderParsedTransactionsView(fileName, transactions, bankName = 'Банк') {
+  window._lastParsedBankName = bankName;
   const dialog = document.getElementById('pdf-debug-dialog');
   const info = document.getElementById('pdf-debug-info');
   const output = document.getElementById('pdf-debug-output');
@@ -693,13 +701,17 @@ function downloadParsedJSON() {
     return;
   }
 
+  // Определяем префикс файла по банку
+  const bankPrefix = (window._lastParsedBankName === 'Сбербанк') ? 'sberbank' : 'gazprombank';
+  const today = new Date().toISOString().slice(0, 10);
+
   const jsonStr = JSON.stringify(window._lastParsedTransactions, null, 2);
   const blob = new Blob([jsonStr], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
 
   const a = document.createElement('a');
   a.href = url;
-  a.download = `gazprombank_parsed_${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `${bankPrefix}_parsed_${today}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
