@@ -439,11 +439,48 @@ document.getElementById('close-manage-categories').addEventListener('click', () 
   document.getElementById('manage-categories-dialog').classList.add('hidden');
 });
 
-function updateCategorySelect(selectEl, type) {
+function updateCategorySelect(containerOrRow, type) {
   if (!Cache || !Cache.categories) return;
+  
+  const row = containerOrRow.closest ? (containerOrRow.closest('.tx-item') || containerOrRow) : containerOrRow;
+  const menu = row.querySelector('.tx-category-menu');
+  const input = row.querySelector('.tx-category');
+  const btn = row.querySelector('.tx-category-btn');
+  const label = row.querySelector('.tx-category-label');
+  
+  if (!menu || !input || !btn || !label) return;
+
   const cats = type === 'Доход' ? Cache.categories.income : Cache.categories.expense;
-  selectEl.innerHTML = '<option value="" disabled selected>Категория...</option>' +
-    cats.map(c => `<option value="${escapeHtml(c.name)}">${c.icon} ${escapeHtml(c.name)}</option>`).join('');
+
+  // Генерируем опции для меню
+  menu.innerHTML = cats.map(c => `
+    <button type="button" class="w-full text-left px-2.5 py-1.5 text-xs text-gray-300 hover:bg-gray-700/80 rounded-lg flex items-center gap-2 cursor-pointer transition-colors" data-cat="${escapeHtml(c.name)}" data-icon="${c.icon || '📦'}">
+      <span>${c.icon || '📦'}</span>
+      <span class="truncate">${escapeHtml(c.name)}</span>
+    </button>
+  `).join('');
+
+  // Навешиваем клик на кнопку открытия
+  btn.onclick = (e) => {
+    e.stopPropagation();
+    const isClosed = menu.classList.contains('hidden');
+    document.querySelectorAll('.custom-dropdown-menu').forEach(m => m.classList.add('hidden'));
+    if (isClosed) menu.classList.remove('hidden');
+  };
+
+  // Навешиваем выбор пункта
+  menu.querySelectorAll('button').forEach(itemBtn => {
+    itemBtn.onclick = (e) => {
+      e.stopPropagation();
+      const catName = itemBtn.dataset.cat;
+      const catIcon = itemBtn.dataset.icon;
+      input.value = catName;
+      label.innerHTML = `${catIcon} ${escapeHtml(catName)}`;
+      label.classList.remove('text-gray-400');
+      label.classList.add('text-white');
+      menu.classList.add('hidden');
+    };
+  });
 }
 
 function processDeposits(deposits, goals) {
