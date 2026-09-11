@@ -83,6 +83,64 @@ class BankDetector {
   }
 }
 
+class StatementCategorizer {
+  static RULES = {
+    "Зарплата": [
+      /заработная плата/i, /salary/i, /ао\s+"цкбм"/i
+    ],
+    "Продукты": [
+      /perek/i, /перекресток/i, /pyaterochka/i, /пятерочка/i, /dostavka iz pyaterochk/i,
+      /okey/i, /окей/i, /lenta/i, /лента/i, /magnit/i, /магнит/i,
+      /krasnoe(&|\s*i\s*)beloe/i, /красное\s*и\s*белое/i, /zhivaya voda/i,
+      /fixprice/i, /фикс\s*прайс/i
+    ],
+    "Кафе и рестораны": [
+      /vlavashe/i, /rostics/i, /ростикс/i, /kfc/i, /kimchi to go/i, /mu mu burgers/i,
+      /bros burritos/i, /dostaevsky/i, /nesselbek/i, /mare dmore/i, /dom lunda/i,
+      /krem/i, /kozhura/i, /fler/i, /vypechka i kofe/i, /1st food factory/i,
+      /kafe/i, /кафе/i, /restoran/i, /ресторан/i, /garden/i,
+      /semenova a/i // Столовая / кафе рядом с работой
+    ],
+    "Транспорт": [
+      /rzd/i, /ржд/i, /szppk/i, /сзппк/i, /transkom/i, /транском/i,
+      // Метро СПб (автоматы пополнения)
+      /mezhdunarodnaya/i, /baltiyskaya/i, /pionerskaya/i, /tekhnol/i, /pl\.\s*lenina/i,
+      /yandex.*go/i, /uber/i, /ситимобил/i, /такси/i
+    ],
+    "Развлечения": [
+      /muzej/i, /музей/i, /homlins/i, /крендел/i, /krantstrevel/i, /lindenmarkt/i,
+      /shtiglitsa/i, /штиглиц/i, /spghpa/i
+    ],
+    "Маркетплейсы": [
+      /\bwb\b/i, /wildberries/i, /вайлдберриз/i, /ozon/i, /озон/i,
+      /kleekstore/i, /yandex.*market/i, /яндекс.*маркет/i, /megamarket/i, /алиэкспресс/i
+    ]
+  };
+
+  static categorize(merchant, rawDetails, type) {
+    const text = `${merchant} ${rawDetails}`;
+
+    // Доходы
+    if (type === 'Доход') {
+      for (const pattern of this.RULES["Зарплата"]) {
+        if (pattern.test(text)) return "Зарплата";
+      }
+      return "Другое";
+    }
+
+    // Расходы
+    for (const [category, patterns] of Object.entries(this.RULES)) {
+      if (category === "Зарплата") continue;
+      for (const pattern of patterns) {
+        if (pattern.test(text)) return category;
+      }
+    }
+
+    // T2, Vezaruspro, МФЦ и прочее неопределенное уйдут сюда автоматически
+    return "Другое";
+  }
+}
+
 class GazprombankParser {
   static VTB_ROW_START = /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})\s+(.+?)\s*([+-]\s*[\d\s]+[.,]\d{2})\s+([+-]\s*[\d\s]+[.,]\d{2})$/;
   static DATE_PREFIX = /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})/;
@@ -178,7 +236,9 @@ class GazprombankParser {
            text.includes('перевод с банк') ||
            text.includes('перевод на банк') ||
            text.includes('перевод между') ||
-           text.includes('перевод по сбп');
+           text.includes('перевод по сбп') ||
+           text.includes('снятие наличных') ||
+           text.includes('vb24');
   }
 
   static _extractMerchant(lines, fullText, opTitle) {
@@ -305,9 +365,10 @@ function renderParsedTransactionsView(fileName, transactions) {
     html += `
       <div class="bg-gray-900/90 border border-gray-700/80 p-3 rounded-xl flex items-center justify-between gap-3">
         <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
             <span class="text-[10px] text-gray-400 bg-gray-800 px-2 py-0.5 rounded font-mono">${tx.displayDate}</span>
             <span class="text-xs font-semibold text-gray-200 truncate">${escapeHtml(tx.merchant)}</span>
+            <span class="text-[10px] font-medium bg-blue-900/50 text-blue-300 border border-blue-700/40 px-2 py-0.5 rounded-full">${escapeHtml(tx.category)}</span>
           </div>
           <p class="text-[10px] text-gray-500 truncate mt-1">${escapeHtml(tx.rawDetails)}</p>
         </div>
