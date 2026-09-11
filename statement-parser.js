@@ -592,16 +592,6 @@ class OzonBankParser {
     return clean || 'Операция Озон Банк';
   } 
 
-    // 3. Другие покупки: очищаем служебные слова
-    let clean = fullText.replace(/^(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}:\d{2}\s+\d+\s*)/, '')
-                        .replace(/Оплата товаров\/услуг\s*(на\s*)?/i, '')
-                        .replace(/Без НДС\.?/i, '')
-                        .replace(/([+−–—\-\u2012\u2013\u2014\u2212]?\s*[\d\s\xa0]+[.,]\d{2}\s*₽)/g, '')
-                        .trim();
-
-    return clean || 'Операция Озон Банк';
-  }
-
   static _isTransferOperation(fullText, merchant) {
     const text = `${fullText} ${merchant}`.toLowerCase();
     return text.includes('перевод') ||
