@@ -1088,3 +1088,131 @@ async function saveCategoryRuleFromModal() {
     showToast('Ошибка при сохранении: ' + err.message, true);
   }
 }
+
+// -------------------------------------------------------------
+// РЕДАКТОР СЛОВАРЯ КАТЕГОРИЙ (ШЕСТЕРЕНКА ⚙️)
+// -------------------------------------------------------------
+function openRulesEditorModal() {
+  const dialog = document.getElementById('rules-editor-dialog');
+  const catSelect = document.getElementById('editor-category-select');
+
+  // Формируем список доступных категорий
+  const expenseCats = window.Cache?.categories?.expense?.map(c => c.name) || [
+    'Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Развлечения', 'Другое'
+  ];
+  const incomeCats = window.Cache?.categories?.income?.map(c => c.name) || [
+    'Зарплата', 'Возврат', 'Кэшбек', 'Другое'
+  ];
+  const allCats = [...new Set([...expenseCats, ...incomeCats])];
+
+  catSelect.innerHTML = allCats.map(cat => 
+    `<option value="${escapeHtml(cat)}">${CATEGORY_ICONS[cat] || '📦'} ${escapeHtml(cat)}</option>`
+  ).join('');
+
+  document.getElementById('editor-keyword-input').value = '';
+  renderRulesList();
+  dialog.classList.remove('hidden');
+}
+
+function closeRulesEditorModal() {
+  document.getElementById('rules-editor-dialog').classList.add('hidden');
+}
+
+function renderRulesList() {
+  const container = document.getElementById('editor-rules-list');
+  const rules = window.Cache?.categoryRules || [];
+
+  if (rules.length === 0) {
+    container.innerHTML = '<p class="text-xs text-gray-500 text-center py-4">В словаре пока нет правил</p>';
+    return;
+  }
+
+  // Группируем правила по категориям
+  const grouped = {};
+  rules.forEach(r => {
+    const cat = r.category || 'Другое';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(r);
+  });
+
+  let html = '';
+  Object.keys(grouped).sort().forEach(cat => {
+    const catIcon = CATEGORY_ICONS[cat] || '📦';
+    html += `
+      <div class="bg-gray-900/70 border border-gray-700/60 rounded-2xl p-3">
+        <div class="text-xs font-bold text-gray-200 mb-2 flex items-center gap-1.5 border-b border-gray-800 pb-1">
+          <span>${catIcon}</span>
+          <span>${escapeHtml(cat)}</span>
+          <span class="text-[10px] text-gray-500 font-normal">(${grouped[cat].length})</span>
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+    `;
+
+    grouped[cat].forEach(r => {
+      html += `
+        <span class="inline-flex items-center gap-1 bg-gray-800 border border-gray-700 text-gray-300 text-xs px-2.5 py-1 rounded-lg">
+          <span>${escapeHtml(r.pattern)}</span>
+          <button type="button" onclick="deleteRuleFromEditor('${r.id}')" class="text-gray-500 hover:text-red-400 font-bold ml-1 text-xs cursor-pointer" title="Удалить слово">✕</button>
+        </span>
+      `;
+    });
+
+    html += `
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+async function addRuleFromEditor() {
+  const input = document.getElementById('editor-keyword-input');
+  const keyword = input.value.trim();
+  const category = document.getElementById('editor-category-select').value;
+
+  if (!keyword) {
+    showToast('Введите слово или фразу', true);
+    return;
+  }
+
+  showToast('Добавление...', false, true);
+  try {
+    const newRule = { pattern: keyword, category: category };
+    const docRef = await db.collection('CategoryRules').add(newRule);
+
+    if (!window.Cache.categoryRules) window.Cache.categoryRules = [];
+    window.Cache.categoryRules.push({ id: docRef.id, ...newRule });
+
+    input.value = '';
+    renderRulesList();
+    applyRulesToOpenedStatement(keyword, category);
+    showToast(`Добавлено: "${keyword}" → ${category}`);
+  } catch (e) {
+    showToast('Ошибка: ' + e.message, true);
+  }
+}
+
+async function deleteRuleFromEditor(ruleId) {
+  try {
+    await db.collection('CategoryRules').doc(ruleId).delete();
+    window.Cache.categoryRules = (window.Cache.categoryRules || []).filter(r => r.id !== ruleId);
+    renderRulesList();
+    showToast('Слово удалено из словаря');
+  } catch (e) {
+    showToast('Ошибка удаления', true);
+  }
+}
+
+// Пересчитывает категории в открытой выписке при добавлении нового правила
+function applyRulesToOpenedStatement(keyword, category) {
+  if (!window._lastParsedTransactions) return;
+  window._lastParsedTransactions.forEach(t => {
+    const full = `${t.merchant} ${t.rawDetails}`.toLowerCase();
+    if (full.includes(keyword.toLowerCase())) {
+      t.category = category;
+      const sel = document.getElementById(`cat-select-${t._id}`);
+      if (sel) sel.value = category;
+    }
+  });
+}
