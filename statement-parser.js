@@ -555,18 +555,42 @@ class OzonBankParser {
     };
   }
 
-  static _extractMerchant(fullText) {
-    // 1. Покупки на маркетплейсе Ozon
+ static _extractMerchant(fullText) {
+    // 1. Покупки картой в магазинах/терминалах: "в [ТОЧКА] дата [ДАТА]"
+    const posMatch = fullText.match(/в\s+([A-Za-z0-9А-Яа-яЁё\s*._"-]+?)\s+дата\b/i);
+    if (posMatch && posMatch[1].trim()) {
+      let store = posMatch[1].trim();
+      // Убираем хвостики страны (RU, RUS) и лишние пробелы
+      return store.replace(/\s+(RU|RUS)$/i, '').replace(/\s+/g, ' ').trim();
+    }
+
+    // 2. Возвраты
+    if (/возврат/i.test(fullText)) {
+      const orderMatch = fullText.match(/заказ\s*№?\s*([0-9-]+)/i);
+      return orderMatch ? `Возврат Ozon (${orderMatch[0]})` : 'Возврат покупки';
+    }
+
+    // 3. Покупки на маркетплейсе Ozon
     if (/платформе\s+ozon/i.test(fullText) || /оплата.*ozon/i.test(fullText)) {
       const orderMatch = fullText.match(/заказ\s*№?\s*([0-9-]+)/i);
       return orderMatch ? `Ozon (${orderMatch[0]})` : 'Ozon';
     }
 
-    // 2. Переводы через СБП
+    // 4. Переводы СБП
     if (/перевод.*сбп/i.test(fullText)) {
       const senderMatch = fullText.match(/Отправитель:\s*([^.]*?)(?:Без НДС|$)/i);
       return senderMatch ? `Перевод СБП (${senderMatch[1].trim()})` : 'Перевод через СБП';
     }
+
+    // Резервная очистка
+    let clean = fullText.replace(/^(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}:\d{2}\s+\d+\s*)/, '')
+                        .replace(/Оплата товаров(\/услуг)?\s*(по карте \d+)?\s*(на\s*)?/i, '')
+                        .replace(/Без НДС\.?/i, '')
+                        .replace(/([+−–—\-\u2012\u2013\u2014\u2212]?\s*[\d\s\xa0]+[.,]\d{2}\s*₽)/g, '')
+                        .trim();
+
+    return clean || 'Операция Озон Банк';
+  } 
 
     // 3. Другие покупки: очищаем служебные слова
     let clean = fullText.replace(/^(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}:\d{2}\s+\d+\s*)/, '')
@@ -733,6 +757,8 @@ const CATEGORY_ICONS = {
   'Жилье': '🏠',
   'Развлечения': '🎬',
   'Зарплата': '💼',
+  'Возврат': '↩️',
+  'Кэшбек': '💰',
   'Другое': '📦'
 };
 
@@ -746,7 +772,7 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
   const expenseCategories = [
     'Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Развлечения', 'Другое'
   ];
-  const incomeCategories = ['Зарплата', 'Другое'];
+  const incomeCategories = ['Зарплата', 'Возврат', 'Кэшбек', 'Другое'];
 
   // Добавляем любые пользовательские категории, если они были созданы в приложении
   if (window.Cache?.categories?.expense) {
