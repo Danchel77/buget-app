@@ -878,14 +878,29 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
           </div>
         </div>
 
-        <!-- СТРОКА 3: Категория слева, сумма справа -->
+        <!-- СТРОКА 3: Кастомное выпадающее меню слева, сумма справа -->
         <div class="flex items-center justify-between gap-2 pt-2 border-t border-gray-800/60">
-          <div class="flex items-center gap-1.5 min-w-0">
-            <select id="cat-select-${tx._id}"
-                    class="w-44 bg-gray-800 border border-gray-700 text-xs text-blue-200 rounded-lg px-2.5 py-1 outline-none cursor-pointer focus:border-blue-500 font-medium truncate"
-                    onchange="changeTxCategory('${tx._id}', this.value)">
-              ${optionsHtml}
-            </select>
+          
+          <!-- Кастомное всплывающее меню -->
+          <div class="relative custom-dropdown-wrap" id="cat-wrap-${tx._id}">
+            <button type="button" 
+                    onclick="toggleImportCatMenu('${tx._id}')" 
+                    class="w-44 bg-gray-800 border border-gray-700 text-xs text-blue-200 rounded-xl px-2.5 py-1.5 flex items-center justify-between outline-none cursor-pointer hover:border-gray-600 transition-colors">
+              <span id="cat-label-${tx._id}" class="truncate">${CATEGORY_ICONS[tx.category] || '📦'} ${escapeHtml(tx.category)}</span>
+              <span class="text-gray-400 text-[8px] ml-1">▼</span>
+            </button>
+            
+            <div id="cat-menu-${tx._id}" 
+                 class="custom-dropdown-menu hidden absolute left-0 bottom-full mb-1 sm:bottom-auto sm:top-full sm:mt-1 w-48 max-h-52 overflow-y-auto bg-gray-800/95 backdrop-blur-md border border-gray-700 rounded-xl shadow-2xl z-50 p-1 space-y-0.5">
+              ${cats.map(cat => `
+                <button type="button" 
+                        onclick="selectImportCat('${tx._id}', '${escapeHtml(cat)}')" 
+                        class="w-full text-left px-2.5 py-1.5 text-xs rounded-lg transition-colors flex items-center gap-2 cursor-pointer ${cat === tx.category ? 'bg-blue-600/20 text-blue-300 font-semibold' : 'text-gray-300 hover:bg-gray-700/70'}">
+                  <span>${CATEGORY_ICONS[cat] || '📦'}</span>
+                  <span class="truncate">${escapeHtml(cat)}</span>
+                </button>
+              `).join('')}
+            </div>
           </div>
 
           <div class="text-right flex-shrink-0">
@@ -909,14 +924,28 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
   dialog.classList.remove('hidden');
 }
 
-/**
- * Ручное изменение категории в карточке
- */
-function changeTxCategory(txId, newCat) {
-  const tx = window._lastParsedTransactions.find(t => t._id === txId);
+function toggleImportCatMenu(txId) {
+  const menu = document.getElementById(`cat-menu-${txId}`);
+  if (!menu) return;
+  const isClosed = menu.classList.contains('hidden');
+  
+  // Закрываем все остальные открытые меню в карточках
+  document.querySelectorAll('.custom-dropdown-menu').forEach(m => m.classList.add('hidden'));
+  
+  if (isClosed) menu.classList.remove('hidden');
+}
+
+function selectImportCat(txId, newCat) {
+  const tx = window._lastParsedTransactions?.find(t => t._id === txId);
   if (tx) {
     tx.category = newCat;
+    const labelEl = document.getElementById(`cat-label-${txId}`);
+    if (labelEl) {
+      labelEl.innerHTML = `${CATEGORY_ICONS[newCat] || '📦'} ${escapeHtml(newCat)}`;
+    }
   }
+  const menu = document.getElementById(`cat-menu-${txId}`);
+  if (menu) menu.classList.add('hidden');
 }
 
 /**
