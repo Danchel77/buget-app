@@ -65,22 +65,27 @@ class StatementCategorizer {
     const text = `${merchant} ${rawDetails}`.toLowerCase();
     const rules = window.Cache?.categoryRules || [];
 
-    // 1. Ищем совпадение в правилах из базы данных (для любого типа операции)
-    for (const rule of rules) {
-      if (!rule.pattern) continue;
-      const pattern = rule.pattern.toLowerCase().trim();
+    // 1. Берем из базы список категорий, разрешенных строго для этого типа (Доход или Расход)
+    const allowedCategories = (type === 'Доход')
+      ? (window.Cache?.categories?.income?.map(c => c.name) || [])
+      : (window.Cache?.categories?.expense?.map(c => c.name) || []);
 
+    // 2. Ищем совпадение в правилах из базы данных
+    for (const rule of rules) {
+      if (!rule.pattern || !rule.category) continue;
+
+      // Если категория правила не относится к текущему типу (например, расходное правило "Маркетплейсы" для дохода) — пропускаем
+      if (allowedCategories.length > 0 && !allowedCategories.includes(rule.category)) {
+        continue;
+      }
+
+      const pattern = rule.pattern.toLowerCase().trim();
       if (this._matches(text, pattern)) {
         return rule.category;
       }
     }
 
-    // 2. Резерв по умолчанию для зарплаты, если в базе ещё нет правила
-    if (type === 'Доход' && (text.includes('заработная плата') || text.includes('salary'))) {
-      return "Зарплата";
-    }
-
-    // 3. Если ничего не подошло
+    // 3. Если в базе нет подходящего правила
     return "Другое";
   }
 
