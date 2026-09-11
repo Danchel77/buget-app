@@ -381,5 +381,23 @@
         </div>
       </div>
   </div>
+    <!-- Модальное окно создания правила категории -->
+  <div id="remember-rule-dialog" class="fixed inset-0 bg-black/80 z-[140] hidden flex flex-col justify-center items-center p-4">
+    <div class="bg-gray-800 border border-gray-700 w-full max-w-sm rounded-3xl p-5 shadow-2xl">
+      <h3 class="font-bold text-white text-base mb-1">Запомнить категорию</h3>
+      <p class="text-xs text-gray-400 mb-4">При совпадении фразы категория будет проставляться автоматически.</p>
+
+      <label class="block text-xs text-gray-400 mb-1">Ключевое слово / фраза</label>
+      <input type="text" id="rule-keyword-input" class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none mb-3 text-sm" placeholder="Например: PEREK или ВкусВилл">
+
+      <label class="block text-xs text-gray-400 mb-1">Категория</label>
+      <select id="rule-category-select" class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl p-3 outline-none mb-5 text-sm"></select>
+
+      <div class="flex gap-2">
+        <button type="button" onclick="closeRememberRuleModal()" class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-medium text-sm">Отмена</button>
+        <button type="button" onclick="saveCategoryRuleFromModal()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-medium text-sm">Сохранить</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
