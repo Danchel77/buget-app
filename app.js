@@ -160,12 +160,13 @@ async function fetchCollection(table) {
 async function fetchAllData() {
   showToast("Синхронизация...", false, true);
   try {
-    const [txS, depS, brS, goalS, catS] = await Promise.all([
+    const [txS, depS, brS, goalS, catS, rulesS] = await Promise.all([
       db.collection('Transactions').get(),
       db.collection('Deposits').get(),
       db.collection('Broker').get(),
       db.collection('Goals').get(),
-      db.collection('Categories').get()
+      db.collection('Categories').get(),
+      db.collection('CategoryRules').get()
     ]);
     const txData = txS.docs.map(d => ({ id: d.id, ...d.data() }));
     const depData = depS.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -181,7 +182,8 @@ async function fetchAllData() {
       deposits: processedDeposits,
       broker: processedBroker,
       goals: processGoals(goalData, processedDeposits, processedBroker),
-      categories: categories
+      categories: categories,
+      categoryRules: await processOrSeedRules(rulesS)
     };
 
     updateGoalDropdowns();
@@ -1561,3 +1563,85 @@ document.addEventListener('click', (e) => {
   e.preventDefault();
   toggleItemSelection(card.dataset.id, card.dataset.table);
 });
+
+// Автозаполнение словаря в Firebase при первом запуске
+async function processOrSeedRules(snapshot) {
+  if (!snapshot.empty) {
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  }
+
+  // Базовый стартовый словарь для первого раза
+  const defaultRules = [
+    { pattern: "perek", category: "Продукты" },
+    { pattern: "перекресток", category: "Продукты" },
+    { pattern: "pyaterochka", category: "Продукты" },
+    { pattern: "пятерочка", category: "Продукты" },
+    { pattern: "okey", category: "Продукты" },
+    { pattern: "окей", category: "Продукты" },
+    { pattern: "lenta", category: "Продукты" },
+    { pattern: "лента", category: "Продукты" },
+    { pattern: "magnit", category: "Продукты" },
+    { pattern: "магнит", category: "Продукты" },
+    { pattern: "krasnoe", category: "Продукты" },
+    { pattern: "красное и белое", category: "Продукты" },
+    { pattern: "fixprice", category: "Продукты" },
+    { pattern: "фикс прайс", category: "Продукты" },
+    { pattern: "zhivaya voda", category: "Продукты" },
+    { pattern: "vlavashe", category: "Кафе и рестораны" },
+    { pattern: "rostics", category: "Кафе и рестораны" },
+    { pattern: "ростикс", category: "Кафе и рестораны" },
+    { pattern: "kfc", category: "Кафе и рестораны" },
+    { pattern: "kimchi to go", category: "Кафе и рестораны" },
+    { pattern: "mu mu burgers", category: "Кафе и рестораны" },
+    { pattern: "bros burritos", category: "Кафе и рестораны" },
+    { pattern: "dostaevsky", category: "Кафе и рестораны" },
+    { pattern: "nesselbek", category: "Кафе и рестораны" },
+    { pattern: "dom lunda", category: "Кафе и рестораны" },
+    { pattern: "krem", category: "Кафе и рестораны" },
+    { pattern: "kozhura", category: "Кафе и рестораны" },
+    { pattern: "1st food factory", category: "Кафе и рестораны" },
+    { pattern: "semenova a", category: "Кафе и рестораны" },
+    { pattern: "rzd", category: "Транспорт" },
+    { pattern: "ржд", category: "Транспорт" },
+    { pattern: "szppk", category: "Транспорт" },
+    { pattern: "сзппк", category: "Транспорт" },
+    { pattern: "transkom", category: "Транспорт" },
+    { pattern: "транском", category: "Транспорт" },
+    { pattern: "mezhdunarodnaya", category: "Транспорт" },
+    { pattern: "baltiyskaya", category: "Транспорт" },
+    { pattern: "pionerskaya", category: "Транспорт" },
+    { pattern: "tekhnol", category: "Транспорт" },
+    { pattern: "pl. lenina", category: "Транспорт" },
+    { pattern: "yandex.go", category: "Транспорт" },
+    { pattern: "такси", category: "Транспорт" },
+    { pattern: "muzej", category: "Развлечения" },
+    { pattern: "музей", category: "Развлечения" },
+    { pattern: "homlins", category: "Развлечения" },
+    { pattern: "afisha", category: "Развлечения" },
+    { pattern: "афиша", category: "Развлечения" },
+    { pattern: "teatr", category: "Развлечения" },
+    { pattern: "театр", category: "Развлечения" },
+    { pattern: "shtiglitsa", category: "Развлечения" },
+    { pattern: "wb", category: "Маркетплейсы" },
+    { pattern: "wildberries", category: "Маркетплейсы" },
+    { pattern: "ozon", category: "Маркетплейсы" },
+    { pattern: "озон", category: "Маркетплейсы" },
+    { pattern: "kleekstore", category: "Маркетплейсы" }
+  ];
+
+  try {
+    const batch = db.batch();
+    const rules = [];
+    defaultRules.forEach(rule => {
+      const docRef = db.collection('CategoryRules').doc();
+      batch.set(docRef, rule);
+      rules.push({ id: docRef.id, ...rule });
+    });
+    await batch.commit();
+    return rules;
+  } catch (e) {
+    console.error("Ошибка заполнения словаря:", e);
+    return defaultRules;
+  }
+}
+
