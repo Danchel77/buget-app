@@ -231,6 +231,138 @@ class GazprombankParser {
 }
 
 // -------------------------------------------------------------
+// ПАРСЕР ЯНДЕКС БАНКА
+// -------------------------------------------------------------
+class YandexBankParser {
+  // Строка операции в Яндексе всегда содержит дату DD.MM.YYYY и сумму со знаком (+ или −) и символом ₽
+  static DATE_REGEX = /\d{2}\.\d{2}\.\d{4}/;
+  static AMOUNT_REGEX = /[+−\-]\s*[\d\s\xa0]+[.,]\d{2}\s*₽/;
+
+  static parse(rawLines, options = { excludeTransfers: true }) {
+    const rawBlocks = [];
+    let currentBlock = null;
+
+    for (let line of rawLines) {
+      line = line.trim();
+      if (!line || this._isServiceLine(line)) continue;
+
+      // Новая операция начинается со строки, где есть и дата, и сумма
+      const isTxStart = this.DATE_REGEX.test(line) && this.AMOUNT_REGEX.test(line);
+
+      if (isTxStart) {
+        if (currentBlock) rawBlocks.push(currentBlock);
+        currentBlock = [line];
+      } else if (currentBlock) {
+        currentBlock.push(line);
+      }
+    }
+    if (currentBlock) rawBlocks.push(currentBlock);
+
+    const parsed = rawBlocks.map(block => this._parseTransactionBlock(block)).filter(Boolean);
+
+    if (options.excludeTransfers) {
+      return parsed.filter(tx => !tx.isTransfer);
+    }
+    return parsed;
+  }
+
+  static _parseTransactionBlock(lines) {
+    const firstLine = lines[0];
+
+    // 1. Извлекаем дату (берем первую дату — дату операции)
+    const dateMatch = firstLine.match(this.DATE_REGEX);
+    if (!dateMatch) return null;
+    const txDate = dateMatch[0];
+
+    // 2. Извлекаем сумму (с учетом типографского минуса −)
+    const amountMatches = firstLine.match(/[+−\-]\s*[\d\s\xa0]+[.,]\d{2}\s*₽/g) || [];
+    if (amountMatches.length === 0) return null;
+
+    const rawAmount = amountMatches[0];
+    const isIncome = rawAmount.includes('+');
+    const type = isIncome ? 'Доход' : 'Расход';
+    
+    // Очищаем сумму в число
+    const cleanNum = rawAmount.replace(/[+−\-]/g, '').replace(/[^\d.,]/g, '').replace(',', '.');
+    const amount = Math.abs(parseFloat(cleanNum)) || 0;
+
+    // 3. Извлекаем описание (в первой строке всё, что идёт ДО даты)
+    const beforeDate = firstLine.split(this.DATE_REGEX)[0].trim();
+    const fullText = lines.join(' ');
+    
+    // Чистим мерчанта
+    const merchant = this._extractMerchant(beforeDate, fullText);
+
+    // 4. Фильтрация переводов
+    const isTransfer = this._isTransferOperation(fullText, merchant);
+
+    // 5. Дата в YYYY-MM-DD
+    const [d, m, y] = txDate.split('.');
+    const isoDate = `${y}-${m}-${d}`;
+
+    // 6. Категоризация по нашей базе
+    const category = StatementCategorizer.categorize(merchant, fullText, type);
+
+    return {
+      date: isoDate,
+      displayDate: txDate,
+      type,
+      amount,
+      merchant,
+      category,
+      isTransfer,
+      bank: 'Яндекс Банк',
+      rawDetails: fullText
+    };
+  }
+
+  static _extractMerchant(beforeDate, fullText) {
+    let title = beforeDate;
+    
+    // Отрезаем служебный префикс Яндекса
+    title = title.replace(/^Оплата товаров и услуг\s*/i, '').trim();
+
+    if (!title && fullText) {
+      title = fullText.replace(/^Оплата товаров и услуг\s*/i, '')
+                       .replace(/в\s+\d{2}:\d{2}/i, '')
+                       .replace(/\*\d{4}/g, '')
+                       .replace(this.DATE_REGEX, '')
+                       .replace(this.AMOUNT_REGEX, '')
+                       .trim();
+    }
+
+    return title || 'Операция Яндекс Банк';
+  }
+
+  static _isTransferOperation(fullText, merchant) {
+    const text = `${fullText} ${merchant}`.toLowerCase();
+    return text.includes('перевод между счетами') ||
+           text.includes('входящий перевод сбп') ||
+           text.includes('исходящий перевод сбп') ||
+           text.includes('внутрибанковский перевод') ||
+           text.includes('перевод сбп') ||
+           text.includes('перевод по номеру') ||
+           text.includes('перевод по сбп') ||
+           text.includes('перевод от') ||
+           text.includes('перевод для');
+  }
+
+  static _isServiceLine(line) {
+    const l = line.toLowerCase();
+    return l.includes('выписка по договору') ||
+           l.includes('описание операции') ||
+           l.includes('дата и время операции') ||
+           l.includes('дата обработки') ||
+           l.includes('сумма в валюте') ||
+           l.includes('входящий остаток') ||
+           l.includes('в рамках договора открыт счёт') ||
+           l.includes('продолжение на следующей странице') ||
+           l.includes('страница') ||
+           l.includes('номер счёта');
+  }
+}
+
+// -------------------------------------------------------------
 // ПАРСЕР СБЕРБАНКА
 // -------------------------------------------------------------
 class SberbankParser {
@@ -362,16 +494,19 @@ class BankDetector {
   static detect(rawLines) {
     const preview = rawLines.slice(0, 35).join(' ').toLowerCase();
 
-    // Проверка на Сбербанк
+    // Яндекс Банк
+    if (preview.includes('яндекс') || preview.includes('yandex') || preview.includes('в рамках договора открыт счёт')) {
+      return 'YANDEX';
+    }
+
+    // Сбербанк
     if (preview.includes('сбербанк') || preview.includes('sberbank') || preview.includes('сбер')) {
       return 'SBER';
     }
 
-    // Проверка на Газпромбанк
-    if (preview.includes('газпромбанк') || preview.includes('гпб') || preview.includes('gazprombank')) {
-      return 'GPB';
-    }
-    if (preview.includes('дата отражения') && preview.includes('содержание операции')) {
+    // Газпромбанк
+    if (preview.includes('газпромбанк') || preview.includes('гпб') || preview.includes('gazprombank') ||
+       (preview.includes('дата отражения') && preview.includes('содержание операции'))) {
       return 'GPB';
     }
 
@@ -384,10 +519,12 @@ class StatementDispatcher {
     const bankCode = BankDetector.detect(rawLines);
 
     if (bankCode === 'UNKNOWN') {
-      throw new Error('Банк не поддерживается. На данный момент доступны: Газпромбанк и Сбербанк.');
+      throw new Error('Банк не поддерживается. На данный момент доступны: Газпромбанк, Сбербанк и Яндекс Банк.');
     }
 
     switch (bankCode) {
+      case 'YANDEX':
+        return { bankName: 'Яндекс Банк', transactions: YandexBankParser.parse(rawLines, { excludeTransfers: true }) };
       case 'SBER':
         return { bankName: 'Сбербанк', transactions: SberbankParser.parse(rawLines, { excludeTransfers: true }) };
       case 'GPB':
@@ -511,7 +648,12 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
     const totalExp = selectedTxs.filter(t => t.type === 'Расход').reduce((s, t) => s + t.amount, 0);
     const totalInc = selectedTxs.filter(t => t.type === 'Доход').reduce((s, t) => s + t.amount, 0);
 
-    const bankBadgeColor = bankName === 'Сбербанк' ? 'bg-emerald-900/60 text-emerald-300 border-emerald-700/60' : 'bg-blue-900/60 text-blue-300 border-blue-700/60';
+    let bankBadgeColor = 'bg-blue-900/60 text-blue-300 border-blue-700/60';
+    if (bankName === 'Сбербанк') {
+      bankBadgeColor = 'bg-emerald-900/60 text-emerald-300 border-emerald-700/60';
+    } else if (bankName === 'Яндекс Банк') {
+      bankBadgeColor = 'bg-amber-900/60 text-amber-300 border-amber-700/60'; // Фирменный жёлто-янтарный цвет
+    }
     
     info.innerHTML = `
       <div class="flex items-center gap-2 mb-1 min-w-0">
@@ -689,7 +831,9 @@ function downloadParsedJSON() {
   }
 
   // Определяем префикс файла по банку
-  const bankPrefix = (window._lastParsedBankName === 'Сбербанк') ? 'sberbank' : 'gazprombank';
+  let bankPrefix = 'gazprombank';
+  if (window._lastParsedBankName === 'Сбербанк') bankPrefix = 'sberbank';
+  if (window._lastParsedBankName === 'Яндекс Банк') bankPrefix = 'yandexbank';
   const today = new Date().toISOString().slice(0, 10);
 
   const jsonStr = JSON.stringify(window._lastParsedTransactions, null, 2);
