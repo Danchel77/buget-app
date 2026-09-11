@@ -185,6 +185,7 @@ async function fetchAllData() {
       categories: categories,
       categoryRules: await processOrSeedRules(rulesS)
     };
+    window.Cache = Cache;
 
     updateGoalDropdowns();
     renderTransactions();
