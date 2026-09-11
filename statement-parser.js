@@ -290,7 +290,7 @@ class YandexBankParser {
     const fullText = lines.join(' ');
     
     // Чистим мерчанта
-    const merchant = this._extractMerchant(beforeDate, fullText);
+    const merchant = this._extractMerchant(beforeDate, lines);
 
     // 4. Фильтрация переводов
     const isTransfer = this._isTransferOperation(fullText, merchant);
@@ -315,35 +315,34 @@ class YandexBankParser {
     };
   }
 
-  static _extractMerchant(beforeDate, fullText) {
-    let title = beforeDate;
-    
-    // Отрезаем служебный префикс Яндекса
-    title = title.replace(/^Оплата товаров и услуг\s*/i, '').trim();
+  static _extractMerchant(beforeDate, lines) {
+    // 1. Берем начало описания с первой строки (до даты)
+    let part1 = beforeDate.replace(/^Оплата товаров и услуг\s*/i, '').trim();
 
-    if (!title && fullText) {
-      title = fullText.replace(/^Оплата товаров и услуг\s*/i, '')
-                       .replace(/в\s+\d{2}:\d{2}/i, '')
-                       .replace(/\*\d{4}/g, '')
-                       .replace(this.DATE_REGEX, '')
-                       .replace(this.AMOUNT_REGEX, '')
-                       .trim();
-    }
+    // 2. Берем продолжение описания со второй (и последующих) строк блока
+    // Убираем время "в ЧЧ:ММ", дату проводки и маску карты
+    let part2 = lines.slice(1).map(line => {
+      return line.replace(/в\s+\d{2}:\d{2}/i, '')
+                 .replace(/\d{2}\.\d{2}\.\d{4}/g, '')
+                 .replace(/\*\d{4}/g, '')
+                 .replace(/[\d\s\xa0]+[.,]\d{2}\s*₽/g, '')
+                 .trim();
+    }).filter(Boolean).join(' ');
 
-    return title || 'Операция Яндекс Банк';
+    // Склеиваем обе части названия
+    let fullMerchant = `${part1} ${part2}`.replace(/^Оплата товаров и услуг\s*/i, '').trim();
+
+    // Убираем лишние пробелы внутри строки
+    fullMerchant = fullMerchant.replace(/\s+/g, ' ');
+
+    return fullMerchant || 'Операция Яндекс Банк';
   }
 
   static _isTransferOperation(fullText, merchant) {
     const text = `${fullText} ${merchant}`.toLowerCase();
-    return text.includes('перевод между счетами') ||
-           text.includes('входящий перевод сбп') ||
-           text.includes('исходящий перевод сбп') ||
-           text.includes('внутрибанковский перевод') ||
-           text.includes('перевод сбп') ||
-           text.includes('перевод по номеру') ||
-           text.includes('перевод по сбп') ||
-           text.includes('перевод от') ||
-           text.includes('перевод для');
+    return text.includes('перевод') ||
+           text.includes('сбп') ||
+           text.includes('между счетами');
   }
 
   static _isServiceLine(line) {
