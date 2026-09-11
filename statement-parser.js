@@ -236,8 +236,7 @@ class GazprombankParser {
 class YandexBankParser {
   // Строка операции в Яндексе всегда содержит дату DD.MM.YYYY и сумму со знаком (+ или −) и символом ₽
   static DATE_REGEX = /\d{2}\.\d{2}\.\d{4}/;
-  static AMOUNT_REGEX = /[+−\-]\s*[\d\s\xa0]+[.,]\d{2}\s*₽/;
-
+  static AMOUNT_REGEX = /[\d\s\xa0]+[.,]\d{2}\s*₽/;
   static parse(rawLines, options = { excludeTransfers: true }) {
     const rawBlocks = [];
     let currentBlock = null;
@@ -275,7 +274,7 @@ class YandexBankParser {
     const txDate = dateMatch[0];
 
     // 2. Извлекаем сумму (с учетом типографского минуса −)
-    const amountMatches = firstLine.match(/[+−\-]\s*[\d\s\xa0]+[.,]\d{2}\s*₽/g) || [];
+    const amountMatches = firstLine.match(/([+−–—\-\u2012\u2013\u2014\u2212]?\s*[\d\s\xa0]+[.,]\d{2})\s*₽/g) || [];
     if (amountMatches.length === 0) return null;
 
     const rawAmount = amountMatches[0];
