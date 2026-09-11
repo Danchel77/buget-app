@@ -227,16 +227,32 @@
           </div>
         </section>
       </div>
-      <!-- Фильтры списка операций -->
-      <div class="flex gap-2 mb-3">
-        <select id="tx-filter-month" onchange="renderTransactions()" class="flex-1 bg-gray-800 border border-gray-700 text-xs text-gray-200 rounded-xl px-3 py-2.5 outline-none cursor-pointer">
-          <option value="all">Все месяцы</option>
-        </select>
-        <select id="tx-filter-category" onchange="renderTransactions()" class="flex-1 bg-gray-800 border border-gray-700 text-xs text-gray-200 rounded-xl px-3 py-2.5 outline-none cursor-pointer">
-          <option value="all">Все категории</option>
-        </select>
+      <!-- КОНТЕЙНЕР СПИСКА И ФИЛЬТРОВ (СКРЫВАЕТСЯ НА ГРАФИКАХ) -->
+      <div id="transactions-list-wrap">
+        
+        <!-- Аккуратные компактные выпадающие меню -->
+        <div class="flex gap-2 mb-3">
+          <!-- Меню выбора месяца -->
+          <div class="relative flex-1" id="wrap-filter-month">
+            <button type="button" onclick="toggleCustomFilterMenu('month')" class="w-full bg-gray-800 border border-gray-700 text-xs text-gray-200 rounded-xl px-3 py-2.5 flex items-center justify-between outline-none cursor-pointer hover:border-gray-600 transition-colors">
+              <span id="label-filter-month" class="truncate">Все месяцы</span>
+              <span class="text-gray-400 text-[9px] ml-1">▼</span>
+            </button>
+            <div id="menu-filter-month" class="hidden absolute left-0 top-full mt-1.5 w-full max-h-60 overflow-y-auto bg-gray-800/95 backdrop-blur-md border border-gray-700 rounded-2xl shadow-2xl z-40 p-1 space-y-0.5"></div>
+          </div>
+
+          <!-- Меню выбора категории -->
+          <div class="relative flex-1" id="wrap-filter-cat">
+            <button type="button" onclick="toggleCustomFilterMenu('cat')" class="w-full bg-gray-800 border border-gray-700 text-xs text-gray-200 rounded-xl px-3 py-2.5 flex items-center justify-between outline-none cursor-pointer hover:border-gray-600 transition-colors">
+              <span id="label-filter-cat" class="truncate">Все категории</span>
+              <span class="text-gray-400 text-[9px] ml-1">▼</span>
+            </button>
+            <div id="menu-filter-cat" class="hidden absolute right-0 top-full mt-1.5 w-full max-h-60 overflow-y-auto bg-gray-800/95 backdrop-blur-md border border-gray-700 rounded-2xl shadow-2xl z-40 p-1 space-y-0.5"></div>
+          </div>
+        </div>
+
+        <div id="transactions-list" class="space-y-4 pb-6"></div>
       </div>
-      <div id="transactions-list" class="space-y-4 pb-6"></div>
     </div>
 
     <!-- ЭКРАН ВКЛАДОВ -->
