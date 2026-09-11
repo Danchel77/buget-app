@@ -294,6 +294,8 @@ function processTransactions(txs) {
 function processCategories(cats) {
   const defaultExpense = [
     { name: 'Продукты', icon: '🍔' },
+    { name: 'Кафе и рестораны', icon: '🍽️' },
+    { name: 'Маркетплейсы', icon: '🛍️' },
     { name: 'Транспорт', icon: '🚗' },
     { name: 'Жилье', icon: '🏠' },
     { name: 'Развлечения', icon: '🎬' },
