@@ -842,23 +842,22 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
       
      <div class="bg-gray-900 border ${tx.isDuplicate || tx.isTransfer ? 'border-gray-800 opacity-50' : 'border-gray-700/80'} p-3 rounded-2xl">
         
-        <!-- СТРОКА 1: Чекбокс, Дата, Мерчант СЛЕВА; Кнопка 📌 и под ней бейдж СПРАВА -->
+        <!-- СТРОКА 1: Чекбокс и Наименование операции (на всю доступную ширину) СЛЕВА; Кнопка 📌 и бейджи СПРАВА -->
         <div class="flex items-start justify-between gap-2 min-w-0">
-          <div class="flex items-center gap-2 min-w-0 flex-1 pt-0.5">
+          <div class="flex items-center gap-2.5 min-w-0 flex-1 pt-0.5">
             <input type="checkbox" 
                    class="w-4 h-4 rounded accent-blue-600 bg-gray-800 border-gray-700 flex-shrink-0 cursor-pointer"
                    data-tx-id="${tx._id}"
                    ${tx.selected ? 'checked' : ''}
                    onchange="toggleTxSelection('${tx._id}', this.checked)">
             
-            <span class="text-xs text-gray-400 font-mono flex-shrink-0">${tx.displayDate}</span>
-            
-            <span class="text-xs font-semibold text-gray-200 truncate flex-1 min-w-0" title="${escapeHtml(tx.merchant)}">
+            <!-- Наименование теперь идет сразу после чекбокса и получает максимум места -->
+            <span class="text-xs font-semibold text-gray-100 truncate flex-1 min-w-0" title="${escapeHtml(tx.merchant)}">
               ${escapeHtml(tx.merchant)}
             </span>
           </div>
 
-          <!-- Правый верхний угол: компактная кнопка 📌 и под ней бейджи -->
+          <!-- Правый верхний угол: Кнопка 📌 и под ней бейджи -->
           <div class="flex flex-col items-end gap-1 flex-shrink-0">
             <button type="button" 
                     onclick="openRememberRuleModal('${tx._id}')" 
@@ -872,11 +871,14 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
           </div>
         </div>
 
-        <!-- СТРОКА 2: Фиксированный по ширине селект категории СЛЕВА, Сумма СПРАВА -->
+        <!-- СТРОКА 2: Дата у левого края + Селект категории СЛЕВА, Сумма СПРАВА -->
         <div class="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-gray-800/60">
-          <div class="flex items-center gap-1.5 min-w-0">
+          <div class="flex items-center gap-2 min-w-0">
+            <!-- Дата прижата к левому краю второй строки -->
+            <span class="text-xs text-gray-400 font-mono flex-shrink-0">${tx.displayDate}</span>
+
             <select id="cat-select-${tx._id}"
-                    class="w-44 bg-gray-800 border border-gray-700 text-xs text-blue-200 rounded-lg px-2.5 py-1 outline-none cursor-pointer focus:border-blue-500 font-medium truncate"
+                    class="w-36 sm:w-44 bg-gray-800 border border-gray-700 text-xs text-blue-200 rounded-lg px-2 py-1 outline-none cursor-pointer focus:border-blue-500 font-medium truncate"
                     onchange="changeTxCategory('${tx._id}', this.value)">
               ${optionsHtml}
             </select>
@@ -888,7 +890,6 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
             </span>
           </div>
         </div>
-
       </div>
     `;
   });
