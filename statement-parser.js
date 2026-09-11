@@ -58,61 +58,66 @@ class StatementExtractor {
 }
 
 // -------------------------------------------------------------
-// 2. ПАРСЕР ТАБЛИЦЫ ОПЕРАЦИЙ (ШАГ 2)
+// 2. ДЕТЕКТОР БАНКА И ПАРСЕРЫ
 // -------------------------------------------------------------
-class StatementTableParser {
+class BankDetector {
   /**
-   * Паттерн строки начала операции:
-   * 1-я дата (совершения), 2-я дата (отражения), текст операции и две суммы в конце (+0,00 и -413,88)
+   * Анализирует первые строки выписки и определяет банк
    */
-  static VTB_ROW_START = /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})\s+(.+?)\s*([+-]\s*[\d\s]+[.,]\d{2})\s+([+-]\s*[\d\s]+[.,]\d{2})$/;
+  static detect(rawLines) {
+    const preview = rawLines.slice(0, 35).join(' ').toLowerCase();
 
-  /**
-   * Альтернативный паттерн (на случай, если суммы без знаков или с пробелами)
-   */
+    if (preview.includes('газпромбанк') || preview.includes('гпб') || preview.includes('gazprombank')) {
+      return 'GPB';
+    }
+    // Сигнатура шапки Газпромбанка: Дата + Дата отражения + Содержание операции
+    if (preview.includes('дата отражения') && preview.includes('содержание операции')) {
+      return 'GPB';
+    }
+
+    // Задел под будущие банки:
+    // if (preview.includes('сбербанк')) return 'SBER';
+    // if (preview.includes('тинькофф') || preview.includes('т-банк')) return 'TBANK';
+
+    return 'GPB'; // По умолчанию для текущей структуры
+  }
+}
+
+class GazprombankParser {
+  static VTB_ROW_START = /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})\s+(.+?)\s*([+-]\s*[\d\s]+[.,]\d{2})\s+([+-]\s*[\d\s]+[.,]\d{2})$/;
   static DATE_PREFIX = /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})/;
 
-  static parse(rawLines) {
+  static parse(rawLines, options = { excludeTransfers: true }) {
     const rawBlocks = [];
     let currentBlock = null;
 
-    // Шаг 2.1: Группировка строк по транзакциям (аккумулятор)
     for (let line of rawLines) {
       line = line.trim();
-      if (!line) continue;
+      if (!line || this._isServiceLine(line)) continue;
 
-      // Игнорируем шапки таблиц, колонтитулы и служебные строки
-      if (this._isServiceLine(line)) continue;
-
-      const isTxStart = this.DATE_PREFIX.test(line);
-
-      if (isTxStart) {
-        if (currentBlock) {
-          rawBlocks.push(currentBlock);
-        }
+      if (this.DATE_PREFIX.test(line)) {
+        if (currentBlock) rawBlocks.push(currentBlock);
         currentBlock = [line];
       } else if (currentBlock) {
-        // Продолжение описания операции
         currentBlock.push(line);
       }
     }
+    if (currentBlock) rawBlocks.push(currentBlock);
 
-    if (currentBlock) {
-      rawBlocks.push(currentBlock);
+    const parsed = rawBlocks.map(block => this._parseTransactionBlock(block)).filter(Boolean);
+
+    // Исключаем переводы между счетами и СБП при необходимости
+    if (options.excludeTransfers) {
+      return parsed.filter(tx => !tx.isTransfer);
     }
-
-    // Шаг 2.2: Извлечение структурированных полей из каждого блока
-    return rawBlocks.map(block => this._parseTransactionBlock(block)).filter(Boolean);
+    return parsed;
   }
 
   static _parseTransactionBlock(lines) {
     const firstLine = lines[0];
     const match = firstLine.match(this.VTB_ROW_START);
 
-    let txDate = '';
-    let rawIncome = '+0,00';
-    let rawExpense = '-0,00';
-    let opTitle = '';
+    let txDate = '', rawIncome = '+0,00', rawExpense = '-0,00', opTitle = '';
 
     if (match) {
       txDate = match[1];
@@ -120,11 +125,9 @@ class StatementTableParser {
       rawIncome = match[4];
       rawExpense = match[5];
     } else {
-      // Запасной разбор, если суммы склеились чуть иначе
       const dateMatch = firstLine.match(this.DATE_PREFIX);
       if (!dateMatch) return null;
       txDate = dateMatch[1];
-      
       const amounts = firstLine.match(/([+-]?\s*[\d\s]+[.,]\d{2})/g) || [];
       if (amounts.length >= 2) {
         rawIncome = amounts[amounts.length - 2];
@@ -134,14 +137,12 @@ class StatementTableParser {
       }
     }
 
-    // Преобразуем суммы в числа
     const incomeVal = this._parseAmount(rawIncome);
     const expenseVal = this._parseAmount(rawExpense);
 
     let type = 'Расход';
     let amount = expenseVal;
 
-    // Если расход 0, а приход > 0 — значит это доход/пополнение
     if (expenseVal === 0 && incomeVal > 0) {
       type = 'Доход';
       amount = incomeVal;
@@ -150,11 +151,12 @@ class StatementTableParser {
       amount = expenseVal;
     }
 
-    // Объединяем все строки блока в единый текст для умного поиска мерчанта
     const fullText = lines.join(' ');
     const merchant = this._extractMerchant(lines, fullText, opTitle);
 
-    // Нормализация даты в YYYY-MM-DD для сохранения
+    // Проверка: является ли операция переводом (СБП, между своими счетами)
+    const isTransfer = this._isTransferOperation(fullText, merchant);
+
     const [d, m, y] = txDate.split('.');
     const isoDate = `${y}-${m}-${d}`;
 
@@ -164,27 +166,30 @@ class StatementTableParser {
       type,
       amount,
       merchant,
+      isTransfer,
+      bank: 'Газпромбанк',
       rawDetails: fullText
     };
   }
 
-  /**
-   * Извлекает чистое и понятное название торговой точки
-   */
+  static _isTransferOperation(fullText, merchant) {
+    const text = (fullText + ' ' + merchant).toLowerCase();
+    return text.includes('sbp c2c') ||
+           text.includes('перевод с банк') ||
+           text.includes('перевод на банк') ||
+           text.includes('перевод между') ||
+           text.includes('перевод по сбп');
+  }
+
   static _extractMerchant(lines, fullText, opTitle) {
-    // 1. Приоритет: ищем название терминала ("Устройство: PEREK MEZHDUNARODNYJ")
     const deviceMatch = fullText.match(/Устройство:\s*([^.]+?)(?:\.\s*Город|\.\s*Сумма|\.|$)/i);
     if (deviceMatch && deviceMatch[1].trim()) {
       return deviceMatch[1].trim();
     }
 
-    // 2. Ищем переводы СБП / физическим лицам
     const sbpMatch = fullText.match(/Перевод\s+(?:по\s+СБП|клиенту|от)\s+([^.]+?)(?:\.|$)/i);
-    if (sbpMatch) {
-      return sbpMatch[0].trim();
-    }
+    if (sbpMatch) return sbpMatch[0].trim();
 
-    // 3. Если ничего специфичного не нашли, берем строку операции без мусора
     let fallback = opTitle || lines[0];
     fallback = fallback.replace(/^(\d{2}\.\d{2}\.\d{4}\s*){1,2}/, '')
                        .replace(/([+-]?\s*[\d\s]+[.,]\d{2})/g, '')
@@ -212,6 +217,20 @@ class StatementTableParser {
   }
 }
 
+// Главный фасад-диспетчер
+class StatementDispatcher {
+  static parse(rawLines) {
+    const bank = BankDetector.detect(rawLines);
+    console.log(`Определен банк выписки: ${bank}`);
+
+    switch (bank) {
+      case 'GPB':
+      default:
+        return GazprombankParser.parse(rawLines, { excludeTransfers: true });
+    }
+  }
+}
+
 // -------------------------------------------------------------
 // 3. UI-ОБРАБОТЧИК И ВЫВОД РЕЗУЛЬТАТА ШАГА 2
 // -------------------------------------------------------------
@@ -231,7 +250,7 @@ async function handleStatementUpload(event) {
     const lines = await StatementExtractor.extractLinesFromPDF(file);
 
     // 2. Формируем таблицу операций
-    const transactions = StatementTableParser.parse(lines);
+    const transactions = StatementDispatcher.parse(lines);
 
     event.target.value = '';
     document.getElementById('toast-container').classList.add('hidden');
@@ -252,6 +271,8 @@ function renderParsedTransactionsView(fileName, transactions) {
   const dialog = document.getElementById('pdf-debug-dialog');
   const info = document.getElementById('pdf-debug-info');
   const output = document.getElementById('pdf-debug-output');
+  // Запоминаем данные для скачивания
+  window._lastParsedTransactions = transactions;
 
   const totalExpense = transactions.filter(t => t.type === 'Расход').reduce((s, t) => s + t.amount, 0);
   const totalIncome = transactions.filter(t => t.type === 'Доход').reduce((s, t) => s + t.amount, 0);
@@ -301,4 +322,26 @@ function renderParsedTransactionsView(fileName, transactions) {
   html += `</div>`;
   output.innerHTML = html;
   dialog.classList.remove('hidden');
+}
+
+// Сохраняем последний результат в глобальную переменную для экспорта
+window._lastParsedTransactions = [];
+
+function downloadParsedJSON() {
+  if (!window._lastParsedTransactions || window._lastParsedTransactions.length === 0) {
+    showToast('Нет данных для скачивания', true);
+    return;
+  }
+
+  const jsonStr = JSON.stringify(window._lastParsedTransactions, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `gazprombank_parsed_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
