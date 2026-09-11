@@ -1051,7 +1051,6 @@ function openRememberRuleModal(txId) {
   currentRememberTx = tx;
 
   const keywordInput = document.getElementById('rule-keyword-input');
-  const catSelect = document.getElementById('rule-category-select');
 
   // Предзаполняем ключевое слово названием торговой точки
   keywordInput.value = tx.merchant;
@@ -1072,9 +1071,7 @@ function openRememberRuleModal(txId) {
     }
   }
 
-  catSelect.innerHTML = targetCats.map(cat => 
-    `<option value="${escapeHtml(cat)}" ${cat === tx.category ? 'selected' : ''}>${escapeHtml(cat)}</option>`
-  ).join('');
+  populateModalCatMenu('rule', targetCats, tx.category);
 
   document.getElementById('remember-rule-dialog').classList.remove('hidden');
 }
@@ -1086,8 +1083,8 @@ function closeRememberRuleModal() {
 
 async function saveCategoryRuleFromModal() {
   const keyword = document.getElementById('rule-keyword-input').value.trim();
-  const category = document.getElementById('rule-category-select').value;
-
+  const category = document.getElementById('rule-category-input').value;
+  
   if (!keyword) {
     showToast('Введите ключевую фразу', true);
     return;
@@ -1130,7 +1127,6 @@ async function saveCategoryRuleFromModal() {
 // -------------------------------------------------------------
 function openRulesEditorModal() {
   const dialog = document.getElementById('rules-editor-dialog');
-  const catSelect = document.getElementById('editor-category-select');
 
   // Формируем список доступных категорий
   const expenseCats = window.Cache?.categories?.expense?.map(c => c.name) || [
@@ -1141,9 +1137,7 @@ function openRulesEditorModal() {
   ];
   const allCats = [...new Set([...expenseCats, ...incomeCats])];
 
-  catSelect.innerHTML = allCats.map(cat => 
-    `<option value="${escapeHtml(cat)}">${CATEGORY_ICONS[cat] || '📦'} ${escapeHtml(cat)}</option>`
-  ).join('');
+  populateModalCatMenu('editor', allCats, 'Продукты');
 
   document.getElementById('editor-keyword-input').value = '';
   renderRulesList();
@@ -1205,7 +1199,7 @@ function renderRulesList() {
 async function addRuleFromEditor() {
   const input = document.getElementById('editor-keyword-input');
   const keyword = input.value.trim();
-  const category = document.getElementById('editor-category-select').value;
+  const category = document.getElementById('editor-category-input').value;
 
   if (!keyword) {
     showToast('Введите слово или фразу', true);
@@ -1252,3 +1246,67 @@ function applyRulesToOpenedStatement(keyword, category) {
     }
   });
 }
+
+// Функции для кастомных меню в модальных окнах
+function toggleModalCatMenu(type) {
+  const menu = document.getElementById(`${type}-category-menu`);
+  if (!menu) return;
+  const isClosed = menu.classList.contains('hidden');
+  
+  // Закрываем все открытые меню
+  document.querySelectorAll('.custom-dropdown-menu').forEach(m => m.classList.add('hidden'));
+  
+  if (isClosed) menu.classList.remove('hidden');
+}
+
+function selectModalCat(type, catName, catIcon) {
+  const input = document.getElementById(`${type}-category-input`);
+  const label = document.getElementById(`${type}-category-label`);
+  const menu = document.getElementById(`${type}-category-menu`);
+
+  if (input) input.value = catName;
+  if (label) {
+    label.innerHTML = `${catIcon || '📦'} ${escapeHtml(catName)}`;
+    label.classList.remove('text-gray-400');
+    label.classList.add('text-white');
+  }
+  if (menu) menu.classList.add('hidden');
+}
+
+// Универсальная функция генерации списка для модального меню
+function populateModalCatMenu(type, categories, selectedCat) {
+  const menu = document.getElementById(`${type}-category-menu`);
+  const input = document.getElementById(`${type}-category-input`);
+  const label = document.getElementById(`${type}-category-label`);
+  if (!menu) return;
+
+  const defaultCat = selectedCat || categories[0] || 'Другое';
+  const defaultIcon = CATEGORY_ICONS[defaultCat] || '📦';
+
+  if (input) input.value = defaultCat;
+  if (label) {
+    label.innerHTML = `${defaultIcon} ${escapeHtml(defaultCat)}`;
+    label.classList.remove('text-gray-400');
+    label.classList.add('text-white');
+  }
+
+  menu.innerHTML = categories.map(cat => {
+    const icon = CATEGORY_ICONS[cat] || '📦';
+    const isSelected = (cat === defaultCat);
+    return `
+      <button type="button" 
+              onclick="selectModalCat('${type}', '${escapeHtml(cat)}', '${icon}')" 
+              class="w-full text-left px-3 py-2 text-xs rounded-xl transition-colors flex items-center gap-2 cursor-pointer ${isSelected ? 'bg-blue-600/20 text-blue-300 font-semibold' : 'text-gray-300 hover:bg-gray-700/70'}">
+        <span>${icon}</span>
+        <span class="truncate">${escapeHtml(cat)}</span>
+      </button>
+    `;
+  }).join('');
+}
+
+// Глобальное закрытие любых открытых кастомных меню при клике в любое место мимо
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.custom-dropdown-wrap')) {
+    document.querySelectorAll('.custom-dropdown-menu').forEach(m => m.classList.add('hidden'));
+  }
+});
