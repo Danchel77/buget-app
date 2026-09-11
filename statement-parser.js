@@ -58,64 +58,39 @@ class StatementExtractor {
 }
 
 // -------------------------------------------------------------
-// 2. ДЕТЕКТОР БАНКА И ПАРСЕРЫ
+// 3. УНИВЕРСАЛЬНЫЙ ОПРЕДЕЛИТЕЛЬ (И ДОХОДЫ, И РАСХОДЫ ИЗ FIREBASE)
 // -------------------------------------------------------------
 class StatementCategorizer {
-  static RULES = {
-    "Зарплата": [
-      /заработная плата/i, /salary/i, /ао\s+"цкбм"/i
-    ],
-    "Продукты": [
-      /perek/i, /перекресток/i, /pyaterochka/i, /пятерочка/i, /dostavka iz pyaterochk/i,
-      /okey/i, /окей/i, /lenta/i, /лента/i, /magnit/i, /магнит/i,
-      /krasnoe(&|\s*i\s*)beloe/i, /красное\s*и\s*белое/i, /zhivaya voda/i,
-      /fixprice/i, /фикс\s*прайс/i
-    ],
-    "Кафе и рестораны": [
-      /vlavashe/i, /rostics/i, /ростикс/i, /kfc/i, /kimchi to go/i, /mu mu burgers/i,
-      /bros burritos/i, /dostaevsky/i, /nesselbek/i, /mare dmore/i, /dom lunda/i,
-      /krem/i, /kozhura/i, /fler/i, /vypechka i kofe/i, /1st food factory/i,
-      /kafe/i, /кафе/i, /restoran/i, /ресторан/i, /garden/i,
-      /semenova a/i // Столовая / кафе рядом с работой
-    ],
-    "Транспорт": [
-      /rzd/i, /ржд/i, /szppk/i, /сзппк/i, /transkom/i, /транском/i,
-      // Метро СПб (автоматы пополнения)
-      /mezhdunarodnaya/i, /baltiyskaya/i, /pionerskaya/i, /tekhnol/i, /pl\.\s*lenina/i,
-      /yandex.*go/i, /uber/i, /ситимобил/i, /такси/i
-    ],
-    "Развлечения": [
-      /muzej/i, /музей/i, /homlins/i, /крендел/i, /krantstrevel/i, /lindenmarkt/i,
-      /shtiglitsa/i, /штиглиц/i, /spghpa/i,
-      /afisha/i, /афиша/i, /teatr/i, /театр/i, /masterskaya/i, /отдых и развлечения/i
-    ],
-    "Маркетплейсы": [
-      /\bwb\b/i, /wildberries/i, /вайлдберриз/i, /ozon/i, /озон/i,
-      /kleekstore/i, /yandex.*market/i, /яндекс.*маркет/i, /megamarket/i, /алиэкспресс/i
-    ]
-  };
-
   static categorize(merchant, rawDetails, type) {
-    const text = `${merchant} ${rawDetails}`;
+    const text = `${merchant} ${rawDetails}`.toLowerCase();
+    const rules = window.Cache?.categoryRules || [];
 
-    // Доходы
-    if (type === 'Доход') {
-      for (const pattern of this.RULES["Зарплата"]) {
-        if (pattern.test(text)) return "Зарплата";
-      }
-      return "Другое";
-    }
+    // 1. Ищем совпадение в правилах из базы данных (для любого типа операции)
+    for (const rule of rules) {
+      if (!rule.pattern) continue;
+      const pattern = rule.pattern.toLowerCase().trim();
 
-    // Расходы
-    for (const [category, patterns] of Object.entries(this.RULES)) {
-      if (category === "Зарплата") continue;
-      for (const pattern of patterns) {
-        if (pattern.test(text)) return category;
+      if (this._matches(text, pattern)) {
+        return rule.category;
       }
     }
 
-    // T2, Vezaruspro, МФЦ и прочее неопределенное уйдут сюда автоматически
+    // 2. Резерв по умолчанию для зарплаты, если в базе ещё нет правила
+    if (type === 'Доход' && (text.includes('заработная плата') || text.includes('salary'))) {
+      return "Зарплата";
+    }
+
+    // 3. Если ничего не подошло
     return "Другое";
+  }
+
+  static _matches(text, pattern) {
+    if (pattern.length <= 4) {
+      const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(^|[^a-zA-Zа-яА-Я0-9])${escaped}([^a-zA-Zа-яА-Я0-9]|$)`, 'i');
+      return regex.test(text);
+    }
+    return text.includes(pattern);
   }
 }
 
@@ -591,12 +566,21 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
         <!-- СТРОКА 2: Категория с иконкой слева, Сумма справа по правому краю -->
         <div class="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-gray-800/60">
           
-          <!-- Селект категории с живой иконкой -->
+          <!-- Селект категории + кнопка Запомнить -->
           <div class="flex items-center gap-1.5 min-w-0">
-            <select class="bg-gray-800 border border-gray-700 text-xs text-blue-200 rounded-lg px-2.5 py-1 outline-none cursor-pointer focus:border-blue-500 font-medium"
+            <select id="cat-select-${tx._id}"
+                    class="bg-gray-800 border border-gray-700 text-xs text-blue-200 rounded-lg px-2 py-1 outline-none cursor-pointer focus:border-blue-500 font-medium"
                     onchange="changeTxCategory('${tx._id}', this.value)">
               ${optionsHtml}
             </select>
+
+            <button type="button" 
+                    onclick="openRememberRuleModal('${tx._id}')" 
+                    class="text-[11px] text-gray-400 hover:text-blue-400 bg-gray-800/80 hover:bg-gray-700/80 border border-gray-700 px-2 py-1 rounded-lg transition-colors flex items-center gap-1" 
+                    title="Запомнить для будущих выписок">
+              <span>📌</span>
+              <span class="hidden sm:inline">Запомнить</span>
+            </button>
           </div>
 
           <!-- Сумма по правому краю -->
@@ -716,4 +700,90 @@ function downloadParsedJSON() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// -------------------------------------------------------------
+// ЛОГИКА ОКНА "ЗАПОМНИТЬ ПРАВИЛО"
+// -------------------------------------------------------------
+let currentRememberTx = null;
+
+function openRememberRuleModal(txId) {
+  const tx = window._lastParsedTransactions?.find(t => t._id === txId);
+  if (!tx) return;
+
+  currentRememberTx = tx;
+
+  const keywordInput = document.getElementById('rule-keyword-input');
+  const catSelect = document.getElementById('rule-category-select');
+
+  // Предзаполняем ключевое слово названием торговой точки
+  keywordInput.value = tx.merchant;
+
+  // Выбираем список категорий в зависимости от типа операции (Доход или Расход)
+  let targetCats = [];
+  
+  if (tx.type === 'Доход') {
+    targetCats = window.Cache?.categories?.income?.map(c => c.name) || ['Зарплата', 'Другое'];
+  } else {
+    targetCats = [
+      'Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Развлечения', 'Другое'
+    ];
+    if (window.Cache?.categories?.expense) {
+      window.Cache.categories.expense.forEach(c => {
+        if (!targetCats.includes(c.name)) targetCats.push(c.name);
+      });
+    }
+  }
+
+  catSelect.innerHTML = targetCats.map(cat => 
+    `<option value="${escapeHtml(cat)}" ${cat === tx.category ? 'selected' : ''}>${escapeHtml(cat)}</option>`
+  ).join('');
+
+  document.getElementById('remember-rule-dialog').classList.remove('hidden');
+}
+
+function closeRememberRuleModal() {
+  document.getElementById('remember-rule-dialog').classList.add('hidden');
+  currentRememberTx = null;
+}
+
+async function saveCategoryRuleFromModal() {
+  const keyword = document.getElementById('rule-keyword-input').value.trim();
+  const category = document.getElementById('rule-category-select').value;
+
+  if (!keyword) {
+    showToast('Введите ключевую фразу', true);
+    return;
+  }
+
+  showToast('Сохранение правила...', false, true);
+
+  try {
+    // 1. Сохраняем правило в Firebase Firestore
+    const newRule = { pattern: keyword, category: category };
+    const docRef = await db.collection('CategoryRules').add(newRule);
+    
+    // 2. Обновляем локальный кэш
+    if (!window.Cache.categoryRules) window.Cache.categoryRules = [];
+    window.Cache.categoryRules.push({ id: docRef.id, ...newRule });
+
+    // 3. Автоматически пересчитываем категории для всех подходящих транзакций в открытом списке!
+    if (window._lastParsedTransactions) {
+      window._lastParsedTransactions.forEach(t => {
+        const full = `${t.merchant} ${t.rawDetails}`.toLowerCase();
+        if (full.includes(keyword.toLowerCase())) {
+          t.category = category;
+          // Обновляем селект в DOM без полной перерисовки
+          const sel = document.getElementById(`cat-select-${t._id}`);
+          if (sel) sel.value = category;
+        }
+      });
+    }
+
+    closeRememberRuleModal();
+    showToast(`Правило сохранено: "${keyword}" → ${category}`);
+  } catch (err) {
+    console.error('Ошибка сохранения правила:', err);
+    showToast('Ошибка при сохранении: ' + err.message, true);
+  }
 }
