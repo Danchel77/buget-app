@@ -760,6 +760,10 @@ const CATEGORY_ICONS = {
 
 function renderParsedTransactionsView(fileName, transactions, bankName = 'Банк') {
   window._lastParsedBankName = bankName;
+
+  // Сортировка от самых свежих к старым (по убыванию даты)
+  transactions.sort((a, b) => b.date.localeCompare(a.date));
+  
   const dialog = document.getElementById('pdf-debug-dialog');
   const info = document.getElementById('pdf-debug-info');
   const output = document.getElementById('pdf-debug-output');
