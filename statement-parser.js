@@ -514,9 +514,9 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
     const bankBadgeColor = bankName === 'Сбербанк' ? 'bg-emerald-900/60 text-emerald-300 border-emerald-700/60' : 'bg-blue-900/60 text-blue-300 border-blue-700/60';
     
     info.innerHTML = `
-      <div class="flex items-center gap-2 mb-1">
-        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border ${bankBadgeColor}">${escapeHtml(bankName)}</span>
-        <span class="text-xs text-gray-300 truncate">${fileName}</span>
+      <div class="flex items-center gap-2 mb-1 min-w-0">
+        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border ${bankBadgeColor} flex-shrink-0">${escapeHtml(bankName)}</span>
+        <span class="text-xs text-gray-300 truncate flex-1 min-w-0" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</span>
       </div>
       <div>К импорту: <b class="text-white">${selectedTxs.length}</b> из ${transactions.length} | 
       <span class="text-red-400">Расход: ${formatMoney(totalExp)}</span> | 
