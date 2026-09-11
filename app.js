@@ -828,6 +828,8 @@ function switchTransactionView(view) {
   }
 }
 
+let currentAnalyticsMonthIndex = 0;
+
 function buildCharts() {
   if (!Cache || !Cache.transactions) return;
   const months = Cache.transactions;
@@ -838,17 +840,6 @@ function buildCharts() {
   const labels = lastMonths.map(m => m.label);
   const expenses = lastMonths.map(m => Number(m.expense) || 0);
   const incomes = lastMonths.map(m => Number(m.income) || 0);
-  const net = lastMonths.map((m, i) => incomes[i] - expenses[i]);
-
-  const select = document.getElementById('chart-month-select');
-  select.innerHTML = months.map(m => `<option value="${m.id}">${m.label}</option>`).join('');
-  const currentSelected = select.dataset.selectedMonth;
-  select.value = months.some(m => m.id === currentSelected) ? currentSelected : months[0].id;
-  select.onchange = () => {
-    select.dataset.selectedMonth = select.value;
-    updateAnalyticsForMonth(select.value);
-  };
-  updateAnalyticsForMonth(select.value);
 
   const ctx = document.getElementById('monthlyExpensesChart').getContext('2d');
   if (monthlyChartObj) monthlyChartObj.destroy();
@@ -887,7 +878,6 @@ function buildCharts() {
       maintainAspectRatio: false,
       animation: { duration: 450, easing: 'easeOutQuart' },
       interaction: { mode: 'index', intersect: true },
-      events: ['mousemove', 'mouseout', 'click'],
       scales: {
         x: {
           stacked: false,
@@ -911,19 +901,35 @@ function buildCharts() {
         tooltip: {
           backgroundColor: '#1b222a', borderColor: 'rgba(255,255,255,.10)', borderWidth: 1,
           titleColor: '#fff', bodyColor: '#c9ced5', padding: 11, cornerRadius: 12,
-          displayColors: true,
           callbacks: { label: context => `${context.dataset.label}: ${formatMoney(context.raw)}` }
         }
       }
     }
   });
 
-  const netEl = document.getElementById('analytics-net');
-  if (netEl) {
-    const current = net[net.length - 1] || 0;
-    netEl.textContent = `${current >= 0 ? '+' : ''}${formatMoney(current)}`;
-    netEl.classList.toggle('is-negative', current < 0);
-  }
+  // Запуск отображения текущего выбранного месяца
+  updateAnalyticsMonthView();
+}
+
+function updateAnalyticsMonthView() {
+  const months = Cache?.transactions || [];
+  if (!months.length) return;
+
+  currentAnalyticsMonthIndex = Math.max(0, Math.min(months.length - 1, currentAnalyticsMonthIndex));
+  const cur = months[currentAnalyticsMonthIndex];
+
+  document.getElementById('analytics-month-label').textContent = cur.label;
+  document.getElementById('prev-month-btn').disabled = (currentAnalyticsMonthIndex >= months.length - 1);
+  document.getElementById('next-month-btn').disabled = (currentAnalyticsMonthIndex <= 0);
+
+  updateAnalyticsForMonth(cur.id);
+}
+
+function changeAnalyticsMonth(direction) {
+  const months = Cache?.transactions || [];
+  if (!months.length) return;
+  currentAnalyticsMonthIndex += direction;
+  updateAnalyticsMonthView();
 }
 
 function formatCompactChartMoney(value) {
