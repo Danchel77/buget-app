@@ -1,122 +1,220 @@
 /**
  * statement-parser.js
- * Клиентский парсер PDF-выписок банков
+ * Парсер банковских PDF-выписок (Шаг 1: извлечение текста, Шаг 2: формирование таблицы)
  */
 
-// Инициализация воркера PDF.js
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
+// -------------------------------------------------------------
+// 1. ИЗВЛЕЧЕНИЕ СЫРОГО ТЕКСТА
+// -------------------------------------------------------------
 class StatementExtractor {
-  /**
-   * Считывает PDF-файл из браузера без отправки на сервер
-   * и возвращает массив структурированных строк по страницам.
-   */
   static async extractLinesFromPDF(file) {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    
-    const allPagesLines = [];
+    const allLines = [];
+
+    const Y_TOLERANCE = 3.5;
 
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
       
-      // Группируем элементы текста по строкам на основе Y-координаты
-      const lines = this._groupItemsIntoLines(textContent.items);
-      allPagesLines.push({
-        page: pageNum,
-        lines: lines
-      });
-    }
-
-    return allPagesLines;
-  }
-
-  /**
-   * Группирует отдельные текстовые фрагменты по близким Y-координатам
-   * и сортирует их слева направо (по X-координате).
-   */
-  static _groupItemsIntoLines(items) {
-    // В PDF точка (0,0) обычно находится в левом нижнем углу.
-    // item.transform: [scaleX, skewY, skewX, scaleY, transX, transY]
-    // transX = transform[4], transY = transform[5]
-    
-    // Допустимая погрешность по вертикали для объединения в одну строку (в пунктах)
-    const Y_TOLERANCE = 3.5;
-    
-    // Сортируем все элементы страницы сверху вниз (от большего Y к меньшему),
-    // а при одинаковом Y — слева направо (от меньшего X к большему)
-    const sortedItems = [...items].filter(it => it.str && it.str.trim().length > 0);
-    sortedItems.sort((a, b) => {
-      if (Math.abs(a.transform[5] - b.transform[5]) > Y_TOLERANCE) {
-        return b.transform[5] - a.transform[5]; // сверху вниз
-      }
-      return a.transform[4] - b.transform[4]; // слева направо
-    });
-
-    const lines = [];
-    let currentLine = [];
-    let currentY = null;
-
-    for (const item of sortedItems) {
-      const x = Math.round(item.transform[4]);
-      const y = item.transform[5];
-      const text = item.str.trim();
-
-      if (currentY === null || Math.abs(y - currentY) <= Y_TOLERANCE) {
-        currentLine.push({ x, text });
-        if (currentY === null) currentY = y;
-      } else {
-        // Завершаем текущую строку
-        if (currentLine.length > 0) {
-          lines.push(this._formatLine(currentLine));
+      const sortedItems = textContent.items.filter(it => it.str && it.str.trim().length > 0);
+      sortedItems.sort((a, b) => {
+        if (Math.abs(a.transform[5] - b.transform[5]) > Y_TOLERANCE) {
+          return b.transform[5] - a.transform[5];
         }
-        currentLine = [{ x, text }];
-        currentY = y;
+        return a.transform[4] - b.transform[4];
+      });
+
+      let currentLine = [];
+      let currentY = null;
+
+      for (const item of sortedItems) {
+        const text = item.str.trim();
+        const y = item.transform[5];
+
+        if (currentY === null || Math.abs(y - currentY) <= Y_TOLERANCE) {
+          currentLine.push(text);
+          if (currentY === null) currentY = y;
+        } else {
+          if (currentLine.length > 0) {
+            allLines.push(currentLine.join(' '));
+          }
+          currentLine = [text];
+          currentY = y;
+        }
+      }
+      if (currentLine.length > 0) {
+        allLines.push(currentLine.join(' '));
       }
     }
 
-    if (currentLine.length > 0) {
-      lines.push(this._formatLine(currentLine));
-    }
-
-    return lines;
-  }
-
-  /**
-   * Формирует объект строки: объединяет слова, идущие подряд в колонки
-   */
-  static _formatLine(items) {
-    // items уже отсортированы по координате X
-    // Попробуем разделить на смысловые колонки по значительному расстоянию между словами (> 15px)
-    const columns = [];
-    let curCol = [];
-    let prevX = null;
-
-    for (const it of items) {
-      if (prevX !== null && (it.x - prevX) > 18) {
-        columns.push(curCol.join(' '));
-        curCol = [];
-      }
-      curCol.push(it.text);
-      prevX = it.x + (it.text.length * 5); // приблизительное окончание слова
-    }
-    if (curCol.length > 0) {
-      columns.push(curCol.join(' '));
-    }
-
-    return {
-      rawText: items.map(i => i.text).join(' '),
-      columns: columns
-    };
+    return allLines;
   }
 }
 
-/**
- * Функция-обработчик загрузки файла из UI
- */
+// -------------------------------------------------------------
+// 2. ПАРСЕР ТАБЛИЦЫ ОПЕРАЦИЙ (ШАГ 2)
+// -------------------------------------------------------------
+class StatementTableParser {
+  /**
+   * Паттерн строки начала операции:
+   * 1-я дата (совершения), 2-я дата (отражения), текст операции и две суммы в конце (+0,00 и -413,88)
+   */
+  static VTB_ROW_START = /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})\s+(.+?)\s*([+-]\s*[\d\s]+[.,]\d{2})\s+([+-]\s*[\d\s]+[.,]\d{2})$/;
+
+  /**
+   * Альтернативный паттерн (на случай, если суммы без знаков или с пробелами)
+   */
+  static DATE_PREFIX = /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})/;
+
+  static parse(rawLines) {
+    const rawBlocks = [];
+    let currentBlock = null;
+
+    // Шаг 2.1: Группировка строк по транзакциям (аккумулятор)
+    for (let line of rawLines) {
+      line = line.trim();
+      if (!line) continue;
+
+      // Игнорируем шапки таблиц, колонтитулы и служебные строки
+      if (this._isServiceLine(line)) continue;
+
+      const isTxStart = this.DATE_PREFIX.test(line);
+
+      if (isTxStart) {
+        if (currentBlock) {
+          rawBlocks.push(currentBlock);
+        }
+        currentBlock = [line];
+      } else if (currentBlock) {
+        // Продолжение описания операции
+        currentBlock.push(line);
+      }
+    }
+
+    if (currentBlock) {
+      rawBlocks.push(currentBlock);
+    }
+
+    // Шаг 2.2: Извлечение структурированных полей из каждого блока
+    return rawBlocks.map(block => this._parseTransactionBlock(block)).filter(Boolean);
+  }
+
+  static _parseTransactionBlock(lines) {
+    const firstLine = lines[0];
+    const match = firstLine.match(this.VTB_ROW_START);
+
+    let txDate = '';
+    let rawIncome = '+0,00';
+    let rawExpense = '-0,00';
+    let opTitle = '';
+
+    if (match) {
+      txDate = match[1];
+      opTitle = match[3];
+      rawIncome = match[4];
+      rawExpense = match[5];
+    } else {
+      // Запасной разбор, если суммы склеились чуть иначе
+      const dateMatch = firstLine.match(this.DATE_PREFIX);
+      if (!dateMatch) return null;
+      txDate = dateMatch[1];
+      
+      const amounts = firstLine.match(/([+-]?\s*[\d\s]+[.,]\d{2})/g) || [];
+      if (amounts.length >= 2) {
+        rawIncome = amounts[amounts.length - 2];
+        rawExpense = amounts[amounts.length - 1];
+      } else if (amounts.length === 1) {
+        rawExpense = amounts[0];
+      }
+    }
+
+    // Преобразуем суммы в числа
+    const incomeVal = this._parseAmount(rawIncome);
+    const expenseVal = this._parseAmount(rawExpense);
+
+    let type = 'Расход';
+    let amount = expenseVal;
+
+    // Если расход 0, а приход > 0 — значит это доход/пополнение
+    if (expenseVal === 0 && incomeVal > 0) {
+      type = 'Доход';
+      amount = incomeVal;
+    } else if (expenseVal > 0) {
+      type = 'Расход';
+      amount = expenseVal;
+    }
+
+    // Объединяем все строки блока в единый текст для умного поиска мерчанта
+    const fullText = lines.join(' ');
+    const merchant = this._extractMerchant(lines, fullText, opTitle);
+
+    // Нормализация даты в YYYY-MM-DD для сохранения
+    const [d, m, y] = txDate.split('.');
+    const isoDate = `${y}-${m}-${d}`;
+
+    return {
+      date: isoDate,
+      displayDate: txDate,
+      type,
+      amount,
+      merchant,
+      rawDetails: fullText
+    };
+  }
+
+  /**
+   * Извлекает чистое и понятное название торговой точки
+   */
+  static _extractMerchant(lines, fullText, opTitle) {
+    // 1. Приоритет: ищем название терминала ("Устройство: PEREK MEZHDUNARODNYJ")
+    const deviceMatch = fullText.match(/Устройство:\s*([^.]+?)(?:\.\s*Город|\.\s*Сумма|\.|$)/i);
+    if (deviceMatch && deviceMatch[1].trim()) {
+      return deviceMatch[1].trim();
+    }
+
+    // 2. Ищем переводы СБП / физическим лицам
+    const sbpMatch = fullText.match(/Перевод\s+(?:по\s+СБП|клиенту|от)\s+([^.]+?)(?:\.|$)/i);
+    if (sbpMatch) {
+      return sbpMatch[0].trim();
+    }
+
+    // 3. Если ничего специфичного не нашли, берем строку операции без мусора
+    let fallback = opTitle || lines[0];
+    fallback = fallback.replace(/^(\d{2}\.\d{2}\.\d{4}\s*){1,2}/, '')
+                       .replace(/([+-]?\s*[\d\s]+[.,]\d{2})/g, '')
+                       .replace(/Операция:\s*/i, '')
+                       .trim();
+
+    return fallback || 'Банковская операция';
+  }
+
+  static _parseAmount(str) {
+    if (!str) return 0;
+    const clean = str.replace(/[^\d.,]/g, '').replace(',', '.');
+    return Math.abs(parseFloat(clean)) || 0;
+  }
+
+  static _isServiceLine(line) {
+    const l = line.toLowerCase();
+    return l.includes('дата отражения') ||
+           l.includes('содержание операции') ||
+           l.includes('денежных средств') ||
+           l.includes('страница') ||
+           l.includes('входящий остаток') ||
+           l.includes('исходящий остаток') ||
+           l.includes('обороты за период');
+  }
+}
+
+// -------------------------------------------------------------
+// 3. UI-ОБРАБОТЧИК И ВЫВОД РЕЗУЛЬТАТА ШАГА 2
+// -------------------------------------------------------------
 async function handleStatementUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -126,70 +224,81 @@ async function handleStatementUpload(event) {
     return;
   }
 
-  showToast('Чтение выписки...', false, true);
+  showToast('Обработка выписки...', false, true);
 
   try {
-    const pagesData = await StatementExtractor.extractLinesFromPDF(file);
-    
-    // Сбрасываем значение input, чтобы можно было загрузить тот же файл снова
-    event.target.value = '';
+    // 1. Вытягиваем строки
+    const lines = await StatementExtractor.extractLinesFromPDF(file);
 
-    // Отображаем окно для отладки и проверки Шага 1
-    renderDebugView(file.name, pagesData);
-    
+    // 2. Формируем таблицу операций
+    const transactions = StatementTableParser.parse(lines);
+
+    event.target.value = '';
     document.getElementById('toast-container').classList.add('hidden');
+
+    // 3. Отображаем результат Шага 2 в модальном окне
+    renderParsedTransactionsView(file.name, transactions);
+
   } catch (err) {
-    console.error('Ошибка парсинга PDF:', err);
-    showToast('Ошибка при чтении PDF: ' + err.message, true);
+    console.error('Ошибка обработки PDF:', err);
+    showToast('Ошибка: ' + err.message, true);
   }
 }
 
 /**
- * Выводит результат Шага 1 в модальное окно
+ * Отрисовывает аккуратную таблицу распознанных операций
  */
-function renderDebugView(fileName, pagesData) {
+function renderParsedTransactionsView(fileName, transactions) {
   const dialog = document.getElementById('pdf-debug-dialog');
   const info = document.getElementById('pdf-debug-info');
   const output = document.getElementById('pdf-debug-output');
 
-  let totalLines = 0;
-  pagesData.forEach(p => totalLines += p.lines.length);
+  const totalExpense = transactions.filter(t => t.type === 'Расход').reduce((s, t) => s + t.amount, 0);
+  const totalIncome = transactions.filter(t => t.type === 'Доход').reduce((s, t) => s + t.amount, 0);
 
-  info.textContent = `Файл: ${fileName} • Страниц: ${pagesData.length} • Всего строк: ${totalLines}`;
-  
-  let html = '';
-  
-  pagesData.forEach(p => {
-    html += `
-      <div class="bg-gray-900/80 p-3 rounded-xl border border-gray-700/80 mb-3">
-        <div class="text-[11px] font-bold text-blue-400 mb-2 border-b border-gray-800 pb-1">
-          --- СТРАНИЦА ${p.page} (${p.lines.length} строк) ---
-        </div>
-        <div class="space-y-1.5">
+  info.innerHTML = `
+    <b>${fileName}</b> • Найдено операций: <span class="text-white font-bold">${transactions.length}</span><br>
+    <span class="text-red-400">Расход: ${formatMoney(totalExpense)}</span> | 
+    <span class="text-emerald-400">Доход: ${formatMoney(totalIncome)}</span>
+  `;
+
+  if (transactions.length === 0) {
+    output.innerHTML = `
+      <div class="text-center py-8 text-gray-400">
+        Не удалось распознать операции. Проверьте формат выписки.
+      </div>
     `;
+    dialog.classList.remove('hidden');
+    return;
+  }
 
-    p.lines.forEach((line, idx) => {
-      const colsHtml = line.columns.map(c => 
-        `<span class="inline-block bg-gray-800 border border-gray-700 px-1.5 py-0.5 rounded text-[11px] text-gray-200 mr-1.5 mb-1">${escapeHtml(c)}</span>`
-      ).join('');
+  let html = `
+    <div class="space-y-2">
+  `;
 
-      html += `
-        <div class="hover:bg-gray-800/50 p-1.5 rounded transition-colors border-b border-gray-800/40">
-          <div class="text-[10px] text-gray-500 mb-0.5">#${idx + 1} Полная строка: <span class="text-gray-300 font-sans">${escapeHtml(line.rawText)}</span></div>
-          <div class="flex flex-wrap items-center mt-1">
-            <span class="text-[9px] text-gray-500 uppercase mr-2">Колонки:</span>
-            ${colsHtml}
-          </div>
-        </div>
-      `;
-    });
+  transactions.forEach((tx, idx) => {
+    const isExp = tx.type === 'Расход';
+    const amountClass = isExp ? 'text-white' : 'text-emerald-400';
+    const amountSign = isExp ? '-' : '+';
 
     html += `
+      <div class="bg-gray-900/90 border border-gray-700/80 p-3 rounded-xl flex items-center justify-between gap-3">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] text-gray-400 bg-gray-800 px-2 py-0.5 rounded font-mono">${tx.displayDate}</span>
+            <span class="text-xs font-semibold text-gray-200 truncate">${escapeHtml(tx.merchant)}</span>
+          </div>
+          <p class="text-[10px] text-gray-500 truncate mt-1">${escapeHtml(tx.rawDetails)}</p>
+        </div>
+        <div class="text-right flex-shrink-0">
+          <span class="text-sm font-bold ${amountClass}">${amountSign}${formatMoney(tx.amount)}</span>
+          <span class="block text-[9px] text-gray-500 uppercase">${tx.type}</span>
         </div>
       </div>
     `;
   });
 
+  html += `</div>`;
   output.innerHTML = html;
   dialog.classList.remove('hidden');
 }
