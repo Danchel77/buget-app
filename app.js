@@ -306,6 +306,8 @@ function processCategories(cats) {
   ];
   const defaultIncome = [
     { name: 'Зарплата', icon: '💼' },
+    { name: 'Возврат', icon: '↩️' },
+    { name: 'Кэшбек', icon: '💰' },
     { name: 'Другое', icon: '📦' }
   ];
 
