@@ -324,57 +324,122 @@ async function handleStatementUpload(event) {
   }
 }
 
+// -------------------------------------------------------------
+// 4. ПРОВЕРКА ДУБЛИКАТОВ И ИМПОРТ В FIREBASE
+// -------------------------------------------------------------
+
 /**
- * Отрисовывает аккуратную таблицу распознанных операций
+ * Проверяет, есть ли уже такая операция в Cache.transactions
+ */
+function isTransactionDuplicate(tx) {
+  if (!window.Cache || !window.Cache.transactions) return false;
+
+  for (const month of window.Cache.transactions) {
+    for (const item of month.items) {
+      if (
+        item.rawDate === tx.date &&
+        Math.abs(item.amount - tx.amount) < 0.01 &&
+        item.type === tx.type
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Отрисовывает аккуратные карточки операций и селекты категорий
  */
 function renderParsedTransactionsView(fileName, transactions) {
   const dialog = document.getElementById('pdf-debug-dialog');
   const info = document.getElementById('pdf-debug-info');
   const output = document.getElementById('pdf-debug-output');
-  // Запоминаем данные для скачивания
+
+  // Помечаем дубликаты и подготавливаем состояние
+  transactions.forEach((tx, idx) => {
+    tx._id = 'tx_parsed_' + idx;
+    tx.isDuplicate = isTransactionDuplicate(tx);
+    tx.selected = !tx.isDuplicate; // дубликаты по умолчанию выключены
+  });
+
   window._lastParsedTransactions = transactions;
 
-  const totalExpense = transactions.filter(t => t.type === 'Расход').reduce((s, t) => s + t.amount, 0);
-  const totalIncome = transactions.filter(t => t.type === 'Доход').reduce((s, t) => s + t.amount, 0);
+  // Доступные категории из приложения
+  const expenseCategories = window.Cache?.categories?.expense?.map(c => c.name) || [
+    'Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Развлечения', 'Другое'
+  ];
+  const incomeCategories = window.Cache?.categories?.income?.map(c => c.name) || [
+    'Зарплата', 'Другое'
+  ];
 
-  info.innerHTML = `
-    <b>${fileName}</b> • Найдено операций: <span class="text-white font-bold">${transactions.length}</span><br>
-    <span class="text-red-400">Расход: ${formatMoney(totalExpense)}</span> | 
-    <span class="text-emerald-400">Доход: ${formatMoney(totalIncome)}</span>
-  `;
+  function updateHeaderSummary() {
+    const selectedTxs = transactions.filter(t => t.selected);
+    const totalExp = selectedTxs.filter(t => t.type === 'Расход').reduce((s, t) => s + t.amount, 0);
+    const totalInc = selectedTxs.filter(t => t.type === 'Доход').reduce((s, t) => s + t.amount, 0);
 
-  if (transactions.length === 0) {
-    output.innerHTML = `
-      <div class="text-center py-8 text-gray-400">
-        Не удалось распознать операции. Проверьте формат выписки.
-      </div>
+    info.innerHTML = `
+      <b>${fileName}</b> • К импорту: <b class="text-white">${selectedTxs.length}</b> из ${transactions.length}<br>
+      <span class="text-red-400">Расход: ${formatMoney(totalExp)}</span> | 
+      <span class="text-emerald-400">Доход: ${formatMoney(totalInc)}</span>
     `;
-    dialog.classList.remove('hidden');
-    return;
+
+    const importBtn = document.getElementById('btn-import-transactions');
+    if (importBtn) {
+      importBtn.innerText = `Импортировать (${selectedTxs.length})`;
+      importBtn.disabled = selectedTxs.length === 0;
+    }
   }
 
-  let html = `
-    <div class="space-y-2">
-  `;
+  let html = `<div class="space-y-2">`;
 
-  transactions.forEach((tx, idx) => {
+  transactions.forEach(tx => {
     const isExp = tx.type === 'Расход';
-    const amountClass = isExp ? 'text-white' : 'text-emerald-400';
     const amountSign = isExp ? '-' : '+';
+    const amountColor = isExp ? 'text-white' : 'text-emerald-400';
+    const cats = isExp ? expenseCategories : incomeCategories;
+
+    const optionsHtml = cats.map(cat => 
+      `<option value="${escapeHtml(cat)}" ${cat === tx.category ? 'selected' : ''}>${escapeHtml(cat)}</option>`
+    ).join('');
 
     html += `
-      <div class="bg-gray-900/90 border border-gray-700/80 p-3 rounded-xl flex items-center justify-between gap-3">
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="text-[10px] text-gray-400 bg-gray-800 px-2 py-0.5 rounded font-mono">${tx.displayDate}</span>
-            <span class="text-xs font-semibold text-gray-200 truncate">${escapeHtml(tx.merchant)}</span>
-            <span class="text-[10px] font-medium bg-blue-900/50 text-blue-300 border border-blue-700/40 px-2 py-0.5 rounded-full">${escapeHtml(tx.category)}</span>
+      <div class="bg-gray-900 border ${tx.isDuplicate ? 'border-gray-800 opacity-60' : 'border-gray-700'} p-3 rounded-2xl transition-all">
+        <!-- СТРОКА 1: Чекбокс, Дата, Мерчант (с многоточием), Сумма -->
+        <div class="flex items-center justify-between gap-2.5">
+          <label class="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer">
+            <input type="checkbox" 
+                   class="w-4 h-4 rounded accent-blue-600 bg-gray-800 border-gray-700 flex-shrink-0 cursor-pointer"
+                   data-tx-id="${tx._id}"
+                   ${tx.selected ? 'checked' : ''}
+                   onchange="toggleTxSelection('${tx._id}', this.checked)">
+            
+            <span class="text-xs text-gray-400 font-mono flex-shrink-0">${tx.displayDate}</span>
+            
+            <!-- Название мерчанта обрезается точками без переноса -->
+            <span class="text-sm font-semibold text-gray-100 truncate" title="${escapeHtml(tx.merchant)}">
+              ${escapeHtml(tx.merchant)}
+            </span>
+          </label>
+
+          <div class="text-right flex-shrink-0 pl-2">
+            <span class="text-sm font-bold ${amountColor}">
+              ${amountSign}${formatMoney(tx.amount)}
+            </span>
           </div>
-          <p class="text-[10px] text-gray-500 truncate mt-1">${escapeHtml(tx.rawDetails)}</p>
         </div>
-        <div class="text-right flex-shrink-0">
-          <span class="text-sm font-bold ${amountClass}">${amountSign}${formatMoney(tx.amount)}</span>
-          <span class="block text-[9px] text-gray-500 uppercase">${tx.type}</span>
+
+        <!-- СТРОКА 2: Выбор категории и статус -->
+        <div class="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-gray-800/60 pl-6">
+          <div class="flex items-center gap-2">
+            <span class="text-[11px] text-gray-500">Категория:</span>
+            <select class="bg-gray-800 border border-gray-700 text-xs text-blue-300 rounded-lg px-2 py-1 outline-none cursor-pointer focus:border-blue-500"
+                    onchange="changeTxCategory('${tx._id}', this.value)">
+              ${optionsHtml}
+            </select>
+          </div>
+
+          ${tx.isDuplicate ? '<span class="text-[10px] text-gray-400 bg-gray-800 px-2 py-0.5 rounded-md border border-gray-700">Уже в базе</span>' : ''}
         </div>
       </div>
     `;
@@ -382,7 +447,83 @@ function renderParsedTransactionsView(fileName, transactions) {
 
   html += `</div>`;
   output.innerHTML = html;
+
+  updateHeaderSummary();
+  window._updateHeaderSummary = updateHeaderSummary;
+
   dialog.classList.remove('hidden');
+}
+
+/**
+ * Переключение чекбокса операции
+ */
+function toggleTxSelection(txId, isSelected) {
+  const tx = window._lastParsedTransactions.find(t => t._id === txId);
+  if (tx) {
+    tx.selected = isSelected;
+    if (window._updateHeaderSummary) window._updateHeaderSummary();
+  }
+}
+
+/**
+ * Ручное изменение категории в карточке
+ */
+function changeTxCategory(txId, newCat) {
+  const tx = window._lastParsedTransactions.find(t => t._id === txId);
+  if (tx) {
+    tx.category = newCat;
+  }
+}
+
+/**
+ * Сохранение всех выбранных операций в Firebase
+ */
+async function importSelectedTransactions() {
+  const selected = (window._lastParsedTransactions || []).filter(t => t.selected);
+  if (selected.length === 0) {
+    showToast('Выберите хотя бы одну операцию', true);
+    return;
+  }
+
+  const btn = document.getElementById('btn-import-transactions');
+  btn.disabled = true;
+  btn.innerText = 'Сохранение...';
+  showToast(`Импорт ${selected.length} операций...`, false, true);
+
+  try {
+    // В Firestore батч вмещает максимум 500 операций
+    const CHUNK_SIZE = 400;
+    for (let i = 0; i < selected.length; i += CHUNK_SIZE) {
+      const chunk = selected.slice(i, i + CHUNK_SIZE);
+      const batch = db.batch();
+
+      chunk.forEach(tx => {
+        const docRef = db.collection('Transactions').doc();
+        batch.set(docRef, {
+          type: tx.type,
+          amount: tx.amount,
+          date: tx.date,            // YYYY-MM-DD
+          category: tx.category,
+          comment: tx.merchant      // Записываем название точки в комментарий
+        });
+      });
+
+      await batch.commit();
+    }
+
+    showToast(`Успешно добавлено ${selected.length} операций!`);
+    document.getElementById('pdf-debug-dialog').classList.add('hidden');
+
+    // Обновляем список транзакций и графики
+    if (typeof fetchCollection === 'function') {
+      await fetchCollection('Transactions');
+    }
+  } catch (err) {
+    console.error('Ошибка импорта:', err);
+    showToast('Ошибка при импорте: ' + err.message, true);
+    btn.disabled = false;
+    btn.innerText = 'Попробовать снова';
+  }
 }
 
 // Сохраняем последний результат в глобальную переменную для экспорта
