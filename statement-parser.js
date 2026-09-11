@@ -314,11 +314,8 @@ class YandexBankParser {
   }
 
   static _extractMerchant(beforeDate, lines) {
-    // 1. Берем начало описания с первой строки (до даты)
     let part1 = beforeDate.replace(/^Оплата товаров и услуг\s*/i, '').trim();
 
-    // 2. Берем продолжение описания со второй (и последующих) строк блока
-    // Убираем время "в ЧЧ:ММ", дату проводки и маску карты
     let part2 = lines.slice(1).map(line => {
       return line.replace(/в\s+\d{2}:\d{2}/i, '')
                  .replace(/\d{2}\.\d{2}\.\d{4}/g, '')
@@ -327,38 +324,35 @@ class YandexBankParser {
                  .trim();
     }).filter(Boolean).join(' ');
 
-    // Склеиваем обе части названия
     let fullMerchant = `${part1} ${part2}`.replace(/^Оплата товаров и услуг\s*/i, '').trim();
 
-    // Убираем лишние пробелы внутри строки
-    fullMerchant = fullMerchant.replace(/\s+/g, ' ');
+    // Зачищаем служебные слова от разорванных шапок страниц Яндекса
+    fullMerchant = fullMerchant
+      .replace(/\b(операции|обработки|договора|мск|карты|валюте)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
 
     return fullMerchant || 'Операция Яндекс Банк';
-  }
-
-  static _isTransferOperation(fullText, merchant) {
-    const text = `${fullText} ${merchant}`.toLowerCase();
-    return text.includes('перевод') ||
-           text.includes('сбп') ||
-           text.includes('между счетами');
   }
 
   static _isServiceLine(line) {
     const l = line.toLowerCase();
     return l.includes('выписка по договору') ||
            l.includes('описание операции') ||
-           l.includes('дата и время операции') ||
+           l.includes('дата и время') ||
            l.includes('дата обработки') ||
            l.includes('сумма в валюте') ||
            l.includes('входящий остаток') ||
-           l.includes('исходящий остаток') ||          // <-- добавлено
-           l.includes('всего расходных операций') ||   // <-- добавлено
-           l.includes('всего приходных операций') ||   // <-- добавлено
-           l.includes('с уважением') ||               // <-- добавлено
-           l.includes('в рамках договора открыт счёт') ||
-           l.includes('продолжение на следующей странице') ||
+           l.includes('исходящий остаток') ||
+           l.includes('всего расходных') ||
+           l.includes('всего приходных') ||
+           l.includes('с уважением') ||
+           l.includes('в рамках договора') ||
+           l.includes('продолжение на') ||
            l.includes('страница') ||
-           l.includes('номер счёта');
+           l.includes('номер счёта') ||
+           (l.includes('операции') && l.includes('мск')) ||      // шапка страницы
+           (l.includes('обработки') && l.includes('договора'));   // шапка страницы
   }
 }
 
