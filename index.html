@@ -200,20 +200,41 @@
           </div>
         </section>
 
-        <!-- 3. ДИАГРАММА СТРУКТУРЫ РАСХОДОВ ЗА ВЫБРАННЫЙ МЕСЯЦ -->
+        <!-- 3. ДИАГРАММА СТРУКТУРЫ С ПЕРЕКЛЮЧАТЕЛЕМ ТИПА -->
         <section class="chart-card chart-card--structure">
-          <div class="chart-card__header">
+          <div class="chart-card__header flex items-center justify-between gap-2">
             <div>
               <p class="chart-card__eyebrow">Структура</p>
-              <h3>Куда уходят деньги</h3>
+              <h3 id="structure-title">Куда уходят деньги</h3>
             </div>
-            <span id="analytics-top-category" class="chart-card__hint">Нет данных</span>
+            
+            <!-- Переключатель Расходы / Доходы -->
+            <div class="flex bg-gray-800 p-0.5 rounded-xl border border-gray-700">
+              <button type="button" id="struct-type-expense" onclick="switchStructureType('Расход')" class="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-gray-700 text-white transition-all">Расходы</button>
+              <button type="button" id="struct-type-income" onclick="switchStructureType('Доход')" class="px-2.5 py-1 text-[11px] font-semibold rounded-lg text-gray-400 hover:text-white transition-all">Доходы</button>
+            </div>
           </div>
+          
           <div class="category-chart-wrap">
-            <div class="chart-canvas chart-canvas--donut"><canvas id="categoryExpensesChart"></canvas><div class="donut-center"><span>Расходы</span><strong id="category-total">0 ₽</strong></div></div>
+            <div class="chart-canvas chart-canvas--donut">
+              <canvas id="categoryExpensesChart"></canvas>
+              <div class="donut-center">
+                <span id="donut-center-label">Расходы</span>
+                <strong id="category-total">0 ₽</strong>
+              </div>
+            </div>
             <div id="category-legend" class="category-legend"></div>
           </div>
         </section>
+      </div>
+      <!-- Фильтры списка операций -->
+      <div class="flex gap-2 mb-3">
+        <select id="tx-filter-month" onchange="renderTransactions()" class="flex-1 bg-gray-800 border border-gray-700 text-xs text-gray-200 rounded-xl px-3 py-2.5 outline-none cursor-pointer">
+          <option value="all">Все месяцы</option>
+        </select>
+        <select id="tx-filter-category" onchange="renderTransactions()" class="flex-1 bg-gray-800 border border-gray-700 text-xs text-gray-200 rounded-xl px-3 py-2.5 outline-none cursor-pointer">
+          <option value="all">Все категории</option>
+        </select>
       </div>
       <div id="transactions-list" class="space-y-4 pb-6"></div>
     </div>
@@ -422,9 +443,9 @@
       <!-- Добавление нового слова -->
       <div class="pt-3 pb-3 border-b border-gray-700/80">
         <p class="text-[11px] text-gray-400 mb-2">Добавить новое слово / фразу:</p>
-        <div class="flex gap-2 mb-2">
-          <input type="text" id="editor-keyword-input" placeholder="Слово / магазин" class="flex-1 bg-gray-700 border border-gray-600 text-white rounded-xl px-3 py-2 text-xs outline-none focus:border-blue-500">
-          <select id="editor-category-select" class="w-36 bg-gray-700 border border-gray-600 text-white rounded-xl px-2 py-2 text-xs outline-none cursor-pointer focus:border-blue-500"></select>
+        <div class="flex flex-col sm:flex-row gap-2 mb-2 w-full">
+          <input type="text" id="editor-keyword-input" placeholder="Слово / магазин" class="w-full flex-1 bg-gray-700 border border-gray-600 text-white rounded-xl px-3 py-2.5 text-xs outline-none focus:border-blue-500 min-w-0">
+          <select id="editor-category-select" class="w-full sm:w-44 bg-gray-700 border border-gray-600 text-white rounded-xl px-2.5 py-2.5 text-xs outline-none cursor-pointer focus:border-blue-500 truncate min-w-0"></select>
         </div>
         <button type="button" onclick="addRuleFromEditor()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer">+ Добавить в словарь</button>
       </div>
