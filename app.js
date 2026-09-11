@@ -741,13 +741,61 @@ function renderTransactions() {
   document.getElementById('month-expense').innerText = formatMoney(curMonth.expense);
   document.getElementById('month-income').innerText = formatMoney(curMonth.income);
 
-  if (data.length === 0) {
+  // 1. Наполняем селекторы фильтров, если они пустые
+  const monthFilter = document.getElementById('tx-filter-month');
+  const catFilter = document.getElementById('tx-filter-category');
+
+  if (monthFilter && monthFilter.options.length <= 1) {
+    data.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.label;
+      monthFilter.appendChild(opt);
+    });
+  }
+
+  if (catFilter && catFilter.options.length <= 1 && Cache.categories) {
+    const allCats = [
+      ...Cache.categories.expense.map(c => ({ name: c.name, type: 'Расход' })),
+      ...Cache.categories.income.map(c => ({ name: c.name, type: 'Доход' }))
+    ];
+    // Уникальные названия категорий
+    const unique = [...new Set(allCats.map(c => c.name))];
+    unique.sort().forEach(catName => {
+      const opt = document.createElement('option');
+      opt.value = catName;
+      opt.textContent = catName;
+      catFilter.appendChild(opt);
+    });
+  }
+
+  const selectedMonth = monthFilter ? monthFilter.value : 'all';
+  const selectedCat = catFilter ? catFilter.value : 'all';
+
+  // 2. Фильтруем данные
+  let filteredMonths = data.map(m => {
+    if (selectedMonth !== 'all' && m.id !== selectedMonth) return null;
+
+    let items = m.items;
+    if (selectedCat !== 'all') {
+      items = items.filter(tx => tx.category === selectedCat);
+    }
+
+    if (items.length === 0) return null;
+
+    return {
+      ...m,
+      items
+    };
+  }).filter(Boolean);
+
+  if (filteredMonths.length === 0) {
     document.getElementById('transactions-list').innerHTML =
-      '<div class="text-center text-gray-500 py-4">Операций нет</div>';
+      '<div class="text-center text-gray-500 py-8 text-xs">Операции не найдены</div>';
     return;
   }
 
-  document.getElementById('transactions-list').innerHTML = data.map(month => `
+  document.getElementById('transactions-list').innerHTML = filteredMonths.map(month => `
     <div class="pt-2 pb-1 border-b border-gray-800 flex justify-between items-end">
       <h3 class="font-bold text-gray-400 text-xs uppercase tracking-wider">${month.label}</h3>
       <span class="text-[10px] text-gray-500">
@@ -779,7 +827,7 @@ function renderTransactions() {
                 ${(() => {
                   const cat = Cache.categories[
                     tx.type === 'Расход' ? 'expense' : 'income'
-                  ].find(c => c.name === tx.category);
+                  ]?.find(c => c.name === tx.category);
 
                   return cat
                     ? `<span class="tx-category__icon">${cat.icon}</span>`
@@ -938,6 +986,35 @@ function formatCompactChartMoney(value) {
   return value;
 }
 
+let currentStructureType = 'Расход'; // 'Расход' или 'Доход'
+
+function switchStructureType(type) {
+  currentStructureType = type;
+  
+  const expBtn = document.getElementById('struct-type-expense');
+  const incBtn = document.getElementById('struct-type-income');
+  if (expBtn && incBtn) {
+    if (type === 'Расход') {
+      expBtn.className = 'px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-gray-700 text-white transition-all';
+      incBtn.className = 'px-2.5 py-1 text-[11px] font-semibold rounded-lg text-gray-400 hover:text-white transition-all';
+    } else {
+      incBtn.className = 'px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-emerald-600 text-white transition-all';
+      expBtn.className = 'px-2.5 py-1 text-[11px] font-semibold rounded-lg text-gray-400 hover:text-white transition-all';
+    }
+  }
+
+  const titleEl = document.getElementById('structure-title');
+  if (titleEl) {
+    titleEl.textContent = type === 'Расход' ? 'Куда уходят деньги' : 'Источники доходов';
+  }
+
+  const months = Cache?.transactions || [];
+  if (months.length > 0) {
+    const curMonth = months[currentAnalyticsMonthIndex] || months[0];
+    updateAnalyticsForMonth(curMonth.id);
+  }
+}
+
 function updateAnalyticsForMonth(monthId) {
   const month = Cache.transactions.find(m => m.id === monthId);
   if (!month) return;
@@ -959,27 +1036,35 @@ function updateAnalyticsForMonth(monthId) {
   }
   if (rateEl) rateEl.textContent = income > 0 ? `${rate}% дохода` : 'Нет дохода';
 
+  // Фильтруем категории по выбранному типу (Расход или Доход)
   const catMap = {};
-  month.items.filter(tx => tx.type === 'Расход').forEach(tx => {
+  month.items.filter(tx => tx.type === currentStructureType).forEach(tx => {
     catMap[tx.category] = (catMap[tx.category] || 0) + (Number(tx.amount) || 0);
   });
+
   const entries = Object.entries(catMap).sort((a,b) => b[1] - a[1]);
   const labels = entries.map(([label]) => label);
   const data = entries.map(([,value]) => value);
-  const colors = ['#7b83ff', '#36d69b', '#f3b65a', '#ff6f7d', '#a878ff', '#ef79b4', '#36bfc0', '#f58b55'];
+  const colors = currentStructureType === 'Расход' 
+    ? ['#7b83ff', '#ff6f7d', '#f3b65a', '#a878ff', '#ef79b4', '#36bfc0', '#f58b55']
+    : ['#36d69b', '#3b82f6', '#10b981', '#6366f1', '#14b8a6', '#8b5cf6'];
   const total = data.reduce((sum, value) => sum + value, 0);
 
   const totalEl = document.getElementById('category-total');
+  const centerLabelEl = document.getElementById('donut-center-label');
   const legendEl = document.getElementById('category-legend');
+  
   if (totalEl) totalEl.textContent = formatMoney(total);
+  if (centerLabelEl) centerLabelEl.textContent = currentStructureType === 'Расход' ? 'Расходы' : 'Доходы';
+
   if (legendEl) {
-    legendEl.innerHTML = entries.length ? entries.slice(0, 6).map(([label, value], i) => `
+    legendEl.innerHTML = entries.length ? entries.map(([label, value], i) => `
       <div class="category-legend__item">
         <span class="category-legend__dot" style="background:${colors[i % colors.length]}"></span>
         <span class="category-legend__name">${escapeHtml(label)}</span>
         <span class="category-legend__value">${formatMoney(value)}</span>
         <span class="category-legend__percent">${total ? Math.round(value / total * 100) : 0}%</span>
-      </div>`).join('') : '<div class="analytics-empty">Нет расходов за выбранный месяц</div>';
+      </div>`).join('') : `<div class="analytics-empty">Нет ${currentStructureType === 'Расход' ? 'расходов' : 'доходов'} за этот месяц</div>`;
   }
 
   const ctx = document.getElementById('categoryExpensesChart').getContext('2d');
@@ -987,7 +1072,7 @@ function updateAnalyticsForMonth(monthId) {
   categoryChartObj = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels: data.length ? labels : ['Нет расходов'],
+      labels: data.length ? labels : ['Нет данных'],
       datasets: [{
         data: data.length ? data : [1],
         backgroundColor: data.length ? colors.slice(0, data.length) : ['#303740'],
@@ -1012,13 +1097,9 @@ function updateAnalyticsForMonth(monthId) {
       }
     }
   });
-
-  const top = entries[0];
-  const topEl = document.getElementById('analytics-top-category');
-  if (topEl) topEl.textContent = top ? `${top[0]} · ${formatMoney(top[1])}` : 'Нет данных';
 }
 
-function drawBrokerChart() {
+  function drawBrokerChart() {
   const br = Cache?.broker;
   const canvas = document.getElementById('brokerChart');
   if (!canvas) return;
