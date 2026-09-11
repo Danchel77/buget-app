@@ -117,10 +117,6 @@ class GazprombankParser {
 
     const parsed = rawBlocks.map(block => this._parseTransactionBlock(block)).filter(Boolean);
 
-    // Исключаем переводы между счетами и СБП при необходимости
-    if (options.excludeTransfers) {
-      return parsed.filter(tx => !tx.isTransfer);
-    }
     return parsed;
   }
 
@@ -259,9 +255,6 @@ class YandexBankParser {
 
     const parsed = rawBlocks.map(block => this._parseTransactionBlock(block)).filter(Boolean);
 
-    if (options.excludeTransfers) {
-      return parsed.filter(tx => !tx.isTransfer);
-    }
     return parsed;
   }
 
@@ -391,9 +384,6 @@ class SberbankParser {
 
     const parsed = rawBlocks.map(block => this._parseTransactionBlock(block)).filter(Boolean);
 
-    if (options.excludeTransfers) {
-      return parsed.filter(tx => !tx.isTransfer);
-    }
     return parsed;
   }
 
@@ -640,7 +630,8 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
     }
 
     tx.isDuplicate = isTransactionDuplicate(tx);
-    tx.selected = !tx.isDuplicate; // дубликаты по умолчанию выключены
+    // Снимаем галочку, если это дубликат ИЛИ если это перевод
+    tx.selected = !tx.isDuplicate && !tx.isTransfer;
   });
 
   window._lastParsedTransactions = transactions;
@@ -688,7 +679,7 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
     ).join('');
 
     html += `
-      <div class="bg-gray-900 border ${tx.isDuplicate ? 'border-gray-800 opacity-60' : 'border-gray-700/80'} p-3 rounded-2xl">
+      <div class="bg-gray-900 border ${tx.isDuplicate || tx.isTransfer ? 'border-gray-800 opacity-60' : 'border-gray-700/80'} p-3 rounded-2xl">
         
         <!-- СТРОКА 1: Чекбокс, Дата, Мерчант СЛЕВА; Кнопка "Запомнить" СПРАВА ВВЕРХУ -->
         <div class="flex items-center justify-between gap-2 min-w-0">
@@ -707,8 +698,8 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
           </div>
 
           <div class="flex items-center gap-1.5 flex-shrink-0">
+            ${tx.isTransfer ? '<span class="text-[9px] text-amber-400/90 bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-800/50">Перевод</span>' : ''}
             ${tx.isDuplicate ? '<span class="text-[9px] text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded border border-gray-700">В базе</span>' : ''}
-            
             <button type="button" 
                     onclick="openRememberRuleModal('${tx._id}')" 
                     class="text-[10px] text-gray-400 hover:text-blue-400 bg-gray-800 hover:bg-gray-700 border border-gray-700 px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer">
