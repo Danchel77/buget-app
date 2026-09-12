@@ -699,7 +699,7 @@ async function importSelectedTransactions() {
       const batch = db.batch();
 
       chunk.forEach(tx => {
-        const docRef = db.collection('Transactions').doc();
+        const docRef = (window.getUserCol ? getUserCol('Transactions') : db.collection('Transactions')).doc();
         batch.set(docRef, {
           type: tx.type,
           amount: tx.amount,
@@ -808,7 +808,8 @@ async function saveCategoryRuleFromModal() {
   try {
     // 1. Сохраняем правило в Firebase Firestore
     const newRule = { pattern: keyword, category: category };
-    const docRef = await db.collection('CategoryRules').add(newRule);
+    const col = window.getUserCol ? getUserCol('CategoryRules') : db.collection('CategoryRules');
+const docRef = await col.add(newRule);
     
     // 2. Обновляем локальный кэш
     if (!window.Cache.categoryRules) window.Cache.categoryRules = [];
@@ -915,7 +916,8 @@ async function addRuleFromEditor() {
   showToast('Добавление...', false, true);
   try {
     const newRule = { pattern: keyword, category: category };
-    const docRef = await db.collection('CategoryRules').add(newRule);
+    const col = window.getUserCol ? getUserCol('CategoryRules') : db.collection('CategoryRules');
+    const docRef = await col.add(newRule);
 
     if (!window.Cache.categoryRules) window.Cache.categoryRules = [];
     window.Cache.categoryRules.push({ id: docRef.id, ...newRule });
@@ -931,7 +933,8 @@ async function addRuleFromEditor() {
 
 async function deleteRuleFromEditor(ruleId) {
   try {
-    await db.collection('CategoryRules').doc(ruleId).delete();
+    const col = window.getUserCol ? getUserCol('CategoryRules') : db.collection('CategoryRules');
+    await col.doc(ruleId).delete();
     window.Cache.categoryRules = (window.Cache.categoryRules || []).filter(r => r.id !== ruleId);
     renderRulesList();
     showToast('Слово удалено из словаря');
