@@ -24,20 +24,101 @@ let brokerChartObj = null;
 let monthlyChartObj = null;
 let categoryChartObj = null;
 
-// --- АВТОРИЗАЦИЯ ---
-function loginUser(e) {
+let currentAuthMode = 'login'; // 'login' или 'register'
+
+// Переключение между вкладками Вход / Регистрация
+function setAuthMode(mode) {
+  currentAuthMode = mode;
+  const loginTab = document.getElementById('tab-auth-login');
+  const regTab = document.getElementById('tab-auth-register');
+  const submitBtn = document.getElementById('auth-submit-btn');
+
+  if (mode === 'login') {
+    loginTab.className = 'flex-1 py-2 text-xs font-semibold rounded-xl bg-blue-600 text-white transition-all cursor-pointer';
+    regTab.className = 'flex-1 py-2 text-xs font-semibold rounded-xl text-gray-400 hover:text-white transition-all cursor-pointer';
+    submitBtn.innerText = 'Войти';
+  } else {
+    regTab.className = 'flex-1 py-2 text-xs font-semibold rounded-xl bg-blue-600 text-white transition-all cursor-pointer';
+    loginTab.className = 'flex-1 py-2 text-xs font-semibold rounded-xl text-gray-400 hover:text-white transition-all cursor-pointer';
+    submitBtn.innerText = 'Создать аккаунт';
+  }
+}
+
+// Превращает никнейм в безопасный виртуальный email для Firebase
+function normalizeAuthEmail(input) {
+  const clean = input.trim().toLowerCase();
+  // Если пользователь ввел реальную почту с @ — оставляем как есть
+  if (clean.includes('@')) {
+    return clean;
+  }
+  // Иначе отсекаем спецсимволы и создаем виртуальный email @budget.local
+  const safeNickname = clean.replace(/[^a-z0-9._-]/g, '');
+  return `${safeNickname || 'user'}@budget.local`;
+}
+
+// Вход через Google в 1 клик
+async function loginWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  showToast('Вход через Google...', false, true);
+
+  try {
+    await auth.signInWithPopup(provider);
+    document.getElementById('toast-container')?.classList.add('hidden');
+  } catch (err) {
+    document.getElementById('toast-container')?.classList.add('hidden');
+    // Не показываем ошибку, если пользователь просто сам закрыл окно авторизации
+    if (err.code !== 'auth/popup-closed-by-user') {
+      showToast('Ошибка авторизации Google: ' + err.message, true);
+    }
+  }
+}
+
+// Обработка отправки формы (Вход или Регистрация)
+async function handleAuthSubmit(e) {
   e.preventDefault();
-  const btn = document.getElementById('login-btn');
+  const usernameInput = document.getElementById('auth-username').value;
+  const password = document.getElementById('auth-password').value;
+  const btn = document.getElementById('auth-submit-btn');
+
+  if (!usernameInput.trim() || !password) return;
+
+  if (password.length < 6) {
+    showToast('Пароль должен быть от 6 символов', true);
+    return;
+  }
+
+  const email = normalizeAuthEmail(usernameInput);
   btn.disabled = true;
-  btn.innerText = 'Вход...';
-  auth.signInWithEmailAndPassword(
-    document.getElementById('login-email').value,
-    document.getElementById('login-password').value
-  ).catch(err => {
-    btn.disabled = false;
-    btn.innerText = 'Войти';
-    showToast('Ошибка: неверный email или пароль', true);
-  });
+
+  if (currentAuthMode === 'login') {
+    btn.innerText = 'Вход...';
+    try {
+      await auth.signInWithEmailAndPassword(email, password);
+    } catch (err) {
+      btn.disabled = false;
+      btn.innerText = 'Войти';
+      showToast('Неверный логин или пароль', true);
+    }
+  } else {
+    btn.innerText = 'Создание аккаунта...';
+    try {
+      const cred = await auth.createUserWithEmailAndPassword(email, password);
+      // Запоминаем красивый никнейм в профиле пользователя
+      if (cred.user) {
+        const displayName = usernameInput.includes('@') ? usernameInput.split('@')[0] : usernameInput.trim();
+        await cred.user.updateProfile({ displayName });
+      }
+      showToast('Аккаунт успешно создан!');
+    } catch (err) {
+      btn.disabled = false;
+      btn.innerText = 'Создать аккаунт';
+      if (err.code === 'auth/email-already-in-use') {
+        showToast('Этот никнейм уже занят', true);
+      } else {
+        showToast('Ошибка регистрации: ' + err.message, true);
+      }
+    }
+  }
 }
 
 function logoutUser() {
