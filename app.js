@@ -451,25 +451,57 @@ function updateCategorySelect(containerOrRow, type) {
   if (!menu || !input || !btn || !label) return;
 
   const cats = type === 'Доход' ? Cache.categories.income : Cache.categories.expense;
+  const defaultCats = [
+    'Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Развлечения', 'Другое', 'Зарплата', 'Возврат', 'Кэшбек'
+  ];
 
-  // Генерируем опции для меню
-  menu.innerHTML = cats.map(c => `
-    <button type="button" class="w-full text-left px-2.5 py-1.5 text-xs text-gray-300 hover:bg-gray-700/80 rounded-lg flex items-center gap-2 cursor-pointer transition-colors" data-cat="${escapeHtml(c.name)}" data-icon="${c.icon || '📦'}">
-      <span>${c.icon || '📦'}</span>
-      <span class="truncate">${escapeHtml(c.name)}</span>
-    </button>
-  `).join('');
+  // Генерируем пункты: список категорий с крестиками у добавленных пользователем
+  let itemsHtml = cats.map(c => {
+    const isCustom = !defaultCats.includes(c.name);
+    return `
+      <div class="flex items-center justify-between hover:bg-gray-700/80 rounded-lg px-2.5 py-1.5 transition-colors group">
+        <button type="button" class="flex-1 text-left text-xs text-gray-200 flex items-center gap-2 cursor-pointer truncate min-w-0" data-cat="${escapeHtml(c.name)}" data-icon="${c.icon || '📦'}">
+          <span>${c.icon || '📦'}</span>
+          <span class="truncate">${escapeHtml(c.name)}</span>
+        </button>
+        ${isCustom ? `
+          <button type="button" onclick="event.stopPropagation(); deleteCategory('${escapeHtml(c.name)}', '${type}')" class="text-gray-500 hover:text-red-400 p-1 text-[11px] leading-none ml-1.5 flex-shrink-0 cursor-pointer" title="Удалить категорию">✕</button>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
 
-  // Навешиваем клик на кнопку открытия
+  // Кнопка "+" в самом низу списка
+  itemsHtml += `
+    <div class="border-t border-gray-700/80 pt-1 mt-1">
+      <button type="button" class="btn-add-cat-in-menu w-full text-left px-2.5 py-1.5 text-xs text-blue-400 hover:bg-gray-700/60 rounded-lg flex items-center gap-1.5 font-semibold cursor-pointer transition-colors">
+        <span>+</span> <span>Добавить категорию</span>
+      </button>
+    </div>
+  `;
+
+  menu.innerHTML = itemsHtml;
+
+  // Открытие меню со смарт-позиционированием (вниз / вверх)
   btn.onclick = (e) => {
     e.stopPropagation();
     const isClosed = menu.classList.contains('hidden');
+    
+    // Закрываем все остальные меню и сбрасываем z-index
     document.querySelectorAll('.custom-dropdown-menu').forEach(m => m.classList.add('hidden'));
-    if (isClosed) menu.classList.remove('hidden');
+    document.querySelectorAll('.tx-item').forEach(r => r.style.zIndex = '');
+
+    if (isClosed) {
+      row.style.zIndex = '30';
+      smartPositionDropdown(menu, btn);
+      menu.classList.remove('hidden');
+    } else {
+      row.style.zIndex = '';
+    }
   };
 
-  // Навешиваем выбор пункта
-  menu.querySelectorAll('button').forEach(itemBtn => {
+  // Клик по пункту категории
+  menu.querySelectorAll('button[data-cat]').forEach(itemBtn => {
     itemBtn.onclick = (e) => {
       e.stopPropagation();
       const catName = itemBtn.dataset.cat;
@@ -479,8 +511,35 @@ function updateCategorySelect(containerOrRow, type) {
       label.classList.remove('text-gray-400');
       label.classList.add('text-white');
       menu.classList.add('hidden');
+      row.style.zIndex = '';
     };
   });
+
+  // Клик по кнопке "+ Добавить категорию"
+  const addBtn = menu.querySelector('.btn-add-cat-in-menu');
+  if (addBtn) {
+    addBtn.onclick = (e) => {
+      e.stopPropagation();
+      menu.classList.add('hidden');
+      row.style.zIndex = '';
+      showAddCategoryDialog(type, row);
+    };
+  }
+}
+
+// Умное позиционирование: открывается вниз, а если снизу нет места — вверх
+function smartPositionDropdown(menu, triggerBtn) {
+  const rect = triggerBtn.getBoundingClientRect();
+  const menuHeight = 220; // примерная высота открытого списка
+  const spaceBelow = window.innerHeight - rect.bottom;
+
+  if (spaceBelow < menuHeight && rect.top > menuHeight) {
+    menu.style.bottom = 'calc(100% + 4px)';
+    menu.style.top = 'auto';
+  } else {
+    menu.style.top = 'calc(100% + 4px)';
+    menu.style.bottom = 'auto';
+  }
 }
 
 function processDeposits(deposits, goals) {
