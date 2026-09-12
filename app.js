@@ -18,6 +18,98 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
+// Хелпер доступа к личной подколлекции авторизованного пользователя
+function getUserCol(table) {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Пользователь не авторизован');
+  return db.collection('users').doc(user.uid).collection(table);
+}
+window.getUserCol = getUserCol;
+
+// Проверка и автоматический мягкий перенос существующих данных в личный профиль
+async function checkAndMigrateExistingData(user) {
+  try {
+    const userDocRef = db.collection('users').doc(user.uid);
+    const userDoc = await userDocRef.get();
+
+    // Если аккаунт уже мигрирован или инициализирован — выходим
+    if (userDoc.exists && userDoc.data()?.migrated) {
+      return;
+    }
+
+    // Проверяем: есть ли уже данные в личной папке?
+    const personalTx = await getUserCol('Transactions').limit(1).get();
+    if (!personalTx.empty) {
+      await userDocRef.set({ migrated: true }, { merge: true });
+      return;
+    }
+
+    // Проверяем старую общую базу в корне
+    const rootTx = await db.collection('Transactions').limit(1).get();
+
+    if (!rootTx.empty) {
+      // Это ты (владелец старых данных)! Копируем все коллекции в личную ветку
+      showToast('Перенос ваших данных в личный профиль...', false, true);
+      const tables = ['Transactions', 'Deposits', 'Broker', 'Goals', 'Categories', 'CategoryRules'];
+
+      for (const table of tables) {
+        const snap = await db.collection(table).get();
+        if (!snap.empty) {
+          const docs = snap.docs;
+          const CHUNK = 400;
+          for (let i = 0; i < docs.length; i += CHUNK) {
+            const batch = db.batch();
+            docs.slice(i, i + CHUNK).forEach(d => {
+              batch.set(getUserCol(table).doc(d.id), d.data());
+            });
+            await batch.commit();
+          }
+        }
+      }
+
+      await userDocRef.set({
+        migrated: true,
+        displayName: user.displayName || user.email?.split('@')[0] || 'Пользователь',
+        email: user.email || '',
+        migratedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      showToast('Все ваши данные успешно перенесены в профиль!');
+    } else {
+      // Новый пользователь: инициализируем стартовые категории и правила
+      await seedNewUserInitialData(user);
+    }
+  } catch (e) {
+    console.error('Ошибка миграции данных:', e);
+  }
+}
+
+// Заполнение начальных категорий и правил для нового аккаунта
+async function seedNewUserInitialData(user) {
+  try {
+    const batch = db.batch();
+    
+    // Начальные правила словаря
+    if (typeof StatementCategorizer !== 'undefined' && StatementCategorizer.DEFAULT_RULES) {
+      StatementCategorizer.DEFAULT_RULES.forEach(r => {
+        batch.set(getUserCol('CategoryRules').doc(), r);
+      });
+    }
+
+    // Документ пользователя
+    batch.set(db.collection('users').doc(user.uid), {
+      migrated: true,
+      displayName: user.displayName || user.email?.split('@')[0] || 'Пользователь',
+      email: user.email || '',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    await batch.commit();
+  } catch (err) {
+    console.error('Ошибка инициализации нового пользователя:', err);
+  }
+}
+
 let Cache = null;
 let currentEditId = null, currentEditTable = null;
 let brokerChartObj = null;
@@ -128,13 +220,16 @@ function logoutUser() {
 // Показываем экран загрузки сразу при старте
 document.getElementById('loading-screen').classList.remove('hidden');
 
-auth.onAuthStateChanged(user => {
-  // Скрываем экран загрузки в любом случае
+auth.onAuthStateChanged(async user => {
   document.getElementById('loading-screen').classList.add('hidden');
   
   if (user) {
     document.getElementById('login-screen').classList.add('hidden');
     switchTab('transactions');
+    
+    // Запускаем перенос данных (сработает один раз только при первом входе)
+    await checkAndMigrateExistingData(user);
+    
     fetchAllData();
   } else {
     document.getElementById('login-screen').classList.remove('hidden');
@@ -213,7 +308,7 @@ function showDialog(title, message, isConfirm, callback) {
 // --- БД И ЛОГИКА ---
 async function fetchCollection(table) {
   try {
-    const querySnapshot = await db.collection(table).get();
+    const querySnapshot = await getUserCol(table).get();
     const data = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
     switch (table) {
       case 'Transactions':
@@ -242,12 +337,12 @@ async function fetchAllData() {
   showToast("Синхронизация...", false, true);
   try {
     const [txS, depS, brS, goalS, catS, rulesS] = await Promise.all([
-      db.collection('Transactions').get(),
-      db.collection('Deposits').get(),
-      db.collection('Broker').get(),
-      db.collection('Goals').get(),
-      db.collection('Categories').get(),
-      db.collection('CategoryRules').get()
+      getUserCol('Transactions').get(),
+      getUserCol('Deposits').get(),
+      getUserCol('Broker').get(),
+      getUserCol('Goals').get(),
+      getUserCol('Categories').get(),
+      getUserCol('CategoryRules').get()
     ]);
     const txData = txS.docs.map(d => ({ id: d.id, ...d.data() }));
     const depData = depS.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -288,13 +383,13 @@ async function submitAction(btnId, table, data) {
 
   try {
     if (currentEditId && currentEditTable === table) {
-      await db.collection(table).doc(currentEditId).update(data);
+      await getUserCol(table).doc(currentEditId).update(data);
     } else if (Array.isArray(data)) {
       const batch = db.batch();
-      data.forEach(item => batch.set(db.collection(table).doc(), item));
+      data.forEach(item => batch.set(getUserCol(table).doc(), item));
       await batch.commit();
     } else {
-      await db.collection(table).add(data);
+      await getUserCol(table).add(data);
     }
 
     btn.disabled = false;
@@ -323,7 +418,7 @@ function deleteRecord(table, id) {
   showDialog('Удаление', 'Точно удалить запись? Это нельзя отменить.', true, async () => {
     showToast("Удаление...", false, true);
     try {
-      await db.collection(table).doc(id).delete();
+      await getUserCol(table).doc(id).delete();
 
       // Оптимизированное обновление
       if (table === 'Transactions') {
@@ -445,7 +540,7 @@ document.getElementById('category-save-btn').addEventListener('click', async () 
     return;
   }
   try {
-    await db.collection('Categories').add({ name, type: currentCategoryType, icon: selectedCategoryIcon });
+    await getUserCol('Categories').add({ name, type: currentCategoryType, icon: selectedCategoryIcon });
     const arr = currentCategoryType === 'Доход' ? Cache.categories.income : Cache.categories.expense;
     arr.push({ name, icon: selectedCategoryIcon });
     updateCategorySelect(currentCategorySelect, currentCategoryType);
@@ -488,7 +583,7 @@ async function deleteCategory(name, type) {
   showDialog('Удаление', `Удалить категорию "${name}"?`, true, async () => {
     try {
       // Найти документ по name и type
-      const snapshot = await db.collection('Categories')
+      const snapshot = await getUserCol('Categories')
         .where('name', '==', name)
         .where('type', '==', type)
         .get();
@@ -1781,7 +1876,7 @@ async function deleteSelectedItems() {
       const batch = db.batch();
       selectedItems.forEach(key => {
         const [table, id] = key.split(':');
-        batch.delete(db.collection(table).doc(id));
+        batch.delete(getUserCol(table).doc(id));
       });
       await batch.commit();
       disableSelectionMode();
