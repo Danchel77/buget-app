@@ -383,27 +383,21 @@
       <input type="text" inputmode="decimal" oninput="formatSumInput(this)" required class="tx-amount w-full text-2xl font-bold bg-gray-800 border border-gray-600 focus:border-blue-500 text-white rounded-lg p-3 outline-none" placeholder="0 ₽">
     </div>
 
-      <div class="grid grid-cols-[115px_1fr] gap-2 mb-3">
+      <div class="grid grid-cols-[110px_1fr] gap-2 mb-3">
       <input type="date" required class="tx-date w-full min-w-0 bg-gray-800 border border-gray-600 text-white rounded-lg p-2 outline-none text-xs">
       
-      <div class="flex items-center gap-1 min-w-0">
-        <!-- Кастомный селектор категории -->
-        <div class="relative flex-1 min-w-0 custom-dropdown-wrap">
-          <input type="hidden" class="tx-category" required>
-          
-          <button type="button" class="tx-category-btn w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-2.5 py-2 text-xs flex items-center justify-between outline-none cursor-pointer hover:border-gray-500 transition-colors">
-            <span class="tx-category-label truncate text-gray-400">Категория...</span>
-            <span class="text-gray-400 text-[8px] ml-1">▼</span>
-          </button>
-          
-          <div class="tx-category-menu custom-dropdown-menu hidden absolute left-0 top-full mt-1 w-full max-h-48 overflow-y-auto bg-gray-800/95 backdrop-blur-md border border-gray-700 rounded-xl shadow-2xl z-50 p-1 space-y-0.5"></div>
-        </div>
-
-        <button type="button" class="manage-categories-btn flex-shrink-0" title="Управление категориями">✎</button>
-        <button type="button" class="add-category-btn flex-shrink-0" title="Добавить категорию">+</button>
+      <!-- Кастомный селектор категории на всю ширину -->
+      <div class="relative w-full min-w-0 custom-dropdown-wrap">
+        <input type="hidden" class="tx-category" required>
+        
+        <button type="button" class="tx-category-btn w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-xs flex items-center justify-between outline-none cursor-pointer hover:border-gray-500 transition-colors">
+          <span class="tx-category-label truncate text-gray-400">Категория...</span>
+          <span class="text-gray-400 text-[8px] ml-1">▼</span>
+        </button>
+        
+        <div class="tx-category-menu custom-dropdown-menu hidden absolute left-0 w-full max-h-56 overflow-y-auto bg-gray-800/95 backdrop-blur-md border border-gray-700 rounded-xl shadow-2xl z-50 p-1 space-y-0.5"></div>
       </div>
     </div>
-
     <input type="text" placeholder="Комментарий" class="tx-comment w-full bg-gray-800 border border-gray-600 text-white placeholder-gray-500 rounded-lg p-2 outline-none text-xs">
   </div>
 </template>
