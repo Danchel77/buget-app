@@ -58,6 +58,35 @@ class StatementExtractor {
 }
 
 // -------------------------------------------------------------
+// ДИНАМИЧЕСКИЕ КАТЕГОРИИ И ИКОНКИ ИЗ FIREBASE
+// -------------------------------------------------------------
+
+/**
+ * Возвращает массив названий категорий нужного типа из Firebase
+ */
+function getActiveCategories(type = 'Расход') {
+  const cats = window.Cache?.categories;
+  if (!cats) {
+    return type === 'Доход' ? ['Зарплата', 'Другое'] : ['Продукты', 'Другое'];
+  }
+  const list = type === 'Доход' ? (cats.income || []) : (cats.expense || []);
+  return list.map(c => c.name);
+}
+
+/**
+ * Находит актуальную иконку для любой категории из базы (включая созданные пользователем)
+ */
+function getDynamicCategoryIcon(catName) {
+  const cats = window.Cache?.categories;
+  if (cats) {
+    const all = [...(cats.expense || []), ...(cats.income || [])];
+    const found = all.find(c => c.name === catName);
+    if (found && found.icon) return found.icon;
+  }
+  return CATEGORY_ICONS[catName] || '📦';
+}
+
+// -------------------------------------------------------------
 // 3. УНИВЕРСАЛЬНЫЙ ОПРЕДЕЛИТЕЛЬ (И ДОХОДЫ, И РАСХОДЫ ИЗ FIREBASE)
 // -------------------------------------------------------------
 class StatementCategorizer {
@@ -65,19 +94,15 @@ class StatementCategorizer {
     const text = `${merchant} ${rawDetails}`.toLowerCase();
     const rules = window.Cache?.categoryRules || [];
 
-    // 1. Берем из базы список категорий, разрешенных строго для этого типа (Доход или Расход)
-    const allowedCategories = (type === 'Доход')
-      ? (window.Cache?.categories?.income?.map(c => c.name) || [])
-      : (window.Cache?.categories?.expense?.map(c => c.name) || []);
+    // Получаем ТОЛЬКО актуальные категории нужного типа из базы
+    const allowedCategories = getActiveCategories(type);
 
-    // 2. Ищем совпадение в правилах из базы данных
+    // Сверяем с правилами из базы
     for (const rule of rules) {
       if (!rule.pattern || !rule.category) continue;
 
-      // Если категория правила не относится к текущему типу (например, расходное правило "Маркетплейсы" для дохода) — пропускаем
-      if (allowedCategories.length > 0 && !allowedCategories.includes(rule.category)) {
-        continue;
-      }
+      // Если категория правила не существует в категориях этого типа — пропускаем
+      if (!allowedCategories.includes(rule.category)) continue;
 
       const pattern = rule.pattern.toLowerCase().trim();
       if (this._matches(text, pattern)) {
@@ -85,8 +110,8 @@ class StatementCategorizer {
       }
     }
 
-    // 3. Если в базе нет подходящего правила
-    return "Другое";
+    // Если ничего не подошло — ставим 'Другое' (или первую категорию из списка)
+    return allowedCategories.includes('Другое') ? 'Другое' : (allowedCategories[0] || 'Другое');
   }
 
   static _matches(text, pattern) {
@@ -192,6 +217,9 @@ class GazprombankParser {
            text.includes('перевод между') ||
            text.includes('перевод по сбп') ||
            text.includes('снятие наличных') ||
+           text.includes('внесение наличных') ||  // <--- добавлено
+           text.includes('взнос наличными') ||    // <--- добавлено
+           text.includes('пополнение наличными') ||
            text.includes('vb24');
   }
 
@@ -339,7 +367,9 @@ class YandexBankParser {
     const text = `${fullText} ${merchant}`.toLowerCase();
     return text.includes('перевод') ||
            text.includes('сбп') ||
-           text.includes('между счетами');
+           text.includes('между счетами') ||
+           text.includes('внесение') ||           // <--- добавлено
+           text.includes('наличными');
   }
 
   static _isServiceLine(line) {
@@ -470,10 +500,13 @@ class SberbankParser {
     const text = `${sberCategory} ${fullText} ${merchant}`.toLowerCase();
     return text.includes('перевод') ||
            text.includes('сбп') ||
-           text.includes('vklad-karta') || // Закрытие / выплата вклада
+           text.includes('vklad-karta') ||
            text.includes('karta-vklad') ||
-           text.includes('bpwww') ||       // Брокерский счёт Сбера (СберИнвестор)
-           text.includes('брокер');
+           text.includes('bpwww') ||
+           text.includes('брокер') ||
+           text.includes('внесение наличных') ||  // <--- добавлено
+           text.includes('зачисление наличных') || // <--- добавлено
+           text.includes('взнос наличными');
   }
 
   static _isServiceLine(line) {
@@ -603,7 +636,9 @@ class OzonBankParser {
     const text = `${fullText} ${merchant}`.toLowerCase();
     return text.includes('перевод') ||
            text.includes('сбп') ||
-           text.includes('отправитель:');
+           text.includes('отправитель:') ||
+           text.includes('внесение наличных') ||  // <--- добавлено
+           text.includes('пополнение наличными');
   }
 
   static _isServiceLine(line) {
@@ -744,21 +779,6 @@ function isTransactionDuplicate(tx) {
 // -------------------------------------------------------------
 // ОБНОВЛЕННЫЙ РЕНДЕР КАРТОЧЕК И ВЫБОРА КАТЕГОРИЙ
 // -------------------------------------------------------------
-
-// Единый справочник иконок для быстрого переключения
-const CATEGORY_ICONS = {
-  'Продукты': '🍔',
-  'Кафе и рестораны': '🍽️',
-  'Маркетплейсы': '🛍️',
-  'Транспорт': '🚗',
-  'Жилье': '🏠',
-  'Развлечения': '🎬',
-  'Зарплата': '💼',
-  'Возврат': '↩️',
-  'Кэшбек': '💰',
-  'Другое': '📦'
-};
-
 function renderParsedTransactionsView(fileName, transactions, bankName = 'Банк') {
   window._lastParsedBankName = bankName;
 
@@ -769,19 +789,9 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
   const info = document.getElementById('pdf-debug-info');
   const output = document.getElementById('pdf-debug-output');
 
-  // Полный список категорий с гарантией наличия новых
-  const expenseCategories = [
-    'Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Развлечения', 'Другое'
-  ];
-  const incomeCategories = ['Зарплата', 'Возврат', 'Кэшбек', 'Другое'];
-
-  // Добавляем любые пользовательские категории, если они были созданы в приложении
-  if (window.Cache?.categories?.expense) {
-    window.Cache.categories.expense.forEach(c => {
-      if (!expenseCategories.includes(c.name)) expenseCategories.push(c.name);
-      if (c.icon) CATEGORY_ICONS[c.name] = c.icon;
-    });
-  }
+  // Берем живые категории строго из базы данных
+  const expenseCategories = getActiveCategories('Расход');
+  const incomeCategories = getActiveCategories('Доход');
 
   // Подготовка и принудительная категоризация
   transactions.forEach((tx, idx) => {
@@ -839,10 +849,10 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
     // Для неактивных карточек сумма окрашивается в тускло-серый цвет
     const amountColor = isInactive ? 'text-gray-500 font-medium' : (isExp ? 'text-white font-bold' : 'text-emerald-400 font-bold');
     const cats = isExp ? expenseCategories : incomeCategories;
-    const currentIcon = CATEGORY_ICONS[tx.category] || '📦';
+    const currentIcon = getDynamicCategoryIcon(tx.category);
 
     const optionsHtml = cats.map(cat => 
-      `<option value="${escapeHtml(cat)}" ${cat === tx.category ? 'selected' : ''}>${CATEGORY_ICONS[cat] || '📦'} ${escapeHtml(cat)}</option>`
+      `<option value="${escapeHtml(cat)}" ${cat === tx.category ? 'selected' : ''}>${getDynamicCategoryIcon(cat)} ${escapeHtml(cat)}</option>`
     ).join('');
 
     html += `
@@ -888,7 +898,7 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
                     onclick="toggleImportCatMenu('${tx._id}')" 
                     id="cat-btn-${tx._id}"
                     class="w-44 ${isInactive ? 'bg-[#14181f] border-gray-800 text-gray-400' : 'bg-gray-800 border-gray-700 text-blue-200'} text-xs rounded-xl px-2.5 py-1.5 flex items-center justify-between outline-none cursor-pointer hover:border-gray-600 transition-colors">
-              <span id="cat-label-${tx._id}" class="truncate">${CATEGORY_ICONS[tx.category] || '📦'} ${escapeHtml(tx.category)}</span>
+              <span id="cat-label-${tx._id}" class="truncate">${getDynamicCategoryIcon(tx.category)} ${escapeHtml(tx.category)}</span>
               <span class="text-gray-400 text-[8px] ml-1">▼</span>
             </button>
             
@@ -902,7 +912,7 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
                     <button type="button" 
                             onclick="selectImportCat('${tx._id}', '${escapeHtml(cat)}')" 
                             class="flex-1 text-left text-xs flex items-center gap-2 cursor-pointer truncate min-w-0">
-                      <span>${CATEGORY_ICONS[cat] || '📦'}</span>
+                      <span>${getDynamicCategoryIcon(cat)}</span>
                       <span class="truncate">${escapeHtml(cat)}</span>
                     </button>
                     ${isCustom ? `
@@ -978,7 +988,7 @@ function selectImportCat(txId, newCat) {
     tx.category = newCat;
     const labelEl = document.getElementById(`cat-label-${txId}`);
     if (labelEl) {
-      labelEl.innerHTML = `${CATEGORY_ICONS[newCat] || '📦'} ${escapeHtml(newCat)}`;
+      labelEl.innerHTML = `${getDynamicCategoryIcon(newCat)} ${escapeHtml(newCat)}`;
     }
   }
   const menu = document.getElementById(`cat-menu-${txId}`);
@@ -1186,15 +1196,8 @@ async function saveCategoryRuleFromModal() {
 function openRulesEditorModal() {
   const dialog = document.getElementById('rules-editor-dialog');
 
-  // Формируем список доступных категорий
-  const expenseCats = window.Cache?.categories?.expense?.map(c => c.name) || [
-    'Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Развлечения', 'Другое'
-  ];
-  const incomeCats = window.Cache?.categories?.income?.map(c => c.name) || [
-    'Зарплата', 'Возврат', 'Кэшбек', 'Другое'
-  ];
-  const allCats = [...new Set([...expenseCats, ...incomeCats])];
-
+  const allCats = [...new Set([...getActiveCategories('Расход'), ...getActiveCategories('Доход')])];
+  
   populateModalCatMenu('editor', allCats, 'Продукты');
 
   document.getElementById('editor-keyword-input').value = '';
@@ -1225,7 +1228,7 @@ function renderRulesList() {
 
   let html = '';
   Object.keys(grouped).sort().forEach(cat => {
-    const catIcon = CATEGORY_ICONS[cat] || '📦';
+    const catIcon = getDynamicCategoryIcon(cat);
     html += `
       <div class="bg-gray-900/70 border border-gray-700/60 rounded-2xl p-3">
         <div class="text-xs font-bold text-gray-200 mb-2 flex items-center gap-1.5 border-b border-gray-800 pb-1">
@@ -1339,7 +1342,7 @@ function populateModalCatMenu(type, categories, selectedCat) {
   if (!menu) return;
 
   const defaultCat = selectedCat || categories[0] || 'Другое';
-  const defaultIcon = CATEGORY_ICONS[defaultCat] || '📦';
+  const defaultIcon = getDynamicCategoryIcon(defaultCat);
 
   if (input) input.value = defaultCat;
   if (label) {
@@ -1349,7 +1352,7 @@ function populateModalCatMenu(type, categories, selectedCat) {
   }
 
   menu.innerHTML = categories.map(cat => {
-    const icon = CATEGORY_ICONS[cat] || '📦';
+    const icon = getDynamicCategoryIcon(cat);
     const isSelected = (cat === defaultCat);
     return `
       <button type="button" 
