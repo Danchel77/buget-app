@@ -124,19 +124,46 @@ class StatementCategorizer {
   }
 }
 
-class GazprombankParser {
-  static VTB_ROW_START = /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})\s+(.+?)\s*([+-]\s*[\d\s]+[.,]\d{2})\s+([+-]\s*[\d\s]+[.,]\d{2})$/;
-  static DATE_PREFIX = /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})/;
+// =============================================================
+// 1. УНИВЕРСАЛЬНЫЙ ДВИЖОК ПАРСИНГА ВЫПИСОК
+// =============================================================
 
-  static parse(rawLines, options = { excludeTransfers: true }) {
+// Единый список признаков переводов и движения наличных для всех банков
+const UNIVERSAL_TRANSFER_KEYWORDS = [
+  'перевод', 'сбп', 'между счетами', 'снятие наличных', 'внесение наличных',
+  'взнос наличными', 'зачисление наличных', 'пополнение наличными', 'наличными',
+  'vklad-karta', 'karta-vklad', 'bpwww', 'брокер', 'vb24'
+];
+
+// Общие служебные строки (шапки, подвалы документов)
+const COMMON_SERVICE_LINES = [
+  'страница', 'выписка по', 'справка о движении', 'входящий остаток',
+  'исходящий остаток', 'итого зачислений', 'итого списаний', 'с уважением',
+  'руководитель департамента', 'лицензия банка россии', 'номер лицевого счёта'
+];
+
+// Утилита очистки суммы из строки в число
+function cleanAmount(str) {
+  if (!str) return 0;
+  const clean = str.replace(/[+−–—\-\u2012\u2013\u2014\u2212]/g, '')
+                   .replace(/[^\d.,]/g, '')
+                   .replace(',', '.');
+  return Math.abs(parseFloat(clean)) || 0;
+}
+
+/**
+ * ЕДИНЫЙ ДВИЖОК: собирает строки в блоки, проверяет переводы и нормализует данные
+ */
+class UniversalStatementParser {
+  static parse(rawLines, config) {
     const rawBlocks = [];
     let currentBlock = null;
 
     for (let line of rawLines) {
       line = line.trim();
-      if (!line || this._isServiceLine(line)) continue;
+      if (!line || this._isServiceLine(line, config)) continue;
 
-      if (this.DATE_PREFIX.test(line)) {
+      if (config.isTxStart(line)) {
         if (currentBlock) rawBlocks.push(currentBlock);
         currentBlock = [line];
       } else if (currentBlock) {
@@ -145,576 +172,207 @@ class GazprombankParser {
     }
     if (currentBlock) rawBlocks.push(currentBlock);
 
-    const parsed = rawBlocks.map(block => this._parseTransactionBlock(block)).filter(Boolean);
-
-    return parsed;
+    return rawBlocks.map(block => this._processBlock(block, config)).filter(Boolean);
   }
 
-  static _parseTransactionBlock(lines) {
-    const firstLine = lines[0];
-    const match = firstLine.match(this.VTB_ROW_START);
+  static _processBlock(lines, config) {
+    // Извлекаем поля через правила конкретного банка
+    const data = config.extract(lines);
+    if (!data || !data.date || !data.amount) return null;
 
-    let txDate = '', rawIncome = '+0,00', rawExpense = '-0,00', opTitle = '';
+    const fullText = lines.join(' ');
+    const merchant = data.merchant || 'Банковская операция';
 
-    if (match) {
-      txDate = match[1];
-      opTitle = match[3];
-      rawIncome = match[4];
-      rawExpense = match[5];
-    } else {
-      const dateMatch = firstLine.match(this.DATE_PREFIX);
-      if (!dateMatch) return null;
-      txDate = dateMatch[1];
-      const amounts = firstLine.match(/([+-]?\s*[\d\s]+[.,]\d{2})/g) || [];
+    // Универсальная проверка на перевод / наличные
+    const isTransfer = this._checkIfTransfer(fullText, merchant, config);
+
+    // Нормализация даты в YYYY-MM-DD
+    let isoDate = data.date;
+    if (data.date.includes('.')) {
+      const [d, m, y] = data.date.split('.');
+      isoDate = `${y.length === 2 ? '20' + y : y}-${m}-${d}`;
+    }
+
+    // Динамическая категоризация через базу Firebase
+    const category = StatementCategorizer.categorize(merchant, `${data.hint || ''} ${fullText}`, data.type);
+
+    return {
+      date: isoDate,
+      displayDate: data.date,
+      type: data.type,
+      amount: data.amount,
+      merchant: merchant,
+      category: category,
+      isTransfer: isTransfer,
+      bank: config.name,
+      rawDetails: fullText
+    };
+  }
+
+  static _checkIfTransfer(fullText, merchant, config) {
+    const text = `${fullText} ${merchant}`.toLowerCase();
+    const hasUniversal = UNIVERSAL_TRANSFER_KEYWORDS.some(kw => text.includes(kw));
+    const hasCustom = config.customTransferCheck ? config.customTransferCheck(text) : false;
+    return hasUniversal || hasCustom;
+  }
+
+  static _isServiceLine(line, config) {
+    const l = line.toLowerCase();
+    const isCommon = COMMON_SERVICE_LINES.some(kw => l.includes(kw));
+    const isCustom = config.isServiceLine ? config.isServiceLine(l) : false;
+    return isCommon || isCustom;
+  }
+}
+
+// =============================================================
+// 2. РЕЕСТР БАНКОВ (КАЖДЫЙ БАНК — ПРОСТОЙ ОБЪЕКТ НАСТРОЕК)
+// =============================================================
+
+const BANK_REGISTRY = [
+  // --- СБЕРБАНК ---
+  {
+    id: 'SBER',
+    name: 'Сбербанк',
+    slug: 'sberbank',
+    badgeColor: 'bg-emerald-900/60 text-emerald-300 border-emerald-700/60',
+    detect: (p) => p.includes('sberbank.ru') || p.includes('сбербанк онлайн') || p.includes('пао сбербанк') || p.includes('выписка по платёжному счёту'),
+    isTxStart: (l) => /^(\d{2}\.\d{2}\.\d{4})\s+\d{2}:\d{2}/.test(l) && !/^\d{2}\.\d{2}\.\d{4}\s+\d{6}/.test(l),
+    extract: (lines) => {
+      const first = lines[0];
+      const dMatch = first.match(/^(\d{2}\.\d{2}\.\d{4})/);
+      const after = first.replace(/^(\d{2}\.\d{2}\.\d{4})\s+\d{2}:\d{2}\s+/, '');
+      const amounts = after.match(/([+-]?\s*[\d\s]+[.,]\d{2})/g) || [];
+      const rawAmount = amounts[0] || '0';
+      const type = rawAmount.includes('+') ? 'Доход' : 'Расход';
+
+      let sberCat = after;
+      amounts.forEach(a => sberCat = sberCat.replace(a, ''));
+      sberCat = sberCat.trim();
+
+      let merchant = sberCat;
+      if (lines.length > 1) {
+        let desc = lines[1].replace(/^\d{2}\.\d{2}\.\d{4}\s+\d+\s*/, '')
+                           .replace(/\.?\s*(Операция|Перевод)\s+по.*$/i, '')
+                           .trim();
+        if (desc) merchant = desc;
+      }
+      return { date: dMatch[1], amount: cleanAmount(rawAmount), type, merchant, hint: sberCat };
+    }
+  },
+
+  // --- ГАЗПРОМБАНК ---
+  {
+    id: 'GPB',
+    name: 'Газпромбанк',
+    slug: 'gazprombank',
+    badgeColor: 'bg-blue-900/60 text-blue-300 border-blue-700/60',
+    detect: (p) => p.includes('газпромбанк') || p.includes('банк гпб') || (p.includes('дата отражения') && p.includes('содержание операции')),
+    isTxStart: (l) => /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})/.test(l),
+    extract: (lines) => {
+      const first = lines[0];
+      const dMatch = first.match(/^(\d{2}\.\d{2}\.\d{4})/);
+      const amounts = first.match(/([+-]?\s*[\d\s]+[.,]\d{2})/g) || [];
+      let inc = 0, exp = 0;
       if (amounts.length >= 2) {
-        rawIncome = amounts[amounts.length - 2];
-        rawExpense = amounts[amounts.length - 1];
+        inc = cleanAmount(amounts[amounts.length - 2]);
+        exp = cleanAmount(amounts[amounts.length - 1]);
       } else if (amounts.length === 1) {
-        rawExpense = amounts[0];
+        exp = cleanAmount(amounts[0]);
       }
+      const type = (exp === 0 && inc > 0) ? 'Доход' : 'Расход';
+      const amount = type === 'Доход' ? inc : exp;
+
+      const full = lines.join(' ');
+      const dev = full.match(/Устройство:\s*([^.]+?)(?:\.\s*Город|\.\s*Сумма|\.|$)/i);
+      const sbp = full.match(/Перевод\s+(?:по\s+СБП|клиенту|от)\s+([^.]+?)(?:\.|$)/i);
+      let merchant = dev ? dev[1].trim() : (sbp ? sbp[0].trim() : first.replace(/^(\d{2}\.\d{2}\.\d{4}\s*){1,2}/, '').replace(/([+-]?\s*[\d\s]+[.,]\d{2})/g, '').replace(/Операция:\s*/i, '').trim());
+
+      return { date: dMatch[1], amount, type, merchant };
     }
+  },
 
-    const incomeVal = this._parseAmount(rawIncome);
-    const expenseVal = this._parseAmount(rawExpense);
+  // --- ЯНДЕКС БАНК ---
+  {
+    id: 'YANDEX',
+    name: 'Яндекс Банк',
+    slug: 'yandexbank',
+    badgeColor: 'bg-amber-900/60 text-amber-300 border-amber-700/60',
+    detect: (p) => p.includes('yabank.yandex.ru') || p.includes('ао «яндекс банк»') || (p.includes('яндекс') && p.includes('в рамках договора открыт счёт')),
+    isTxStart: (l) => /\d{2}\.\d{2}\.\d{4}/.test(l) && /[\d\s\xa0]+[.,]\d{2}\s*₽/.test(l),
+    isServiceLine: (l) => (l.includes('операции') && l.includes('мск')) || (l.includes('обработки') && l.includes('договора')),
+    extract: (lines) => {
+      const first = lines[0];
+      const dMatch = first.match(/\d{2}\.\d{2}\.\d{4}/);
+      const amounts = first.match(/([+−–—\-\u2012\u2013\u2014\u2212]?\s*[\d\s\xa0]+[.,]\d{2})\s*₽/g) || [];
+      const raw = amounts[0] || '0';
+      const type = raw.includes('+') ? 'Доход' : 'Расход';
 
-    let type = 'Расход';
-    let amount = expenseVal;
+      let part1 = first.split(/\d{2}\.\d{2}\.\d{4}/)[0].replace(/^Оплата товаров и услуг\s*/i, '').trim();
+      let part2 = lines.slice(1).map(l => l.replace(/в\s+\d{2}:\d{2}/i, '').replace(/\d{2}\.\d{2}\.\d{4}/g, '').replace(/\*\d{4}/g, '').replace(/[\d\s\xa0]+[.,]\d{2}\s*₽/g, '').trim()).filter(Boolean).join(' ');
+      let merchant = `${part1} ${part2}`.replace(/^Оплата товаров и услуг\s*/i, '').replace(/\b(операции|обработки|договора|мск|карты|валюте)\b/gi, '').replace(/\s+/g, ' ').trim() || 'Операция Яндекс Банк';
 
-    if (expenseVal === 0 && incomeVal > 0) {
-      type = 'Доход';
-      amount = incomeVal;
-    } else if (expenseVal > 0) {
-      type = 'Расход';
-      amount = expenseVal;
+      return { date: dMatch[0], amount: cleanAmount(raw), type, merchant };
     }
+  },
 
-    const fullText = lines.join(' ');
-    const merchant = this._extractMerchant(lines, fullText, opTitle);
+  // --- ОЗОН БАНК ---
+  {
+    id: 'OZON',
+    name: 'Озон Банк',
+    slug: 'ozonbank',
+    badgeColor: 'bg-sky-900/60 text-sky-300 border-sky-700/60',
+    detect: (p) => p.includes('ооо «озон банк»') || p.includes('справка о движении средств') || (p.includes('ozon') && p.includes('лицензия банка россии')),
+    isTxStart: (l) => /^\d{2}\.\d{2}\.\d{4}/.test(l),
+    extract: (lines) => {
+      const first = lines[0];
+      const dMatch = first.match(/(\d{2}\.\d{2}\.\d{4})/);
+      const full = lines.join(' ');
+      const amounts = full.match(/([+−–—\-\u2012\u2013\u2014\u2212]\s*[\d\s\xa0]+[.,]\d{2})/g) || [];
+      const raw = amounts[0] || '0';
+      const type = raw.includes('+') ? 'Доход' : 'Расход';
 
-    // Проверка: является ли операция переводом (СБП, между своими счетами)
-    const isTransfer = this._isTransferOperation(fullText, merchant);
-
-    const [d, m, y] = txDate.split('.');
-    const isoDate = `${y}-${m}-${d}`;
-
-    return {
-      date: isoDate,
-      displayDate: txDate,
-      type,
-      amount,
-      merchant,
-      isTransfer,
-      bank: 'Газпромбанк',
-      rawDetails: fullText
-    };
-  }
-
-  static _isTransferOperation(fullText, merchant) {
-    const text = (fullText + ' ' + merchant).toLowerCase();
-    return text.includes('sbp c2c') ||
-           text.includes('перевод с банк') ||
-           text.includes('перевод на банк') ||
-           text.includes('перевод между') ||
-           text.includes('перевод по сбп') ||
-           text.includes('снятие наличных') ||
-           text.includes('внесение наличных') ||  // <--- добавлено
-           text.includes('взнос наличными') ||    // <--- добавлено
-           text.includes('пополнение наличными') ||
-           text.includes('vb24');
-  }
-
-  static _extractMerchant(lines, fullText, opTitle) {
-    const deviceMatch = fullText.match(/Устройство:\s*([^.]+?)(?:\.\s*Город|\.\s*Сумма|\.|$)/i);
-    if (deviceMatch && deviceMatch[1].trim()) {
-      return deviceMatch[1].trim();
-    }
-
-    const sbpMatch = fullText.match(/Перевод\s+(?:по\s+СБП|клиенту|от)\s+([^.]+?)(?:\.|$)/i);
-    if (sbpMatch) return sbpMatch[0].trim();
-
-    let fallback = opTitle || lines[0];
-    fallback = fallback.replace(/^(\d{2}\.\d{2}\.\d{4}\s*){1,2}/, '')
-                       .replace(/([+-]?\s*[\d\s]+[.,]\d{2})/g, '')
-                       .replace(/Операция:\s*/i, '')
-                       .trim();
-
-    return fallback || 'Банковская операция';
-  }
-
-  static _parseAmount(str) {
-    if (!str) return 0;
-    const clean = str.replace(/[^\d.,]/g, '').replace(',', '.');
-    return Math.abs(parseFloat(clean)) || 0;
-  }
-
-  static _isServiceLine(line) {
-    const l = line.toLowerCase();
-    return l.includes('дата отражения') ||
-           l.includes('содержание операции') ||
-           l.includes('денежных средств') ||
-           l.includes('страница') ||
-           l.includes('входящий остаток') ||
-           l.includes('исходящий остаток') ||
-           l.includes('обороты за период');
-  }
-}
-
-// -------------------------------------------------------------
-// ПАРСЕР ЯНДЕКС БАНКА
-// -------------------------------------------------------------
-class YandexBankParser {
-  // Строка операции в Яндексе всегда содержит дату DD.MM.YYYY и сумму со знаком (+ или −) и символом ₽
-  static DATE_REGEX = /\d{2}\.\d{2}\.\d{4}/;
-  static AMOUNT_REGEX = /[\d\s\xa0]+[.,]\d{2}\s*₽/;
-  static parse(rawLines, options = { excludeTransfers: true }) {
-    const rawBlocks = [];
-    let currentBlock = null;
-
-    for (let line of rawLines) {
-      line = line.trim();
-      if (!line || this._isServiceLine(line)) continue;
-
-      // Новая операция начинается со строки, где есть и дата, и сумма
-      const isTxStart = this.DATE_REGEX.test(line) && this.AMOUNT_REGEX.test(line);
-
-      if (isTxStart) {
-        if (currentBlock) rawBlocks.push(currentBlock);
-        currentBlock = [line];
-      } else if (currentBlock) {
-        currentBlock.push(line);
+      let merchant = 'Операция Озон Банк';
+      const pos = full.match(/(?:сумма\s*[\d.]+\s*в|\bв)\s+([\s\S]+?)\s+дата\s*\d{4}/i);
+      if (pos && pos[1].trim()) {
+        merchant = pos[1].replace(/\s+(RU|RUS)$/i, '').replace(/\s+/g, ' ').trim();
+      } else if (/выплата\s+к[еэ]шб[еэ]ка/i.test(full)) {
+        merchant = 'Кэшбек Ozon';
+      } else if (/возврат/i.test(full)) {
+        const o = full.match(/заказ\s*№?\s*([0-9a-zA-Z-]+)/i);
+        merchant = o ? `Возврат Ozon (${o[0]})` : 'Возврат покупки';
+      } else if (/ozon\s*travel/i.test(full)) {
+        const o = full.match(/заказ\s*№?\s*([0-9a-zA-Z-]+)/i);
+        merchant = o ? `Ozon Travel (${o[0]})` : 'Ozon Travel';
+      } else if (/платформе\s+ozon|оплата.*ozon/i.test(full)) {
+        const o = full.match(/заказ\s*№?\s*([0-9a-zA-Z-]+)/i);
+        merchant = o ? `Ozon (${o[0]})` : 'Ozon';
+      } else if (/перевод.*сбп/i.test(full)) {
+        const s = full.match(/(?:Отправитель|Получатель):\s*([^.]*?)(?:Без НДС|$)/i);
+        merchant = s ? `Перевод СБП (${s[1].trim()})` : 'Перевод через СБП';
       }
+
+      return { date: dMatch[1], amount: cleanAmount(raw), type, merchant };
     }
-    if (currentBlock) rawBlocks.push(currentBlock);
-
-    const parsed = rawBlocks.map(block => this._parseTransactionBlock(block)).filter(Boolean);
-
-    return parsed;
   }
-
-  static _parseTransactionBlock(lines) {
-    const firstLine = lines[0];
-
-    // 1. Извлекаем дату (берем первую дату — дату операции)
-    const dateMatch = firstLine.match(this.DATE_REGEX);
-    if (!dateMatch) return null;
-    const txDate = dateMatch[0];
-
-    // 2. Извлекаем сумму (с учетом типографского минуса −)
-    const amountMatches = firstLine.match(/([+−–—\-\u2012\u2013\u2014\u2212]?\s*[\d\s\xa0]+[.,]\d{2})\s*₽/g) || [];
-    if (amountMatches.length === 0) return null;
-
-    const rawAmount = amountMatches[0];
-    const isIncome = rawAmount.includes('+');
-    const type = isIncome ? 'Доход' : 'Расход';
-    
-    // Очищаем сумму в число
-    const cleanNum = rawAmount.replace(/[+−\-]/g, '').replace(/[^\d.,]/g, '').replace(',', '.');
-    const amount = Math.abs(parseFloat(cleanNum)) || 0;
-
-    // 3. Извлекаем описание (в первой строке всё, что идёт ДО даты)
-    const beforeDate = firstLine.split(this.DATE_REGEX)[0].trim();
-    const fullText = lines.join(' ');
-    
-    // Чистим мерчанта
-    const merchant = this._extractMerchant(beforeDate, lines);
-
-    // 4. Фильтрация переводов
-    const isTransfer = this._isTransferOperation(fullText, merchant);
-
-    // 5. Дата в YYYY-MM-DD
-    const [d, m, y] = txDate.split('.');
-    const isoDate = `${y}-${m}-${d}`;
-
-    // 6. Категоризация по нашей базе
-    const category = StatementCategorizer.categorize(merchant, fullText, type);
-
-    return {
-      date: isoDate,
-      displayDate: txDate,
-      type,
-      amount,
-      merchant,
-      category,
-      isTransfer,
-      bank: 'Яндекс Банк',
-      rawDetails: fullText
-    };
-  }
-
-  static _extractMerchant(beforeDate, lines) {
-    let part1 = beforeDate.replace(/^Оплата товаров и услуг\s*/i, '').trim();
-
-    let part2 = lines.slice(1).map(line => {
-      return line.replace(/в\s+\d{2}:\d{2}/i, '')
-                 .replace(/\d{2}\.\d{2}\.\d{4}/g, '')
-                 .replace(/\*\d{4}/g, '')
-                 .replace(/[\d\s\xa0]+[.,]\d{2}\s*₽/g, '')
-                 .trim();
-    }).filter(Boolean).join(' ');
-
-    let fullMerchant = `${part1} ${part2}`.replace(/^Оплата товаров и услуг\s*/i, '').trim();
-
-    // Зачищаем служебные слова от разорванных шапок страниц Яндекса
-    fullMerchant = fullMerchant
-      .replace(/\b(операции|обработки|договора|мск|карты|валюте)\b/gi, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    return fullMerchant || 'Операция Яндекс Банк';
-  }
-
-  static _isTransferOperation(fullText, merchant) {
-    const text = `${fullText} ${merchant}`.toLowerCase();
-    return text.includes('перевод') ||
-           text.includes('сбп') ||
-           text.includes('между счетами') ||
-           text.includes('внесение') ||           // <--- добавлено
-           text.includes('наличными');
-  }
-
-  static _isServiceLine(line) {
-    const l = line.toLowerCase();
-    return l.includes('выписка по договору') ||
-           l.includes('описание операции') ||
-           l.includes('дата и время') ||
-           l.includes('дата обработки') ||
-           l.includes('сумма в валюте') ||
-           l.includes('входящий остаток') ||
-           l.includes('исходящий остаток') ||
-           l.includes('всего расходных') ||
-           l.includes('всего приходных') ||
-           l.includes('с уважением') ||
-           l.includes('в рамках договора') ||
-           l.includes('продолжение на') ||
-           l.includes('страница') ||
-           l.includes('номер счёта') ||
-           (l.includes('операции') && l.includes('мск')) ||      // шапка страницы
-           (l.includes('обработки') && l.includes('договора'));   // шапка страницы
-  }
-}
-
-// -------------------------------------------------------------
-// ПАРСЕР СБЕРБАНКА
-// -------------------------------------------------------------
-class SberbankParser {
-  static ROW_START = /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2})\s+(.+)$/;
-
-  static parse(rawLines, options = { excludeTransfers: true }) {
-    const rawBlocks = [];
-    let currentBlock = null;
-
-    for (let line of rawLines) {
-      line = line.trim();
-      if (!line || this._isServiceLine(line)) continue;
-
-      const isTxStart = this.ROW_START.test(line) && !/^\d{2}\.\d{2}\.\d{4}\s+\d{6}/.test(line);
-
-      if (isTxStart) {
-        if (currentBlock) rawBlocks.push(currentBlock);
-        currentBlock = [line];
-      } else if (currentBlock) {
-        currentBlock.push(line);
-      }
-    }
-    if (currentBlock) rawBlocks.push(currentBlock);
-
-    const parsed = rawBlocks.map(block => this._parseTransactionBlock(block)).filter(Boolean);
-
-    return parsed;
-  }
-
-  static _parseTransactionBlock(lines) {
-    const firstLine = lines[0];
-    const match = firstLine.match(this.ROW_START);
-    if (!match) return null;
-
-    const txDate = match[1];
-    const afterDateTime = match[3];
-
-    const amounts = afterDateTime.match(/([+-]?\s*[\d\s]+[.,]\d{2})/g) || [];
-    if (amounts.length === 0) return null;
-
-    const rawAmount = amounts[0];
-    const isIncome = rawAmount.includes('+');
-    const type = isIncome ? 'Доход' : 'Расход';
-    const amount = Math.abs(parseFloat(rawAmount.replace(/[^\d.,]/g, '').replace(',', '.'))) || 0;
-
-    // Категория от самого Сбербанка (например: "Отдых и развлечения", "Рестораны и кафе")
-    let sberCategory = afterDateTime;
-    amounts.forEach(a => sberCategory = sberCategory.replace(a, ''));
-    sberCategory = sberCategory.trim();
-
-    const fullText = lines.join(' ');
-    const merchant = this._extractMerchant(lines, sberCategory);
-
-    // Проверка: перевод, закрытие вклада или брокерский счет
-    const isTransfer = this._isTransferOperation(sberCategory, fullText, merchant);
-
-    const [d, m, y] = txDate.split('.');
-    const isoDate = `${y}-${m}-${d}`;
-
-    // Приоритетная категоризация с учетом категорий Сбера
-    const category = this._determineCategory(sberCategory, merchant, fullText, type);
-
-    return {
-      date: isoDate,
-      displayDate: txDate,
-      type,
-      amount,
-      merchant,
-      category,
-      isTransfer,
-      bank: 'Сбербанк',
-      rawDetails: fullText
-    };
-  }
-
-  static _determineCategory(sberCat, merchant, fullText, type) {
-    const sberLower = sberCat.toLowerCase();
-
-    // 1. Прямой маппинг родных категорий Сбера
-    if (sberLower.includes('отдых и развлечения')) return 'Развлечения';
-    if (sberLower.includes('рестораны и кафе') || sberLower.includes('кафе и рестораны')) return 'Кафе и рестораны';
-    if (sberLower.includes('супермаркеты')) return 'Продукты';
-    if (sberLower.includes('транспорт')) return 'Транспорт';
-    if (sberLower.includes('коммунальные') || sberLower.includes('жилье')) return 'Жилье';
-
-    // 2. Если у Сбера "Прочие операции/расходы" — используем наш общий классификатор
-    return StatementCategorizer.categorize(merchant, `${sberCat} ${fullText}`, type);
-  }
-
-  static _extractMerchant(lines, sberCategory) {
-    if (lines.length > 1) {
-      // Убираем дату проводки и код авторизации
-      let descLine = lines[1].replace(/^\d{2}\.\d{2}\.\d{4}\s+\d+\s*/, '');
-      // Убираем технические хвосты "Операция по карте...", "Операция по счету..."
-      descLine = descLine.replace(/\.?\s*Операция\s+по.*$/i, '')
-                         .replace(/\.?\s*Перевод\s+по.*$/i, '')
-                         .trim();
-      if (descLine) return descLine;
-    }
-    return sberCategory || 'Операция Сбербанк';
-  }
-
-  static _isTransferOperation(sberCategory, fullText, merchant) {
-    const text = `${sberCategory} ${fullText} ${merchant}`.toLowerCase();
-    return text.includes('перевод') ||
-           text.includes('сбп') ||
-           text.includes('vklad-karta') ||
-           text.includes('karta-vklad') ||
-           text.includes('bpwww') ||
-           text.includes('брокер') ||
-           text.includes('внесение наличных') ||  // <--- добавлено
-           text.includes('зачисление наличных') || // <--- добавлено
-           text.includes('взнос наличными');
-  }
-
-  static _isServiceLine(line) {
-    const l = line.toLowerCase();
-    return l.includes('выписка по платёжному счёту') ||
-           l.includes('расшифровка операций') ||
-           l.includes('дата операции') ||
-           l.includes('сумма в валюте') ||
-           l.includes('остаток средств') ||
-           l.includes('страница') ||
-           l.includes('продолжение на следующей странице') ||
-           l.includes('для проверки подлинности') ||
-           l.includes('действителен до') ||
-           l.includes('итого по операциям');
-  }
-}
-
-// -------------------------------------------------------------
-// ПАРСЕР ОЗОН БАНКА
-// -------------------------------------------------------------
-class OzonBankParser {
-  // Начало операции: любая строка, начинающаяся с даты ДД.ММ.ГГГГ
-  static ROW_START = /^\d{2}\.\d{2}\.\d{4}/;
-
-  static parse(rawLines) {
-    const rawBlocks = [];
-    let currentBlock = null;
-
-    for (let line of rawLines) {
-      line = line.trim();
-      if (!line || this._isServiceLine(line)) continue;
-
-      if (this.ROW_START.test(line)) {
-        if (currentBlock) rawBlocks.push(currentBlock);
-        currentBlock = [line];
-      } else if (currentBlock) {
-        currentBlock.push(line);
-      }
-    }
-    if (currentBlock) rawBlocks.push(currentBlock);
-
-    return rawBlocks.map(block => this._parseTransactionBlock(block)).filter(Boolean);
-  }
-
-  static _parseTransactionBlock(lines) {
-    const firstLine = lines[0];
-    const dateMatch = firstLine.match(/(\d{2}\.\d{2}\.\d{4})/);
-    if (!dateMatch) return null;
-
-    const txDate = dateMatch[1];
-    const fullText = lines.join(' ');
-
-    // Ищем сумму: обязательный знак (+ или -), число с копейками, а знак ₽ делаем необязательным
-    const amounts = fullText.match(/([+−–—\-\u2012\u2013\u2014\u2212]\s*[\d\s\xa0]+[.,]\d{2})/g) || [];
-    if (amounts.length === 0) return null;
-
-    const rawAmount = amounts[0];
-    const isIncome = rawAmount.includes('+');
-    const type = isIncome ? 'Доход' : 'Расход';
-
-    const cleanNum = rawAmount.replace(/[^\d.,]/g, '').replace(',', '.');
-    const amount = Math.abs(parseFloat(cleanNum)) || 0;
-
-    // Извлекаем понятное имя мерчанта
-    const merchant = this._extractMerchant(fullText);
-
-    // Проверка на перевод (СБП, пополнение)
-    const isTransfer = this._isTransferOperation(fullText, merchant);
-
-    const [d, m, y] = txDate.split('.');
-    const isoDate = `${y}-${m}-${d}`;
-
-    const category = StatementCategorizer.categorize(merchant, fullText, type);
-
-    return {
-      date: isoDate,
-      displayDate: txDate,
-      type,
-      amount,
-      merchant,
-      category,
-      isTransfer,
-      bank: 'Озон Банк',
-      rawDetails: fullText
-    };
-  }
-
- static _extractMerchant(fullText) {
-    // 1. Покупки картой в магазинах/терминалах: "в [ТОЧКА] дата [ДАТА]"
-    // Вырезаем название точки между "сумма ... в" и "дата 202X"
-    const posMatch = fullText.match(/(?:сумма\s*[\d.]+\s*в|\bв)\s+([\s\S]+?)\s+дата\s*\d{4}/i);
-    if (posMatch && posMatch[1].trim()) {
-      let store = posMatch[1].trim();
-      // Убираем хвостики страны (RU, RUS) и лишние пробелы
-      return store.replace(/\s+(RU|RUS)$/i, '').replace(/\s+/g, ' ').trim();
-    }
-
-    // 2. Возвраты
-    if (/возврат/i.test(fullText)) {
-      const orderMatch = fullText.match(/заказ\s*№?\s*([0-9-]+)/i);
-      return orderMatch ? `Возврат Ozon (${orderMatch[0]})` : 'Возврат покупки';
-    }
-
-    // 3. Покупки на маркетплейсе Ozon
-    if (/платформе\s+ozon/i.test(fullText) || /оплата.*ozon/i.test(fullText)) {
-      const orderMatch = fullText.match(/заказ\s*№?\s*([0-9-]+)/i);
-      return orderMatch ? `Ozon (${orderMatch[0]})` : 'Ozon';
-    }
-
-    // 4. Переводы СБП
-    if (/перевод.*сбп/i.test(fullText)) {
-      const senderMatch = fullText.match(/Отправитель:\s*([^.]*?)(?:Без НДС|$)/i);
-      return senderMatch ? `Перевод СБП (${senderMatch[1].trim()})` : 'Перевод через СБП';
-    }
-
-    // Резервная очистка
-    let clean = fullText.replace(/^(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}:\d{2}\s+\d+\s*)/, '')
-                        .replace(/Оплата товаров(\/услуг)?\s*(по карте \d+)?\s*(на\s*)?/i, '')
-                        .replace(/Без НДС\.?/i, '')
-                        .replace(/([+−–—\-\u2012\u2013\u2014\u2212]?\s*[\d\s\xa0]+[.,]\d{2}\s*₽)/g, '')
-                        .trim();
-
-    return clean || 'Операция Озон Банк';
-  } 
-
-  static _isTransferOperation(fullText, merchant) {
-    const text = `${fullText} ${merchant}`.toLowerCase();
-    return text.includes('перевод') ||
-           text.includes('сбп') ||
-           text.includes('отправитель:') ||
-           text.includes('внесение наличных') ||  // <--- добавлено
-           text.includes('пополнение наличными');
-  }
-
-  static _isServiceLine(line) {
-    const l = line.toLowerCase();
-    return l.includes('справка о движении средств') ||
-           l.includes('ооо «озон банк»') ||
-           l.includes('лицензия банка россии') ||
-           l.includes('владелец:') ||
-           l.includes('номер лицевого счёта') ||
-           l.includes('период выписки') ||
-           l.includes('входящий остаток') ||
-           l.includes('дата операции') ||
-           l.includes('назначение платежа') ||
-           l.includes('сумма операции') ||
-           l.includes('российские рубли') ||
-           l.includes('страница');
-  }
-}
-
-class BankDetector {
-  static detect(rawLines) {
-    // Берем первые 40 строк документа для анализа шапки
-    const preview = rawLines.slice(0, 40).join(' ').toLowerCase();
-
-    // 1. Сбербанк (ищем реквизиты эмитента)
-    if (preview.includes('sberbank.ru') || 
-        preview.includes('сбербанк онлайн') || 
-        preview.includes('пао сбербанк') || 
-        preview.includes('выписка по платёжному счёту')) {
-      return 'SBER';
-    }
-
-    // 2. Озон Банк (только официальные реквизиты Озона в шапке)
-    if (preview.includes('ооо «озон банк»') || 
-        preview.includes('справка о движении средств') || 
-        (preview.includes('ozon') && preview.includes('лицензия банка россии'))) {
-      return 'OZON';
-    }
-
-    // 3. Яндекс Банк (реквизиты договора и сайта)
-    if (preview.includes('yabank.yandex.ru') || 
-        preview.includes('ао «яндекс банк»') || 
-        (preview.includes('яндекс') && preview.includes('в рамках договора открыт счёт'))) {
-      return 'YANDEX';
-    }
-
-    // 4. Газпромбанк
-    if (preview.includes('газпромбанк') || 
-        preview.includes('банк гпб') || 
-        (preview.includes('дата отражения') && preview.includes('содержание операции'))) {
-      return 'GPB';
-    }
-
-    return 'UNKNOWN';
-  }
-}
-
+];
+
+// =============================================================
+// 3. ДИСПЕТЧЕР (НАХОДИТ БАНК И ЗАПУСКАЕТ ПАРСИНГ)
+// =============================================================
 class StatementDispatcher {
   static parse(rawLines) {
-    const bankCode = BankDetector.detect(rawLines);
+    const preview = rawLines.slice(0, 40).join(' ').toLowerCase();
+    
+    // Ищем подходящий банк в реестре
+    const config = BANK_REGISTRY.find(bank => bank.detect(preview));
 
-    if (bankCode === 'UNKNOWN') {
-      throw new Error('Банк не поддерживается. На данный момент доступны: Газпромбанк, Сбербанк, Яндекс Банк и Озон Банк.');
+    if (!config) {
+      const supported = BANK_REGISTRY.map(b => b.name).join(', ');
+      throw new Error(`Банк не поддерживается. На данный момент доступны: ${supported}.`);
     }
 
-    switch (bankCode) {
-        case 'OZON':
-        return { bankName: 'Озон Банк', transactions: OzonBankParser.parse(rawLines) };
-      case 'YANDEX':
-        return { bankName: 'Яндекс Банк', transactions: YandexBankParser.parse(rawLines, { excludeTransfers: true }) };
-      case 'SBER':
-        return { bankName: 'Сбербанк', transactions: SberbankParser.parse(rawLines, { excludeTransfers: true }) };
-      case 'GPB':
-      default:
-        return { bankName: 'Газпромбанк', transactions: GazprombankParser.parse(rawLines, { excludeTransfers: true }) };
-    }
+    const transactions = UniversalStatementParser.parse(rawLines, config);
+    return { bank: config, transactions };
   }
 }
 
@@ -736,14 +394,11 @@ async function handleStatementUpload(event) {
     // 1. Вытягиваем строки
     const lines = await StatementExtractor.extractLinesFromPDF(file);
 
-    // 2. Формируем таблицу операций
     const result = StatementDispatcher.parse(lines);
+    renderParsedTransactionsView(file.name, result.transactions, result.bank);
 
     event.target.value = '';
     document.getElementById('toast-container').classList.add('hidden');
-
-    // 3. Отображаем результат Шага 2 в модальном окне
-    renderParsedTransactionsView(file.name, result.transactions, result.bankName);
 
   } catch (err) {
     console.error('Ошибка обработки PDF:', err);
@@ -779,8 +434,8 @@ function isTransactionDuplicate(tx) {
 // -------------------------------------------------------------
 // ОБНОВЛЕННЫЙ РЕНДЕР КАРТОЧЕК И ВЫБОРА КАТЕГОРИЙ
 // -------------------------------------------------------------
-function renderParsedTransactionsView(fileName, transactions, bankName = 'Банк') {
-  window._lastParsedBankName = bankName;
+function renderParsedTransactionsView(fileName, transactions, bankConfig) {
+  window._lastActiveBank = bankConfig; // Сохраняем весь конфиг банка
 
   // Сортировка от самых свежих к старым (по убыванию даты)
   transactions.sort((a, b) => b.date.localeCompare(a.date));
@@ -814,14 +469,8 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
     const totalExp = selectedTxs.filter(t => t.type === 'Расход').reduce((s, t) => s + t.amount, 0);
     const totalInc = selectedTxs.filter(t => t.type === 'Доход').reduce((s, t) => s + t.amount, 0);
 
-    let bankBadgeColor = 'bg-blue-900/60 text-blue-300 border-blue-700/60';
-    if (bankName === 'Сбербанк') {
-      bankBadgeColor = 'bg-emerald-900/60 text-emerald-300 border-emerald-700/60';
-    } else if (bankName === 'Яндекс Банк') {
-      bankBadgeColor = 'bg-amber-900/60 text-amber-300 border-amber-700/60'; // Фирменный жёлто-янтарный цвет
-    } else if (bankName === 'Озон Банк') {
-      bankBadgeColor = 'bg-sky-900/60 text-sky-300 border-sky-700/60';
-    }
+    const bankBadgeColor = bankConfig.badgeColor || 'bg-blue-900/60 text-blue-300 border-blue-700/60';
+    const bankName = bankConfig.name || 'Банк';
     
     info.innerHTML = `
       <div class="flex items-center gap-2 mb-1 min-w-0">
@@ -1087,11 +736,7 @@ function downloadParsedJSON() {
     return;
   }
 
-  // Определяем префикс файла по банку
-  let bankPrefix = 'gazprombank';
-  if (window._lastParsedBankName === 'Сбербанк') bankPrefix = 'sberbank';
-  if (window._lastParsedBankName === 'Яндекс Банк') bankPrefix = 'yandexbank';
-  if (window._lastParsedBankName === 'Озон Банк') bankPrefix = 'ozonbank';
+  const slug = window._lastActiveBank?.slug || 'statement';
   const today = new Date().toISOString().slice(0, 10);
 
   const jsonStr = JSON.stringify(window._lastParsedTransactions, null, 2);
@@ -1100,7 +745,7 @@ function downloadParsedJSON() {
 
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${bankPrefix}_parsed_${today}.json`;
+  a.download = `${slug}_parsed_${today}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
