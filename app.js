@@ -26,61 +26,19 @@ function getUserCol(table) {
 }
 window.getUserCol = getUserCol;
 
-// Проверка и автоматический мягкий перенос существующих данных в личный профиль
-async function checkAndMigrateExistingData(user) {
+// Инициализация профиля ТОЛЬКО если это совершенно новый пользователь
+async function initNewUserIfNeeded(user) {
   try {
     const userDocRef = db.collection('users').doc(user.uid);
     const userDoc = await userDocRef.get();
 
-    // Если аккаунт уже мигрирован или инициализирован — выходим
-    if (userDoc.exists && userDoc.data()?.migrated) {
-      return;
-    }
+    // Пользователь уже зарегистрирован и настроен — сразу выходим
+    if (userDoc.exists) return;
 
-    // Проверяем: есть ли уже данные в личной папке?
-    const personalTx = await getUserCol('Transactions').limit(1).get();
-    if (!personalTx.empty) {
-      await userDocRef.set({ migrated: true }, { merge: true });
-      return;
-    }
-
-    // Проверяем старую общую базу в корне
-    const rootTx = await db.collection('Transactions').limit(1).get();
-
-    if (!rootTx.empty) {
-      // Это ты (владелец старых данных)! Копируем все коллекции в личную ветку
-      showToast('Перенос ваших данных в личный профиль...', false, true);
-      const tables = ['Transactions', 'Deposits', 'Broker', 'Goals', 'Categories', 'CategoryRules'];
-
-      for (const table of tables) {
-        const snap = await db.collection(table).get();
-        if (!snap.empty) {
-          const docs = snap.docs;
-          const CHUNK = 400;
-          for (let i = 0; i < docs.length; i += CHUNK) {
-            const batch = db.batch();
-            docs.slice(i, i + CHUNK).forEach(d => {
-              batch.set(getUserCol(table).doc(d.id), d.data());
-            });
-            await batch.commit();
-          }
-        }
-      }
-
-      await userDocRef.set({
-        migrated: true,
-        displayName: user.displayName || user.email?.split('@')[0] || 'Пользователь',
-        email: user.email || '',
-        migratedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-
-      showToast('Все ваши данные успешно перенесены в профиль!');
-    } else {
-      // Новый пользователь: инициализируем стартовые категории и правила
-      await seedNewUserInitialData(user);
-    }
+    // Новый аккаунт: создаем профиль и начальные категории со словарем
+    await seedNewUserInitialData(user);
   } catch (e) {
-    console.error('Ошибка миграции данных:', e);
+    console.error('Ошибка инициализации профиля:', e);
   }
 }
 
@@ -281,8 +239,7 @@ auth.onAuthStateChanged(async user => {
     document.getElementById('login-screen').classList.add('hidden');
     switchTab('transactions');
     
-    // Запускаем перенос данных (сработает один раз только при первом входе)
-    await checkAndMigrateExistingData(user);
+    await initNewUserIfNeeded(user);
     
     fetchAllData();
   } else {
