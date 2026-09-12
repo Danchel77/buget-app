@@ -634,8 +634,14 @@ async function deleteCategory(name, type) {
   });
 }
 
-document.getElementById('close-manage-categories').addEventListener('click', () => {
+  document.getElementById('close-manage-categories').addEventListener('click', () => {
   document.getElementById('manage-categories-dialog').classList.add('hidden');
+  
+  // Возврат в кабинет, если открывали оттуда
+  if (window._returnToProfile) {
+    window._returnToProfile = false;
+    openProfileModal();
+  }
 });
 
 function updateCategorySelect(containerOrRow, type) {
@@ -2184,3 +2190,17 @@ function applyBrokerVisibility(show) {
 window.openProfileModal = openProfileModal;
 window.closeProfileModal = closeProfileModal;
 window.toggleBrokerSetting = toggleBrokerSetting;
+
+// Память навигации: запоминаем, если окно было вызвано из профиля
+window._returnToProfile = false;
+
+window.openSubModalFromProfile = function(type) {
+  closeProfileModal(); // временно закрываем профиль
+  window._returnToProfile = true; // ставим маячок возврата
+
+  if (type === 'categories') {
+    showManageCategoriesDialog();
+  } else if (type === 'rules') {
+    openRulesEditorModal();
+  }
+};
