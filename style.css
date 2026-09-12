@@ -1190,8 +1190,20 @@ body.selection-mode #goals-list .goal-edit-btn {
   transform: scale(1.08);
 }
 
-/* Отступ трека скролла от верхнего и нижнего закругленного края */
-.custom-dropdown-menu::-webkit-scrollbar-track,
-.tx-category-menu::-webkit-scrollbar-track {
-  margin: 10px 0;
+/* Скрываем серый ползунок в меню, сохраняя плавный скролл пальцем */
+#menu-filter-month,
+#menu-filter-cat,
+.custom-dropdown-menu,
+.tx-category-menu {
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important;
+}
+
+#menu-filter-month::-webkit-scrollbar,
+#menu-filter-cat::-webkit-scrollbar,
+.custom-dropdown-menu::-webkit-scrollbar,
+.tx-category-menu::-webkit-scrollbar {
+  display: none !important; /* Chrome, Safari, Android */
+  width: 0 !important;
+  height: 0 !important;
 }
