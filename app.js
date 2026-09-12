@@ -371,7 +371,12 @@ async function fetchAllData() {
     const processedBroker = processBroker(brData, goalData);
     const catData = catS.docs.map(d => ({ id: d.id, ...d.data() }));
     const categories = processCategories(catData);
+    
+    // БЕРЕЖНО СОХРАНЯЕМ СУЩЕСТВУЮЩИЕ НАСТРОЙКИ (showBroker и т.д.) ИЗ loadUserSettings
+    const existingSettings = (Cache && Cache.settings) ? Cache.settings : {};
+    
     Cache = {
+      settings: existingSettings,
       transactions: processTransactions(txData),
       deposits: processedDeposits,
       broker: processedBroker,
