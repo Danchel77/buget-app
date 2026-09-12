@@ -844,8 +844,7 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
     ).join('');
 
     html += `
-      <div class="bg-gray-900 border ${tx.isDuplicate || tx.isTransfer ? 'border-gray-800 opacity-50' : 'border-gray-700/80'} p-3 rounded-2xl space-y-2">
-        
+      <div class="card-parsed-row bg-gray-900 border ${tx.isDuplicate || tx.isTransfer ? 'border-gray-800/80 bg-gray-900/60' : 'border-gray-700/80'} p-3 rounded-2xl space-y-2 relative" id="card-tx-${tx._id}">
         <!-- СТРОКА 1: Чекбокс, наименование и кнопка запоминания 📌 -->
         <div class="flex items-center justify-between gap-2 min-w-0">
           <div class="flex items-center gap-2.5 min-w-0 flex-1">
@@ -878,28 +877,44 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
           </div>
         </div>
 
-        <!-- СТРОКА 3: Кастомное выпадающее меню слева, сумма справа -->
+        <!-- СТРОКА 3: Кастомное меню (без прозрачности) слева, сумма справа -->
         <div class="flex items-center justify-between gap-2 pt-2 border-t border-gray-800/60">
           
-          <!-- Кастомное всплывающее меню -->
           <div class="relative custom-dropdown-wrap" id="cat-wrap-${tx._id}">
             <button type="button" 
                     onclick="toggleImportCatMenu('${tx._id}')" 
+                    id="cat-btn-${tx._id}"
                     class="w-44 bg-gray-800 border border-gray-700 text-xs text-blue-200 rounded-xl px-2.5 py-1.5 flex items-center justify-between outline-none cursor-pointer hover:border-gray-600 transition-colors">
               <span id="cat-label-${tx._id}" class="truncate">${CATEGORY_ICONS[tx.category] || '📦'} ${escapeHtml(tx.category)}</span>
               <span class="text-gray-400 text-[8px] ml-1">▼</span>
             </button>
             
             <div id="cat-menu-${tx._id}" 
-                 class="custom-dropdown-menu hidden absolute left-0 bottom-full mb-1 sm:bottom-auto sm:top-full sm:mt-1 w-48 max-h-52 overflow-y-auto bg-gray-800/95 backdrop-blur-md border border-gray-700 rounded-xl shadow-2xl z-50 p-1 space-y-0.5">
-              ${cats.map(cat => `
-                <button type="button" 
-                        onclick="selectImportCat('${tx._id}', '${escapeHtml(cat)}')" 
-                        class="w-full text-left px-2.5 py-1.5 text-xs rounded-lg transition-colors flex items-center gap-2 cursor-pointer ${cat === tx.category ? 'bg-blue-600/20 text-blue-300 font-semibold' : 'text-gray-300 hover:bg-gray-700/70'}">
-                  <span>${CATEGORY_ICONS[cat] || '📦'}</span>
-                  <span class="truncate">${escapeHtml(cat)}</span>
+                 class="custom-dropdown-menu hidden absolute left-0 w-48 max-h-56 overflow-y-auto bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-50 p-1 space-y-0.5">
+              ${cats.map(cat => {
+                const defaultList = ['Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Развлечения', 'Другое', 'Зарплата', 'Возврат', 'Кэшбек'];
+                const isCustom = !defaultList.includes(cat);
+                return `
+                  <div class="flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors ${cat === tx.category ? 'bg-blue-600/20 text-blue-300 font-semibold' : 'text-gray-300 hover:bg-gray-700/70'}">
+                    <button type="button" 
+                            onclick="selectImportCat('${tx._id}', '${escapeHtml(cat)}')" 
+                            class="flex-1 text-left text-xs flex items-center gap-2 cursor-pointer truncate min-w-0">
+                      <span>${CATEGORY_ICONS[cat] || '📦'}</span>
+                      <span class="truncate">${escapeHtml(cat)}</span>
+                    </button>
+                    ${isCustom ? `
+                      <button type="button" onclick="event.stopPropagation(); deleteCategoryFromImport('${escapeHtml(cat)}', '${tx.type}')" class="text-gray-500 hover:text-red-400 p-1 text-[11px] leading-none ml-1 cursor-pointer" title="Удалить категорию">✕</button>
+                    ` : ''}
+                  </div>
+                `;
+              }).join('')}
+
+              <!-- Кнопка добавления новой категории -->
+              <div class="border-t border-gray-700/80 pt-1 mt-1">
+                <button type="button" onclick="event.stopPropagation(); addCategoryFromImport('${tx.type}')" class="w-full text-left px-2 py-1.5 text-xs text-blue-400 hover:bg-gray-700/60 rounded-lg flex items-center gap-1.5 font-semibold cursor-pointer transition-colors">
+                  <span>+</span> <span>Добавить категорию</span>
                 </button>
-              `).join('')}
+              </div>
             </div>
           </div>
 
@@ -926,13 +941,33 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
 
 function toggleImportCatMenu(txId) {
   const menu = document.getElementById(`cat-menu-${txId}`);
-  if (!menu) return;
+  const btn = document.getElementById(`cat-btn-${txId}`);
+  const card = document.getElementById(`card-tx-${txId}`);
+  if (!menu || !btn) return;
+
   const isClosed = menu.classList.contains('hidden');
   
-  // Закрываем все остальные открытые меню в карточках
+  // Закрываем все меню и сбрасываем z-index всех карточек
   document.querySelectorAll('.custom-dropdown-menu').forEach(m => m.classList.add('hidden'));
-  
-  if (isClosed) menu.classList.remove('hidden');
+  document.querySelectorAll('.card-parsed-row').forEach(c => c.style.zIndex = '');
+
+  if (isClosed) {
+    // Поднимаем слой текущей карточки над соседними
+    if (card) card.style.zIndex = '40';
+    
+    // Позиционируем вниз (или вверх, если внизу нет места)
+    const rect = btn.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    if (spaceBelow < 220 && rect.top > 220) {
+      menu.style.bottom = 'calc(100% + 4px)';
+      menu.style.top = 'auto';
+    } else {
+      menu.style.top = 'calc(100% + 4px)';
+      menu.style.bottom = 'auto';
+    }
+
+    menu.classList.remove('hidden');
+  }
 }
 
 function selectImportCat(txId, newCat) {
@@ -946,6 +981,27 @@ function selectImportCat(txId, newCat) {
   }
   const menu = document.getElementById(`cat-menu-${txId}`);
   if (menu) menu.classList.add('hidden');
+  const card = document.getElementById(`card-tx-${txId}`);
+  if (card) card.style.zIndex = '';
+}
+
+// Удаление категории прямо из окна импорта
+async function deleteCategoryFromImport(catName, type) {
+  if (typeof deleteCategory === 'function') {
+    await deleteCategory(catName, type);
+    // Перерисовываем список импорта с обновленными категориями
+    if (window._lastParsedTransactions && window._lastParsedFileName) {
+      renderParsedTransactionsView(window._lastParsedFileName, window._lastParsedTransactions, window._lastParsedBankName);
+    }
+  }
+}
+
+// Добавление категории прямо из окна импорта
+function addCategoryFromImport(type) {
+  document.querySelectorAll('.custom-dropdown-menu').forEach(m => m.classList.add('hidden'));
+  if (typeof showAddCategoryDialog === 'function') {
+    showAddCategoryDialog(type);
+  }
 }
 
 /**
