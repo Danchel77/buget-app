@@ -1140,3 +1140,52 @@ body.selection-mode #goals-list .goal-edit-btn {
     opacity: 1;
   }
 }
+
+/* ============================================================
+   КАСТОМНЫЕ ДРОПДАУНЫ И ВЫБОР ИКОНОК
+   ============================================================ */
+
+/* 1. Блокировка пролистывания страницы при скролле выпадающих меню */
+.custom-dropdown-menu,
+.tx-category-menu,
+#pdf-debug-output,
+#category-icon-grid,
+#categories-list-container,
+#editor-rules-list {
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+/* 2. Сетка иконок категорий */
+#category-icon-grid {
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+/* Базовая кнопка иконки */
+.icon-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px;
+  font-size: 20px;
+  border-radius: 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.icon-option:active {
+  transform: scale(0.95);
+}
+
+/* ЯРКАЯ ОБВОДКА И СВЕЧЕНИЕ ВЫБРАННОЙ ИКОНКИ */
+.icon-option.selected {
+  border-color: var(--accent) !important;
+  background: rgba(123, 131, 255, 0.25) !important;
+  box-shadow: 0 0 0 2px var(--accent), 0 0 14px rgba(123, 131, 255, 0.45) !important;
+  transform: scale(1.08);
+}
