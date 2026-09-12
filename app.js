@@ -238,9 +238,16 @@ auth.onAuthStateChanged(async user => {
   if (user) {
     document.getElementById('login-screen').classList.add('hidden');
     switchTab('transactions');
-    
+
+    // Обновляем никнейм в шапке
+    const nameEl = document.getElementById('header-user-name');
+    if (nameEl) {
+      const name = user.displayName || (user.email?.includes('@budget.local') ? user.email.replace('@budget.local', '') : user.email?.split('@')[0]) || 'Профиль';
+      nameEl.textContent = name;
+    }
+
     await initNewUserIfNeeded(user);
-    
+    await loadUserSettings(user);
     fetchAllData();
   } else {
     document.getElementById('login-screen').classList.remove('hidden');
@@ -2075,3 +2082,100 @@ async function processOrSeedRules(snapshot) {
   }
 }
 
+// =============================================================
+// ЛИЧНЫЙ КАБИНЕТ И НАСТРОЙКИ ПОЛЬЗОВАТЕЛЯ
+// =============================================================
+
+function openProfileModal() {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const dialog = document.getElementById('profile-dialog');
+  const nameEl = document.getElementById('profile-username-display');
+  const typeEl = document.getElementById('profile-auth-type');
+  const avatarLetter = document.getElementById('profile-avatar-letter');
+
+  const rawName = user.displayName || (user.email?.includes('@budget.local') ? user.email.replace('@budget.local', '') : user.email?.split('@')[0]) || 'Пользователь';
+  
+  if (nameEl) nameEl.textContent = rawName;
+  if (avatarLetter) {
+    avatarLetter.textContent = rawName.charAt(0).toUpperCase();
+  }
+
+  if (typeEl) {
+    const isGoogle = user.providerData?.some(p => p.providerId === 'google.com');
+    typeEl.textContent = isGoogle ? `Google (${user.email})` : `Никнейм: ${rawName}`;
+  }
+
+  // Обновляем состояние чекбокса брокера
+  const toggle = document.getElementById('toggle-broker-setting');
+  if (toggle) {
+    toggle.checked = !!(Cache?.settings?.showBroker);
+  }
+
+  dialog.classList.remove('hidden');
+}
+
+function closeProfileModal() {
+  const dialog = document.getElementById('profile-dialog');
+  if (dialog) dialog.classList.add('hidden');
+}
+
+// Загрузка настроек пользователя из Firestore
+async function loadUserSettings(user) {
+  try {
+    const doc = await db.collection('users').doc(user.uid).get();
+    const settings = doc.data()?.settings || {};
+    
+    // Если настройка ещё не задана, по умолчанию брокер скрыт (как заказывали)
+    const showBroker = settings.showBroker !== undefined ? settings.showBroker : false;
+
+    if (!Cache) Cache = {};
+    if (!Cache.settings) Cache.settings = {};
+    Cache.settings.showBroker = showBroker;
+
+    applyBrokerVisibility(showBroker);
+  } catch (err) {
+    console.error('Ошибка загрузки настроек:', err);
+  }
+}
+
+// Переключение тумблера брокера в настройках
+async function toggleBrokerSetting(enable) {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  showToast(enable ? 'Включение брокера...' : 'Скрытие брокера...', false, true);
+  try {
+    await db.collection('users').doc(user.uid).set({
+      settings: { showBroker: enable }
+    }, { merge: true });
+
+    if (!Cache.settings) Cache.settings = {};
+    Cache.settings.showBroker = enable;
+
+    applyBrokerVisibility(enable);
+    showToast(enable ? 'Раздел «Брокер» включен' : 'Раздел «Брокер» скрыт');
+  } catch (e) {
+    showToast('Ошибка сохранения: ' + e.message, true);
+  }
+}
+
+// Применение видимости вкладки в нижней навигации
+function applyBrokerVisibility(show) {
+  const navBroker = document.getElementById('nav-broker');
+  if (navBroker) {
+    navBroker.classList.toggle('hidden', !show);
+  }
+
+  // Если пользователь находился во вкладке брокера и выключил её — переключаем на трат
+  const brokerTab = document.getElementById('broker-tab');
+  if (!show && brokerTab && !brokerTab.classList.contains('hidden')) {
+    switchTab('transactions');
+  }
+}
+
+// Публикация в window
+window.openProfileModal = openProfileModal;
+window.closeProfileModal = closeProfileModal;
+window.toggleBrokerSetting = toggleBrokerSetting;
