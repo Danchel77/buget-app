@@ -833,9 +833,11 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
   let html = `<div class="space-y-2.5">`;
 
   transactions.forEach(tx => {
+    const isInactive = tx.isDuplicate || tx.isTransfer;
     const isExp = tx.type === 'Расход';
     const amountSign = isExp ? '-' : '+';
-    const amountColor = isExp ? 'text-white' : 'text-emerald-400';
+    // Для неактивных карточек сумма окрашивается в тускло-серый цвет
+    const amountColor = isInactive ? 'text-gray-500 font-medium' : (isExp ? 'text-white font-bold' : 'text-emerald-400 font-bold');
     const cats = isExp ? expenseCategories : incomeCategories;
     const currentIcon = CATEGORY_ICONS[tx.category] || '📦';
 
@@ -844,7 +846,9 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
     ).join('');
 
     html += `
-      <div class="card-parsed-row bg-gray-900 border ${tx.isDuplicate || tx.isTransfer ? 'border-gray-800/80 bg-gray-900/60' : 'border-gray-700/80'} p-3 rounded-2xl space-y-2 relative" id="card-tx-${tx._id}">
+      <!-- Карточка: активная выделяется ярче, неактивная (перевод/дубль) становится глубоко-серой -->
+      <div class="card-parsed-row border ${isInactive ? 'bg-[#0e1217] border-gray-800/90' : 'bg-gray-900 border-gray-700/80 shadow-sm'} p-3 rounded-2xl space-y-2 relative" id="card-tx-${tx._id}">
+        
         <!-- СТРОКА 1: Чекбокс, наименование и кнопка запоминания 📌 -->
         <div class="flex items-center justify-between gap-2 min-w-0">
           <div class="flex items-center gap-2.5 min-w-0 flex-1">
@@ -854,7 +858,7 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
                    ${tx.selected ? 'checked' : ''}
                    onchange="toggleTxSelection('${tx._id}', this.checked)">
             
-            <span class="text-xs font-semibold text-gray-100 truncate flex-1 min-w-0" title="${escapeHtml(tx.merchant)}">
+            <span class="text-xs ${isInactive ? 'text-gray-400 font-normal' : 'text-gray-100 font-semibold'} truncate flex-1 min-w-0" title="${escapeHtml(tx.merchant)}">
               ${escapeHtml(tx.merchant)}
             </span>
           </div>
@@ -869,22 +873,21 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
 
         <!-- СТРОКА 2: Дата слева, бейдж справа -->
         <div class="flex items-center justify-between gap-2">
-          <span class="text-[11px] text-gray-400 font-mono">${tx.displayDate}</span>
+          <span class="text-[11px] ${isInactive ? 'text-gray-600' : 'text-gray-400'} font-mono">${tx.displayDate}</span>
           
           <div class="flex items-center gap-1.5 flex-shrink-0">
-            ${tx.isTransfer ? '<span class="text-[9px] text-amber-400/90 bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-800/50">Перевод</span>' : ''}
-            ${tx.isDuplicate ? '<span class="text-[9px] text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded border border-gray-700">В базе</span>' : ''}
+            ${tx.isTransfer ? '<span class="text-[9px] text-amber-500/90 bg-amber-950/30 px-1.5 py-0.5 rounded border border-amber-900/40">Перевод</span>' : ''}
+            ${tx.isDuplicate ? '<span class="text-[9px] text-gray-400 bg-gray-800/80 px-1.5 py-0.5 rounded border border-gray-700/60">В базе</span>' : ''}
           </div>
         </div>
 
-        <!-- СТРОКА 3: Кастомное меню (без прозрачности) слева, сумма справа -->
+        <!-- СТРОКА 3: Категория слева, сумма справа -->
         <div class="flex items-center justify-between gap-2 pt-2 border-t border-gray-800/60">
-          
           <div class="relative custom-dropdown-wrap" id="cat-wrap-${tx._id}">
             <button type="button" 
                     onclick="toggleImportCatMenu('${tx._id}')" 
                     id="cat-btn-${tx._id}"
-                    class="w-44 bg-gray-800 border border-gray-700 text-xs text-blue-200 rounded-xl px-2.5 py-1.5 flex items-center justify-between outline-none cursor-pointer hover:border-gray-600 transition-colors">
+                    class="w-44 ${isInactive ? 'bg-[#14181f] border-gray-800 text-gray-400' : 'bg-gray-800 border-gray-700 text-blue-200'} text-xs rounded-xl px-2.5 py-1.5 flex items-center justify-between outline-none cursor-pointer hover:border-gray-600 transition-colors">
               <span id="cat-label-${tx._id}" class="truncate">${CATEGORY_ICONS[tx.category] || '📦'} ${escapeHtml(tx.category)}</span>
               <span class="text-gray-400 text-[8px] ml-1">▼</span>
             </button>
@@ -909,7 +912,6 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
                 `;
               }).join('')}
 
-              <!-- Кнопка добавления новой категории -->
               <div class="border-t border-gray-700/80 pt-1 mt-1">
                 <button type="button" onclick="event.stopPropagation(); addCategoryFromImport('${tx.type}')" class="w-full text-left px-2 py-1.5 text-xs text-blue-400 hover:bg-gray-700/60 rounded-lg flex items-center gap-1.5 font-semibold cursor-pointer transition-colors">
                   <span>+</span> <span>Добавить категорию</span>
@@ -919,7 +921,7 @@ function renderParsedTransactionsView(fileName, transactions, bankName = 'Бан
           </div>
 
           <div class="text-right flex-shrink-0">
-            <span class="text-sm font-bold ${amountColor}">
+            <span class="text-sm ${amountColor}">
               ${amountSign}${formatMoney(tx.amount)}
             </span>
           </div>
