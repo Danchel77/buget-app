@@ -142,12 +142,19 @@
     </div>
   </div>
 
-  <!-- ШАПКА -->
   <header class="bg-gray-900 border-b border-gray-800 text-white p-4 sticky top-0 z-10 flex justify-between items-center shadow-md">
-    <h1 class="text-lg font-bold">Бюджет</h1>
-    <div class="flex items-center gap-3 text-xs opacity-70">
-      <span>Обновлено: <span id="last-sync">...</span></span>
-      <button onclick="logoutUser()" class="bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded border border-gray-700 transition-colors text-sm font-medium">Выйти</button>
+    <h1 class="text-lg font-bold flex items-center gap-2">
+      <span class="text-blue-400">◇</span> Бюджет
+    </h1>
+    
+    <div class="flex items-center gap-3 text-xs">
+      <span class="text-gray-400 hidden sm:inline">Обновлено: <span id="last-sync">...</span></span>
+
+      <!-- Кнопка Личного кабинета -->
+      <button type="button" onclick="openProfileModal()" class="bg-gray-800 hover:bg-gray-700 active:scale-95 px-3 py-1.5 rounded-xl border border-gray-700 transition-all flex items-center gap-2 text-xs font-semibold text-gray-200 cursor-pointer shadow-sm">
+        <span class="w-5 h-5 rounded-full bg-blue-600/30 text-blue-400 border border-blue-500/40 flex items-center justify-center text-[10px]">👤</span>
+        <span id="header-user-name" class="truncate max-w-[90px] sm:max-w-[130px]">Профиль</span>
+      </button>
     </div>
   </header>
 
@@ -533,6 +540,73 @@
 
       <div class="pt-3 border-t border-gray-700 mt-2 flex justify-end">
         <button type="button" onclick="closeRulesEditorModal()" class="w-full bg-gray-700 text-white py-2.5 rounded-xl text-xs font-semibold cursor-pointer">Закрыть</button>
+      </div>
+    </div>
+  </div>
+    <!-- Модальное окно Личного кабинета -->
+  <div id="profile-dialog" class="fixed inset-0 bg-black/85 z-[150] hidden flex flex-col justify-center items-center p-4 animate-fade-in">
+    <div class="bg-gray-800 border border-gray-700 w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col max-h-[90vh]">
+      
+      <!-- Шапка окна -->
+      <div class="flex items-center justify-between pb-3 border-b border-gray-700">
+        <h3 class="font-bold text-white text-base">Личный кабинет</h3>
+        <button type="button" onclick="closeProfileModal()" class="text-gray-400 hover:text-white text-lg p-1 cursor-pointer">✕</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto pt-4 space-y-4 pr-1">
+        <!-- Карточка пользователя -->
+        <div class="flex items-center gap-3 bg-gray-900/80 border border-gray-700/80 p-3.5 rounded-2xl">
+          <div id="profile-avatar-letter" class="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-500/40 text-blue-400 font-bold text-xl flex items-center justify-center flex-shrink-0">
+            👤
+          </div>
+          <div class="min-w-0 flex-1">
+            <h4 id="profile-username-display" class="text-sm font-bold text-white truncate">Пользователь</h4>
+            <p id="profile-auth-type" class="text-[11px] text-gray-400 truncate mt-0.5">Вход по логину</p>
+          </div>
+        </div>
+
+        <!-- Настройки разделов -->
+        <div>
+          <p class="text-[11px] uppercase tracking-wider text-gray-400 font-bold mb-2">Настройки приложения</p>
+          
+          <!-- Тумблер Брокерского счёта -->
+          <label class="flex items-center justify-between p-3 rounded-2xl bg-gray-900/60 border border-gray-700/60 cursor-pointer hover:border-gray-600 transition-colors">
+            <div class="pr-2">
+              <div class="text-xs font-semibold text-white flex items-center gap-1.5">
+                <span>📈</span>
+                <span>Брокерский счёт</span>
+              </div>
+              <div class="text-[10px] text-gray-400 mt-0.5">Отображать вкладку «Брокер» в меню</div>
+            </div>
+            <input type="checkbox" id="toggle-broker-setting" onchange="toggleBrokerSetting(this.checked)" class="w-4 h-4 rounded accent-blue-600 cursor-pointer">
+          </label>
+        </div>
+
+        <!-- Быстрые действия -->
+        <div>
+          <p class="text-[11px] uppercase tracking-wider text-gray-400 font-bold mb-2">Справочники</p>
+          <div class="space-y-1.5">
+            <button type="button" onclick="closeProfileModal(); showManageCategoriesDialog();" class="w-full text-left p-3 rounded-2xl bg-gray-900/40 border border-gray-700/60 hover:bg-gray-700/50 transition-colors flex items-center justify-between text-xs text-gray-200 cursor-pointer">
+              <span class="flex items-center gap-2"><span>📂</span> <span>Управление категориями</span></span>
+              <span class="text-gray-500 text-sm">›</span>
+            </button>
+            <button type="button" onclick="closeProfileModal(); openRulesEditorModal();" class="w-full text-left p-3 rounded-2xl bg-gray-900/40 border border-gray-700/60 hover:bg-gray-700/50 transition-colors flex items-center justify-between text-xs text-gray-200 cursor-pointer">
+              <span class="flex items-center gap-2"><span>⚙️</span> <span>Словарь правил выписок</span></span>
+              <span class="text-gray-500 text-sm">›</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Безопасность и выход -->
+        <div class="pt-2 border-t border-gray-700/80 space-y-2">
+          <button type="button" onclick="closeProfileModal(); logoutUser();" class="w-full py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-2xl text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-2">
+            <span>🚪</span> <span>Выйти из аккаунта</span>
+          </button>
+
+          <button type="button" onclick="closeProfileModal(); deleteCurrentAccountAndData();" class="w-full py-2.5 text-red-400 hover:text-red-300 hover:bg-red-950/20 border border-red-900/30 rounded-2xl text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5">
+            <span>⚠️</span> <span>Удалить аккаунт и данные</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
