@@ -214,8 +214,62 @@ async function handleAuthSubmit(e) {
 }
 
 function logoutUser() {
-  showDialog('Выход', 'Точно выйти из аккаунта?', true, () => auth.signOut());
+  showDialog('Выход', 'Точно выйти из аккаунта?', true, async () => {
+    // Полностью стираем кэш в оперативной памяти браузера
+    Cache = null;
+    window.Cache = null;
+    
+    // Сбрасываем интерфейс
+    document.getElementById('transactions-list').innerHTML = '';
+    document.getElementById('month-expense').innerText = '0 ₽';
+    document.getElementById('month-income').innerText = '0 ₽';
+    
+    await auth.signOut();
+  });
 }
+
+// Полное удаление аккаунта и всех его подколлекций
+async function deleteCurrentAccountAndData() {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  showDialog('Удаление аккаунта', 'ВНИМАНИЕ! Все ваши транзакции, вклады, цели и настройки будут безвозвратно удалены. Продолжить?', true, async () => {
+    showToast('Удаление всех данных аккаунта...', false, true);
+    try {
+      const tables = ['Transactions', 'Deposits', 'Broker', 'Goals', 'Categories', 'CategoryRules'];
+
+      // 1. Стираем все подколлекции пользователя
+      for (const table of tables) {
+        const snap = await getUserCol(table).get();
+        if (!snap.empty) {
+          const batch = db.batch();
+          snap.docs.forEach(doc => batch.delete(doc.ref));
+          await batch.commit();
+        }
+      }
+
+      // 2. Стираем профиль пользователя в Firestore
+      await db.collection('users').doc(user.uid).delete();
+
+      // 3. Стираем учетную запись из Firebase Auth
+      await user.delete();
+
+      // Очищаем кэш в памяти
+      Cache = null;
+      window.Cache = null;
+
+      showToast('Аккаунт и все данные удалены');
+    } catch (err) {
+      console.error('Ошибка при удалении аккаунта:', err);
+      if (err.code === 'auth/requires-recent-login') {
+        showToast('Для безопасности требуется повторный вход перед удалением', true);
+      } else {
+        showToast('Ошибка: ' + err.message, true);
+      }
+    }
+  });
+}
+window.deleteCurrentAccountAndData = deleteCurrentAccountAndData;
 
 // Показываем экран загрузки сразу при старте
 document.getElementById('loading-screen').classList.remove('hidden');
