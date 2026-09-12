@@ -853,6 +853,14 @@ function openRulesEditorModal() {
 
 function closeRulesEditorModal() {
   document.getElementById('rules-editor-dialog').classList.add('hidden');
+  
+  // Возврат в кабинет, если открывали оттуда
+  if (window._returnToProfile) {
+    window._returnToProfile = false;
+    if (typeof openProfileModal === 'function') {
+      openProfileModal();
+    }
+  }
 }
 
 function renderRulesList() {
