@@ -1189,3 +1189,9 @@ body.selection-mode #goals-list .goal-edit-btn {
   box-shadow: 0 0 0 2px var(--accent), 0 0 14px rgba(123, 131, 255, 0.45) !important;
   transform: scale(1.08);
 }
+
+/* Отступ трека скролла от верхнего и нижнего закругленного края */
+.custom-dropdown-menu::-webkit-scrollbar-track,
+.tx-category-menu::-webkit-scrollbar-track {
+  margin: 10px 0;
+}
