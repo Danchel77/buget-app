@@ -229,34 +229,28 @@ class UniversalStatementParser {
 // =============================================================
 
 const BANK_REGISTRY = [
-  // --- СБЕРБАНК ---
+  // --- ЯНДЕКС БАНК ---
   {
-    id: 'SBER',
-    name: 'Сбербанк',
-    slug: 'sberbank',
-    badgeColor: 'bg-emerald-900/60 text-emerald-300 border-emerald-700/60',
-    detect: (p) => p.includes('sberbank.ru') || p.includes('сбербанк онлайн') || p.includes('пао сбербанк') || p.includes('выписка по платёжному счёту'),
-    isTxStart: (l) => /^(\d{2}\.\d{2}\.\d{4})\s+\d{2}:\d{2}/.test(l) && !/^\d{2}\.\d{2}\.\d{4}\s+\d{6}/.test(l),
+    id: 'YANDEX',
+    name: 'Яндекс Банк',
+    slug: 'yandexbank',
+    badgeColor: 'bg-amber-900/60 text-amber-300 border-amber-700/60',
+    // Лицензия ЦБ РФ № 3027 либо официальное юрлицо в шапке документа
+    detect: (header) => header.includes('3027') || header.includes('яндекс банк') || header.includes('yabank.yandex.ru'),
+    isTxStart: (l) => /\d{2}\.\d{2}\.\d{4}/.test(l) && /[\d\s\xa0]+[.,]\d{2}\s*₽/.test(l),
+    isServiceLine: (l) => (l.includes('операции') && l.includes('мск')) || (l.includes('обработки') && l.includes('договора')),
     extract: (lines) => {
       const first = lines[0];
-      const dMatch = first.match(/^(\d{2}\.\d{2}\.\d{4})/);
-      const after = first.replace(/^(\d{2}\.\d{2}\.\d{4})\s+\d{2}:\d{2}\s+/, '');
-      const amounts = after.match(/([+-]?\s*[\d\s]+[.,]\d{2})/g) || [];
-      const rawAmount = amounts[0] || '0';
-      const type = rawAmount.includes('+') ? 'Доход' : 'Расход';
+      const dMatch = first.match(/\d{2}\.\d{2}\.\d{4}/);
+      const amounts = first.match(/([+−–—\-\u2012\u2013\u2014\u2212]?\s*[\d\s\xa0]+[.,]\d{2})\s*₽/g) || [];
+      const raw = amounts[0] || '0';
+      const type = raw.includes('+') ? 'Доход' : 'Расход';
 
-      let sberCat = after;
-      amounts.forEach(a => sberCat = sberCat.replace(a, ''));
-      sberCat = sberCat.trim();
+      let part1 = first.split(/\d{2}\.\d{2}\.\d{4}/)[0].replace(/^Оплата товаров и услуг\s*/i, '').trim();
+      let part2 = lines.slice(1).map(l => l.replace(/в\s+\d{2}:\d{2}/i, '').replace(/\d{2}\.\d{2}\.\d{4}/g, '').replace(/\*\d{4}/g, '').replace(/[\d\s\xa0]+[.,]\d{2}\s*₽/g, '').trim()).filter(Boolean).join(' ');
+      let merchant = `${part1} ${part2}`.replace(/^Оплата товаров и услуг\s*/i, '').replace(/\b(операции|обработки|договора|мск|карты|валюте)\b/gi, '').replace(/\s+/g, ' ').trim() || 'Операция Яндекс Банк';
 
-      let merchant = sberCat;
-      if (lines.length > 1) {
-        let desc = lines[1].replace(/^\d{2}\.\d{2}\.\d{4}\s+\d+\s*/, '')
-                           .replace(/\.?\s*(Операция|Перевод)\s+по.*$/i, '')
-                           .trim();
-        if (desc) merchant = desc;
-      }
-      return { date: dMatch[1], amount: cleanAmount(rawAmount), type, merchant, hint: sberCat };
+      return { date: dMatch[0], amount: cleanAmount(raw), type, merchant };
     }
   },
 
@@ -266,7 +260,8 @@ const BANK_REGISTRY = [
     name: 'Газпромбанк',
     slug: 'gazprombank',
     badgeColor: 'bg-blue-900/60 text-blue-300 border-blue-700/60',
-    detect: (p) => p.includes('газпромбанк') || p.includes('банк гпб') || (p.includes('дата отражения') && p.includes('содержание операции')),
+    // Генеральная лицензия ЦБ РФ № 354 либо Банк ГПБ (АО) в шапке документа
+    detect: (header, tableHeader) => header.includes('354') || header.includes('банк гпб') || header.includes('пао «газпромбанк»') || (tableHeader.includes('дата отражения') && tableHeader.includes('содержание операции')),
     isTxStart: (l) => /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})/.test(l),
     extract: (lines) => {
       const first = lines[0];
@@ -291,27 +286,35 @@ const BANK_REGISTRY = [
     }
   },
 
-  // --- ЯНДЕКС БАНК ---
+  // --- СБЕРБАНК ---
   {
-    id: 'YANDEX',
-    name: 'Яндекс Банк',
-    slug: 'yandexbank',
-    badgeColor: 'bg-amber-900/60 text-amber-300 border-amber-700/60',
-    detect: (p) => p.includes('yabank.yandex.ru') || p.includes('ао «яндекс банк»') || (p.includes('яндекс') && p.includes('в рамках договора открыт счёт')),
-    isTxStart: (l) => /\d{2}\.\d{2}\.\d{4}/.test(l) && /[\d\s\xa0]+[.,]\d{2}\s*₽/.test(l),
-    isServiceLine: (l) => (l.includes('операции') && l.includes('мск')) || (l.includes('обработки') && l.includes('договора')),
+    id: 'SBER',
+    name: 'Сбербанк',
+    slug: 'sberbank',
+    badgeColor: 'bg-emerald-900/60 text-emerald-300 border-emerald-700/60',
+    // Генеральная лицензия ЦБ РФ № 1481 либо sberbank.ru в шапке
+    detect: (header) => header.includes('1481') || header.includes('sberbank.ru') || header.includes('пао сбербанк') || header.includes('сбербанк онлайн'),
+    isTxStart: (l) => /^(\d{2}\.\d{2}\.\d{4})\s+\d{2}:\d{2}/.test(l) && !/^\d{2}\.\d{2}\.\d{4}\s+\d{6}/.test(l),
     extract: (lines) => {
       const first = lines[0];
-      const dMatch = first.match(/\d{2}\.\d{2}\.\d{4}/);
-      const amounts = first.match(/([+−–—\-\u2012\u2013\u2014\u2212]?\s*[\d\s\xa0]+[.,]\d{2})\s*₽/g) || [];
-      const raw = amounts[0] || '0';
-      const type = raw.includes('+') ? 'Доход' : 'Расход';
+      const dMatch = first.match(/^(\d{2}\.\d{2}\.\d{4})/);
+      const after = first.replace(/^(\d{2}\.\d{2}\.\d{4})\s+\d{2}:\d{2}\s+/, '');
+      const amounts = after.match(/([+-]?\s*[\d\s]+[.,]\d{2})/g) || [];
+      const rawAmount = amounts[0] || '0';
+      const type = rawAmount.includes('+') ? 'Доход' : 'Расход';
 
-      let part1 = first.split(/\d{2}\.\d{2}\.\d{4}/)[0].replace(/^Оплата товаров и услуг\s*/i, '').trim();
-      let part2 = lines.slice(1).map(l => l.replace(/в\s+\d{2}:\d{2}/i, '').replace(/\d{2}\.\d{2}\.\d{4}/g, '').replace(/\*\d{4}/g, '').replace(/[\d\s\xa0]+[.,]\d{2}\s*₽/g, '').trim()).filter(Boolean).join(' ');
-      let merchant = `${part1} ${part2}`.replace(/^Оплата товаров и услуг\s*/i, '').replace(/\b(операции|обработки|договора|мск|карты|валюте)\b/gi, '').replace(/\s+/g, ' ').trim() || 'Операция Яндекс Банк';
+      let sberCat = after;
+      amounts.forEach(a => sberCat = sberCat.replace(a, ''));
+      sberCat = sberCat.trim();
 
-      return { date: dMatch[0], amount: cleanAmount(raw), type, merchant };
+      let merchant = sberCat;
+      if (lines.length > 1) {
+        let desc = lines[1].replace(/^\d{2}\.\d{2}\.\d{4}\s+\d+\s*/, '')
+                           .replace(/\.?\s*(Операция|Перевод)\s+по.*$/i, '')
+                           .trim();
+        if (desc) merchant = desc;
+      }
+      return { date: dMatch[1], amount: cleanAmount(rawAmount), type, merchant, hint: sberCat };
     }
   },
 
@@ -321,7 +324,8 @@ const BANK_REGISTRY = [
     name: 'Озон Банк',
     slug: 'ozonbank',
     badgeColor: 'bg-sky-900/60 text-sky-300 border-sky-700/60',
-    detect: (p) => p.includes('ооо «озон банк»') || p.includes('справка о движении средств') || (p.includes('ozon') && p.includes('лицензия банка россии')),
+    // Базовая лицензия ЦБ РФ № 359 либо ООО «Озон Банк» в шапке
+    detect: (header) => header.includes('359') || header.includes('озон банк') || header.includes('ozon bank'),
     isTxStart: (l) => /^\d{2}\.\d{2}\.\d{4}/.test(l),
     extract: (lines) => {
       const first = lines[0];
@@ -361,10 +365,15 @@ const BANK_REGISTRY = [
 // =============================================================
 class StatementDispatcher {
   static parse(rawLines) {
-    const preview = rawLines.slice(0, 40).join(' ').toLowerCase();
+    // 1. Шапка документа: строго первые 12 строк. Здесь находятся реквизиты эмитента и лицензия,
+    // но ещё гарантированно не начались строки с операциями переводов.
+    const header = rawLines.slice(0, 12).join(' ').toLowerCase();
+
+    // 2. Зона таблицы: первые 30 строк для проверки названий колонок (например, "дата отражения")
+    const tableHeader = rawLines.slice(0, 30).join(' ').toLowerCase();
     
-    // Ищем подходящий банк в реестре
-    const config = BANK_REGISTRY.find(bank => bank.detect(preview));
+    // Ищем подходящий банк по юридическим реквизитам шапки
+    const config = BANK_REGISTRY.find(bank => bank.detect(header, tableHeader));
 
     if (!config) {
       const supported = BANK_REGISTRY.map(b => b.name).join(', ');
@@ -497,7 +506,10 @@ function renderFilteredRows(transactions) {
 
     html += `
       <!-- Просторная 2-уровневая строка (мерчант на всю строку, дата и чипс снизу) -->
-      <div class="card-parsed-row bg-[#181B24] border border-[rgba(255,255,255,0.06)] px-3.5 py-2.5 rounded-2xl flex flex-col gap-1.5 transition-all relative ${isInactive ? 'opacity-55 bg-[#12151C]' : 'hover:border-[rgba(255,255,255,0.12)]'}" id="card-tx-${tx._id}">
+      <div class="card-parsed-row bg-[#181B24] border border-[rgba(255,255,255,0.06)] px-3.5 py-2.5 rounded-2xl flex flex-col gap-1.5 transition-all relative ${isInactive ? 'bg-[#12151C]' : 'hover:border-[rgba(255,255,255,0.12)]'}" 
+           id="card-tx-${tx._id}" 
+           data-is-inactive="${isInactive}"
+           style="${isInactive ? 'opacity: 0.55;' : ''}">
         
         <!-- СТРОКА 1: Чекбокс, Название мерчанта (почти на всю строку!) и Сумма -->
         <div class="flex items-center justify-between gap-2.5 min-w-0">
@@ -659,18 +671,26 @@ function toggleImportCatMenu(txId) {
 
   const isClosed = menu.classList.contains('hidden');
   
-  // Закрываем все меню и сбрасываем z-index всех карточек
+  // Закрываем все открытые меню и возвращаем исходную прозрачность карточкам
   document.querySelectorAll('.custom-dropdown-menu').forEach(m => m.classList.add('hidden'));
-  document.querySelectorAll('.card-parsed-row').forEach(c => c.style.zIndex = '');
+  document.querySelectorAll('.card-parsed-row').forEach(c => {
+    c.style.zIndex = '';
+    if (c.dataset.isInactive === 'true') {
+      c.style.opacity = '0.55';
+    }
+  });
 
   if (isClosed) {
-    // Поднимаем слой текущей карточки над соседними
-    if (card) card.style.zIndex = '40';
+    // Поднимаем z-index и убираем полупрозрачность на время работы с меню
+    if (card) {
+      card.style.zIndex = '60';
+      card.style.opacity = '1';
+    }
     
     // Позиционируем вниз (или вверх, если внизу нет места)
     const rect = btn.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom;
-    if (spaceBelow < 220 && rect.top > 220) {
+    if (spaceBelow < 240 && rect.top > 240) {
       menu.style.bottom = 'calc(100% + 4px)';
       menu.style.top = 'auto';
     } else {
@@ -679,6 +699,7 @@ function toggleImportCatMenu(txId) {
     }
 
     menu.classList.remove('hidden');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
   }
 }
 
