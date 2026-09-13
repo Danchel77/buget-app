@@ -37,10 +37,23 @@ body::before { display: none; /* Убираем дешевое фоновое с
   transform: scale(0.98);
 }
 
-/* Скрытая шторка-bottom sheet */
-.bottom-sheet-overlay { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
-.bottom-sheet { transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
-.bottom-sheet.open { transform: translateY(0); }
+/* Плавающее контекстное меню у карточки */
+.card-context-menu {
+  position: fixed;
+  z-index: 120;
+  background: #181B24;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
+  min-width: 190px;
+  animation: context-menu-in 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+@keyframes context-menu-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: scale(1); }
+}
 
 * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
 html { background: var(--bg); color-scheme: dark; }
@@ -141,7 +154,7 @@ body.selection-mode #transactions-list .tx-amount {
 }
 
 /* ---------- forms / generic UI ---------- */
-input, select, textarea { color:var(--text) !important; background:var(--surface-2) !important; border-color:var(--line-strong) !important; border-radius:14px !important; }
+input, select, textarea { color:var(--text) !important; background:var(--surface-2) !important; border-color:var(--line-strong) !important; border-radius:14px !important; padding: 10px 14px !important; }
 input:focus, select:focus, textarea:focus { border-color:rgba(123,131,255,.6) !important; box-shadow:0 0 0 3px rgba(123,131,255,.10) !important; }
 #tx-form-container,#deposit-form-container,#broker-form-container,#broker-goal-container,#goal-form-container { background:var(--surface) !important; border-color:var(--line) !important; border-radius:20px !important; }
 
