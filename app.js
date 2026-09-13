@@ -1208,14 +1208,16 @@ function renderTransactions() {
             
             // Если иконки нет (старая запись с удаленной категории) — ставим 'tag' по умолчанию
             const iconStr = catInfo && catInfo.icon ? catInfo.icon : 'tag';
-            // Цвет фона иконки (Красный = расход, Зеленый = доход)
-            const iconBg = isExp ? 'bg-[#FF453A]/10 text-[#FF453A]' : 'bg-[#30D158]/10 text-[#30D158]';
+            // Нейтральная премиальная подложка для расходов вместо кислотно-красной
+            const iconBg = isExp 
+              ? 'bg-[#212430] text-[#9EA7B3] border border-[rgba(255,255,255,0.04)]' 
+              : 'bg-[#30D158]/10 text-[#30D158] border border-[#30D158]/20';
 
             return `
-              <div class="card cursor-pointer w-full py-[14px] px-4 flex items-center justify-between"
+              <div class="card cursor-pointer w-full py-[13px] px-4 flex items-center justify-between"
                    data-id="${tx.id}"
                    data-table="Transactions"
-                   onclick="openTransactionSheet('${tx.id}', '${tx.type}', '${tx.amount}', '${escapeHtml(tx.category)}', '${escapeHtml(tx.comment)}', '${tx.rawDate}')">
+                   onclick="openCardContextMenu(event, '${escapeHtml(tx.category)}', () => editTx('${tx.id}', '${tx.type}', ${tx.amount}, '${escapeHtml(tx.category)}', '${escapeHtml(tx.comment)}', '${tx.rawDate}'), () => deleteRecord('Transactions', '${tx.id}'))">
                 
                 <!-- Чекбокс для мультиселекта долгого нажатия -->
                 <input type="checkbox" class="select-checkbox hidden" data-id="${tx.id}">
@@ -2359,54 +2361,166 @@ window.openSubModalFromProfile = function(type) {
   }
 };
 
-// ЛОГИКА BOTTOM SHEET
-function openActionSheet(id, title, subtitle, onEditClick, onDeleteClick) {
-  const overlay = document.getElementById('action-sheet');
-  const sheet = overlay.querySelector('.bottom-sheet');
-  const header = document.getElementById('action-sheet-header');
-  
-  header.innerHTML = `<h3 class="text-[16px] font-bold text-white mb-0.5 truncate">${title}</h3><p class="text-sm text-gray-500">${subtitle}</p>`;
-  
-  const eBtn = document.getElementById('action-sheet-edit');
-  const dBtn = document.getElementById('action-sheet-delete');
-  
-  eBtn.onclick = () => { closeActionSheet(); setTimeout(onEditClick, 250); };
-  dBtn.onclick = () => { closeActionSheet(); setTimeout(onDeleteClick, 250); };
+// -------------------------------------------------------------
+// ПЛАВАЮЩЕЕ КОНТЕКСТНОЕ МЕНЮ (У КАРТОЧКИ)
+// -------------------------------------------------------------
+function openCardContextMenu(e, title, onEdit, onDelete) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('card-context-menu');
+  const titleEl = document.getElementById('context-menu-title');
+  const editBtn = document.getElementById('context-btn-edit');
+  const deleteBtn = document.getElementById('context-btn-delete');
+  if (!menu) return;
 
-  overlay.classList.remove('hidden');
-  // Trigger animation next frame
-  requestAnimationFrame(() => {
-    overlay.classList.remove('opacity-0');
-    sheet.classList.add('open');
+  titleEl.innerText = title || 'Действия';
+  editBtn.onclick = () => { closeCardContextMenu(); onEdit(); };
+  deleteBtn.onclick = () => { closeCardContextMenu(); onDelete(); };
+
+  // Позиционирование ровно у карточки (сверху или снизу)
+  const card = e.currentTarget;
+  const rect = card.getBoundingClientRect();
+  menu.classList.remove('hidden');
+
+  const menuHeight = 110;
+  const menuWidth = 190;
+  const spaceBelow = window.innerHeight - rect.bottom;
+
+  let top = (spaceBelow < menuHeight + 20) ? (rect.top - menuHeight - 4) : (rect.bottom + 4);
+  let left = Math.min(window.innerWidth - menuWidth - 16, Math.max(16, rect.right - menuWidth));
+
+  menu.style.top = `${top}px`;
+  menu.style.left = `${left}px`;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function closeCardContextMenu() {
+  const menu = document.getElementById('card-context-menu');
+  if (menu) menu.classList.add('hidden');
+}
+
+// Для совместимости с Вкладами и Целями:
+function openActionSheet(id, title, subtitle, onEditClick, onDeleteClick) {
+  openCardContextMenu(window.event, title, onEditClick, onDeleteClick);
+}
+
+// Закрытие контекстного меню при клике мимо
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#card-context-menu')) {
+    closeCardContextMenu();
+  }
+  if (!e.target.closest('#custom-datepicker') && !e.target.closest('input[type="date"]')) {
+    closeCustomDatePicker();
+  }
+});
+
+// -------------------------------------------------------------
+// КАСТОМНЫЙ КАЛЕНДАРЬ (ДРОПДАУН ВМЕСТО СИСТЕМНОГО ДИАЛОГА)
+// -------------------------------------------------------------
+let activeDateInput = null;
+let currentPickerDate = new Date();
+
+function setupCustomDatePickers() {
+  document.querySelectorAll('input[type="date"]').forEach(input => {
+    input.readOnly = true; // Отключаем открытие огромного системного окна Android
+    input.style.cursor = 'pointer';
+    input.onclick = (e) => {
+      e.stopPropagation();
+      openCustomDatePicker(input);
+    };
   });
 }
+document.addEventListener('DOMContentLoaded', setupCustomDatePickers);
+setTimeout(setupCustomDatePickers, 500);
 
-function closeActionSheet() {
-  const overlay = document.getElementById('action-sheet');
-  const sheet = overlay.querySelector('.bottom-sheet');
-  sheet.classList.remove('open');
-  overlay.classList.add('opacity-0');
-  setTimeout(() => overlay.classList.add('hidden'), 300);
+function openCustomDatePicker(inputEl) {
+  activeDateInput = inputEl;
+  const picker = document.getElementById('custom-datepicker');
+  if (!picker) return;
+
+  const currentVal = inputEl.value ? new Date(inputEl.value) : new Date();
+  currentPickerDate = isNaN(currentVal.getTime()) ? new Date() : currentVal;
+
+  renderCustomDatePicker();
+
+  // Позиционируем прямо под полем даты
+  const rect = inputEl.getBoundingClientRect();
+  picker.classList.remove('hidden');
+
+  const spaceBelow = window.innerHeight - rect.bottom;
+  let top = (spaceBelow < 280) ? (rect.top - 285) : (rect.bottom + 6);
+  let left = Math.min(window.innerWidth - 295, Math.max(12, rect.left));
+
+  picker.style.top = `${top}px`;
+  picker.style.left = `${left}px`;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-// Wrapper for clicking Transactions
-function openTransactionSheet(id, type, amount, cat, comment, rawDate) {
-  openActionSheet(
-    id, 
-    cat, 
-    `${formatMoney(amount, true)} • ${formatDateStr(rawDate, 'dd.MM.yyyy')}`,
-    () => editTx(id, type, amount, cat, comment, rawDate),
-    () => deleteRecord('Transactions', id)
-  );
+function closeCustomDatePicker() {
+  const picker = document.getElementById('custom-datepicker');
+  if (picker) picker.classList.add('hidden');
+  activeDateInput = null;
 }
 
-// Wrapper for clicking Deposits
-function openDepositSheet(id, name, amount, rate, start, end, goalId) {
-  openActionSheet(
-    id, 
-    name, 
-    `Текущий остаток: ${formatMoney(amount, true)}`, // Показываем точные копейки внутри шторки
-    () => editDep(id, name, amount, rate, start, end, goalId),
-    () => deleteRecord('Deposits', id)
-  );
+function changeCustomDatePickerMonth(delta) {
+  currentPickerDate.setMonth(currentPickerDate.getMonth() + delta);
+  renderCustomDatePicker();
 }
+
+function selectCustomDatePickerToday() {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  if (activeDateInput) {
+    activeDateInput.value = `${yyyy}-${mm}-${dd}`;
+    activeDateInput.dispatchEvent(new Event('change'));
+  }
+  closeCustomDatePicker();
+}
+
+function renderCustomDatePicker() {
+  const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+  const label = document.getElementById('datepicker-month-year');
+  const grid = document.getElementById('datepicker-days-grid');
+  if (!label || !grid) return;
+
+  const year = currentPickerDate.getFullYear();
+  const month = currentPickerDate.getMonth();
+  label.innerText = `${monthNames[month]} ${year}`;
+
+  const firstDayIndex = (new Date(year, month, 1).getDay() + 6) % 7; // Понедельник = 0
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  let html = '';
+  for (let i = 0; i < firstDayIndex; i++) {
+    html += `<span></span>`;
+  }
+
+  const selectedDateStr = activeDateInput ? activeDateInput.value : '';
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dayStr = String(day).padStart(2, '0');
+    const monthStr = String(month + 1).padStart(2, '0');
+    const fullDate = `${year}-${monthStr}-${dayStr}`;
+    const isSelected = selectedDateStr === fullDate;
+
+    html += `
+      <button type="button" onclick="applyCustomDate('${fullDate}')" class="h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer font-medium ${isSelected ? 'bg-[#6C5DD3] text-white font-bold' : 'hover:bg-[#212430] text-gray-300'}">
+        ${day}
+      </button>
+    `;
+  }
+  grid.innerHTML = html;
+}
+
+function applyCustomDate(dateStr) {
+  if (activeDateInput) {
+    activeDateInput.value = dateStr;
+    activeDateInput.dispatchEvent(new Event('change'));
+  }
+  closeCustomDatePicker();
+}
+window.changeCustomDatePickerMonth = changeCustomDatePickerMonth;
+window.selectCustomDatePickerToday = selectCustomDatePickerToday;
+window.closeCustomDatePicker = closeCustomDatePicker;
+window.applyCustomDate = applyCustomDate;
