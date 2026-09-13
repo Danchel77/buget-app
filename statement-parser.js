@@ -496,81 +496,86 @@ function renderFilteredRows(transactions) {
     const currentIcon = getDynamicCategoryIcon(tx.category);
 
     html += `
-      <!-- Ультракомпактная строка высотой 52-54px -->
-      <div class="card-parsed-row bg-[#181B24] border border-[rgba(255,255,255,0.06)] px-3 py-2 rounded-2xl flex items-center justify-between gap-2.5 transition-all relative ${isInactive ? 'opacity-60 bg-[#12151C]' : 'hover:border-[rgba(255,255,255,0.12)]'}" id="card-tx-${tx._id}">
+      <!-- Просторная 2-уровневая строка (мерчант на всю строку, дата и чипс снизу) -->
+      <div class="card-parsed-row bg-[#181B24] border border-[rgba(255,255,255,0.06)] px-3.5 py-2.5 rounded-2xl flex flex-col gap-1.5 transition-all relative ${isInactive ? 'opacity-55 bg-[#12151C]' : 'hover:border-[rgba(255,255,255,0.12)]'}" id="card-tx-${tx._id}">
         
-        <!-- Чекбокс и название мерчанта -->
-        <div class="flex items-center gap-2.5 min-w-0 flex-1">
-          <input type="checkbox" 
-                 class="w-4 h-4 rounded accent-[#6C5DD3] bg-[#212430] border-gray-700 flex-shrink-0 cursor-pointer"
-                 data-tx-id="${tx._id}"
-                 ${tx.selected ? 'checked' : ''}
-                 onchange="toggleTxSelection('${tx._id}', this.checked)">
+        <!-- СТРОКА 1: Чекбокс, Название мерчанта (почти на всю строку!) и Сумма -->
+        <div class="flex items-center justify-between gap-2.5 min-w-0">
+          <div class="flex items-center gap-2.5 min-w-0 flex-1">
+            <input type="checkbox" 
+                   class="w-4 h-4 rounded accent-[#6C5DD3] bg-[#212430] border-gray-700 flex-shrink-0 cursor-pointer"
+                   data-tx-id="${tx._id}"
+                   ${tx.selected ? 'checked' : ''}
+                   onchange="toggleTxSelection('${tx._id}', this.checked)">
 
-          <div class="min-w-0 flex flex-col justify-center">
             <span class="text-[13px] ${isInactive ? 'text-gray-400 font-normal' : 'text-gray-100 font-semibold'} truncate leading-tight" title="${escapeHtml(tx.merchant)}">
               ${escapeHtml(tx.merchant)}
             </span>
-            <div class="flex items-center gap-1.5 mt-0.5">
-              <span class="text-[10px] text-[#848D99] font-mono">${tx.displayDate}</span>
-              ${tx.isTransfer ? '<span class="text-[9px] text-amber-400 bg-amber-950/40 px-1 py-0.2 rounded">Перевод</span>' : ''}
-              ${tx.isDuplicate ? '<span class="text-[9px] text-gray-400 bg-gray-800 px-1 py-0.2 rounded">В базе</span>' : ''}
-            </div>
           </div>
-        </div>
 
-        <!-- Компактный чипс-выпадающий список категории -->
-        <div class="relative custom-dropdown-wrap flex-shrink-0" id="cat-wrap-${tx._id}">
-          <button type="button" 
-                  onclick="toggleImportCatMenu('${tx._id}')" 
-                  id="cat-btn-${tx._id}"
-                  class="bg-[#212430] border border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.15)] text-[#F2F4F7] text-[11px] font-medium rounded-full px-2.5 py-1 flex items-center gap-1.5 outline-none transition-colors cursor-pointer max-w-[130px]">
-            <i data-lucide="${currentIcon}" class="w-3.5 h-3.5 text-[#848D99] flex-shrink-0"></i> 
-            <span id="cat-label-${tx._id}" class="truncate">${escapeHtml(tx.category)}</span>
-            <i data-lucide="chevron-down" class="w-3 h-3 text-gray-500 flex-shrink-0"></i>
-          </button>
-          
-          <div id="cat-menu-${tx._id}" 
-               class="custom-dropdown-menu hidden absolute right-0 w-52 max-h-60 overflow-y-auto bg-[#181B24] border border-[rgba(255,255,255,0.08)] rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.85)] z-50 p-1.5 space-y-0.5">
-            ${cats.map(cat => {
-              const defaultList = ['Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Развлечения', 'Другое', 'Зарплата', 'Возврат', 'Кэшбек'];
-              const isCustom = !defaultList.includes(cat);
-              const loopIcon = getDynamicCategoryIcon(cat);
-              return `
-                <div class="flex items-center justify-between hover:bg-[#2A2D3C] rounded-xl px-2.5 py-1.5 transition-colors group">
-                  <button type="button" 
-                          onclick="selectImportCat('${tx._id}', '${escapeHtml(cat)}', '${loopIcon}')" 
-                          class="flex-1 text-left text-[12px] font-medium text-gray-200 flex items-center gap-2 cursor-pointer truncate min-w-0">
-                    <i data-lucide="${loopIcon}" class="w-3.5 h-3.5 text-[#848D99]"></i>
-                    <span class="truncate">${escapeHtml(cat)}</span>
-                  </button>
-                  ${isCustom ? `
-                    <button type="button" onclick="event.stopPropagation(); deleteCategoryFromImport('${escapeHtml(cat)}', '${tx.type}')" class="text-gray-500 hover:text-[#FF453A] p-1 flex-shrink-0 cursor-pointer"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
-                  ` : ''}
-                </div>
-              `;
-            }).join('')}
-
-            <div class="border-t border-[rgba(255,255,255,0.06)] pt-1 mt-1">
-              <button type="button" onclick="event.stopPropagation(); addCategoryFromImport('${tx.type}')" class="w-full text-left px-2 py-1.5 text-[12px] text-blue-400 hover:bg-[#2A2D3C] rounded-lg flex items-center gap-1.5 font-medium cursor-pointer transition-colors">
-                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                <span>Добавить</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Сумма и аккуратная булавка Pin -->
-        <div class="flex items-center gap-2 flex-shrink-0 ml-1">
-          <span class="text-[14px] ${amountColor} font-mono text-right">
+          <span class="text-[14px] ${amountColor} font-mono font-semibold flex-shrink-0 ml-2">
             ${amountSign}${formatMoney(tx.amount)}
           </span>
-          <button type="button" 
-                  onclick="openRememberRuleModal('${tx._id}')" 
-                  class="text-gray-500 hover:text-[#6C5DD3] hover:bg-[#212430] p-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center" 
-                  title="Закрепить правило категории">
-            <i data-lucide="pin" class="w-3.5 h-3.5"></i>
-          </button>
+        </div>
+
+        <!-- СТРОКА 2: Дата/Статус слева, Категория-чипс и Пин справа -->
+        <div class="flex items-center justify-between gap-2 pt-1 border-t border-[rgba(255,255,255,0.03)]">
+          <div class="flex items-center gap-2 text-[11px] text-[#848D99]">
+            <span class="font-mono">${tx.displayDate}</span>
+            ${tx.isTransfer ? '<span class="text-[9px] font-bold text-amber-400 bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-900/40">Перевод</span>' : ''}
+            ${tx.isDuplicate ? '<span class="text-[9px] font-bold text-gray-400 bg-gray-800/80 px-1.5 py-0.5 rounded border border-gray-700/60">В базе</span>' : ''}
+          </div>
+
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <!-- Чипс категории -->
+            <div class="relative custom-dropdown-wrap" id="cat-wrap-${tx._id}">
+              <button type="button" 
+                      onclick="toggleImportCatMenu('${tx._id}')" 
+                      id="cat-btn-${tx._id}"
+                      class="bg-[#212430] border border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.15)] text-[#F2F4F7] text-[11px] font-medium rounded-full px-2.5 py-1 flex items-center gap-1.5 outline-none transition-colors cursor-pointer max-w-[150px]">
+                <i data-lucide="${currentIcon}" class="w-3.5 h-3.5 text-[#848D99] flex-shrink-0"></i> 
+                <span id="cat-label-${tx._id}" class="truncate">${escapeHtml(tx.category)}</span>
+                <i data-lucide="chevron-down" class="w-3 h-3 text-gray-500 flex-shrink-0"></i>
+              </button>
+              
+              <div id="cat-menu-${tx._id}" 
+                   class="custom-dropdown-menu hidden absolute right-0 bottom-full mb-1.5 w-52 max-h-60 overflow-y-auto bg-[#181B24] border border-[rgba(255,255,255,0.08)] rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.85)] z-50 p-1.5 space-y-0.5">
+                ${cats.map(cat => {
+                  const defaultList = ['Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Развлечения', 'Другое', 'Зарплата', 'Возврат', 'Кэшбек'];
+                  const isCustom = !defaultList.includes(cat);
+                  const loopIcon = getDynamicCategoryIcon(cat);
+                  return `
+                    <div class="flex items-center justify-between hover:bg-[#2A2D3C] rounded-xl px-2.5 py-1.5 transition-colors group">
+                      <button type="button" 
+                              onclick="selectImportCat('${tx._id}', '${escapeHtml(cat)}', '${loopIcon}')" 
+                              class="flex-1 text-left text-[12px] font-medium text-gray-200 flex items-center gap-2 cursor-pointer truncate min-w-0">
+                        <i data-lucide="${loopIcon}" class="w-3.5 h-3.5 text-[#848D99]"></i>
+                        <span class="truncate">${escapeHtml(cat)}</span>
+                      </button>
+                      ${isCustom ? `
+                        <button type="button" onclick="event.stopPropagation(); deleteCategoryFromImport('${escapeHtml(cat)}', '${tx.type}')" class="text-gray-500 hover:text-[#FF453A] p-1 flex-shrink-0 cursor-pointer"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                      ` : ''}
+                    </div>
+                  `;
+                }).join('')}
+
+                <div class="border-t border-[rgba(255,255,255,0.06)] pt-1 mt-1">
+                  <button type="button" onclick="event.stopPropagation(); addCategoryFromImport('${tx.type}')" class="w-full text-left px-2 py-1.5 text-[12px] text-blue-400 hover:bg-[#2A2D3C] rounded-lg flex items-center gap-1.5 font-medium cursor-pointer transition-colors">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                    <span>Добавить</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Аккуратный пин правила -->
+            <button type="button" 
+                    onclick="openRememberRuleModal('${tx._id}')" 
+                    class="text-gray-500 hover:text-[#6C5DD3] hover:bg-[#212430] p-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center" 
+                    title="Закрепить правило категории">
+              <i data-lucide="pin" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
         </div>
 
       </div>
