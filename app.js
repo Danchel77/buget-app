@@ -2765,3 +2765,26 @@ window.changeCustomDatePickerMonth = changeCustomDatePickerMonth;
 window.selectCustomDatePickerToday = selectCustomDatePickerToday;
 window.closeCustomDatePicker = closeCustomDatePicker;
 window.applyCustomDate = applyCustomDate;
+
+// Управление информационным окном импорта PDF
+function openPdfInfoModal() {
+  const dlg = document.getElementById('pdf-info-dialog');
+  if (dlg) {
+    dlg.classList.remove('hidden');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+}
+window.openPdfInfoModal = openPdfInfoModal;
+
+function closePdfInfoModal() {
+  const dlg = document.getElementById('pdf-info-dialog');
+  if (dlg) dlg.classList.add('hidden');
+}
+window.closePdfInfoModal = closePdfInfoModal;
+
+function triggerPdfFileInput() {
+  closePdfInfoModal();
+  const fileInput = document.getElementById('pdf-file-input');
+  if (fileInput) fileInput.click();
+}
+window.triggerPdfFileInput = triggerPdfFileInput;
