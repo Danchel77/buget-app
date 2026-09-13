@@ -676,14 +676,15 @@ function updateCategorySelect(containerOrRow, type) {
   // Генерируем пункты: список категорий с крестиками у добавленных пользователем
   let itemsHtml = cats.map(c => {
     const isCustom = !defaultCats.includes(c.name);
+    const icon = c.icon && c.icon !== '📦' ? c.icon : 'tag';
     return `
-      <div class="flex items-center justify-between hover:bg-gray-700/80 rounded-lg px-2.5 py-1.5 transition-colors group">
-        <button type="button" class="flex-1 text-left text-xs text-gray-200 flex items-center gap-2 cursor-pointer truncate min-w-0" data-cat="${escapeHtml(c.name)}" data-icon="${c.icon || '📦'}">
-          <span>${c.icon || '📦'}</span>
+      <div class="flex items-center justify-between hover:bg-[#2A2D3C] rounded-xl px-2.5 py-1.5 transition-colors group">
+        <button type="button" class="flex-1 text-left text-[13px] font-medium text-gray-200 flex items-center gap-2.5 cursor-pointer truncate min-w-0" data-cat="${escapeHtml(c.name)}" data-icon="${icon}">
+          <i data-lucide="${icon}" class="w-[18px] h-[18px] text-[#848D99]"></i>
           <span class="truncate">${escapeHtml(c.name)}</span>
         </button>
         ${isCustom ? `
-          <button type="button" onclick="event.stopPropagation(); deleteCategory('${escapeHtml(c.name)}', '${type}')" class="text-gray-500 hover:text-red-400 p-1 text-[11px] leading-none ml-1.5 flex-shrink-0 cursor-pointer" title="Удалить категорию">✕</button>
+          <button type="button" onclick="event.stopPropagation(); deleteCategory('${escapeHtml(c.name)}', '${type}')" class="text-gray-500 hover:text-[#FF453A] p-1.5 flex-shrink-0 cursor-pointer"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
         ` : ''}
       </div>
     `;
@@ -725,7 +726,8 @@ function updateCategorySelect(containerOrRow, type) {
       const catName = itemBtn.dataset.cat;
       const catIcon = itemBtn.dataset.icon;
       input.value = catName;
-      label.innerHTML = `${catIcon} ${escapeHtml(catName)}`;
+      label.innerHTML = `<i data-lucide="${catIcon}" class="w-4 h-4 mr-1.5 inline-block align-text-bottom"></i> ${escapeHtml(catName)}`;
+      if(typeof lucide !== 'undefined') lucide.createIcons();
       label.classList.remove('text-gray-400');
       label.classList.add('text-white');
       menu.classList.add('hidden');
@@ -1773,51 +1775,52 @@ function editGoal(id, name, target, deadline) {
   window.scrollTo(0, 0);
 }
 
+function openGoalSheet(id, name, target, rawDeadline) {
+  openActionSheet(
+    id, 
+    name, 
+    `Цель: ${formatMoney(target)}`,
+    () => editGoal(id, name, target, rawDeadline),
+    () => deleteRecord('Goals', id)
+  );
+}
+
 function renderGoals() {
   const data = Cache.goals || [];
   if (data.length === 0) {
-    document.getElementById('goals-list').innerHTML = '<div class="text-center text-gray-500 py-4">Целей нет</div>';
+    document.getElementById('goals-list').innerHTML = '<div class="text-center text-[#848D99] py-10 text-[13px]">Целей нет</div>';
     return;
   }
   document.getElementById('goals-list').innerHTML = data.map(g => `
-        <div class="card goal-card" data-id="${g.id}" data-table="Goals">
-      <input type="checkbox" class="select-checkbox" data-id="${g.id}">
-
-      <button
-        onclick="deleteRecord('Goals','${g.id}')"
-        class="goal-delete-btn"
-        title="Удалить"
-      >✕</button>
-
-      <div class="goal-main">
-        <h3>${escapeHtml(g.name)}</h3>
-        ${g.isAchieved
-          ? '<span class="goal-status goal-status--achieved">Достигнута</span>'
-          : `<span class="goal-date">До ${escapeHtml(g.deadlineStr)}</span>`}
+    <div class="card w-full flex flex-col p-4 cursor-pointer overflow-hidden ${g.isAchieved ? 'ring-1 ring-[#30D158]/50 bg-[#30D158]/5' : ''}" 
+         data-id="${g.id}" data-table="Goals"
+         onclick="openGoalSheet('${g.id}', '${escapeHtml(g.name)}', ${g.target}, '${g.rawDeadline}')">
+      
+      <div class="flex justify-between items-center w-full mb-3">
+        <h3 class="text-[16px] font-semibold text-gray-200 truncate pr-3">${escapeHtml(g.name)}</h3>
+        ${g.isAchieved 
+          ? `<span class="px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase bg-[#30D158]/20 text-[#30D158] rounded-full flex-shrink-0">Выполнена</span>`
+          : `<span class="text-[12px] text-[#848D99] whitespace-nowrap">До ${escapeHtml(g.deadlineStr)}</span>`
+        }
       </div>
 
-      <div class="goal-progress-value">${g.progress}%</div>
-
-      <button
-        onclick="editGoal('${g.id}','${escapeHtml(g.name)}',${g.target},'${escapeHtml(g.rawDeadline)}')"
-        class="goal-edit-btn"
-        title="Редактировать"
-      >✎</button>
-
-      <div class="goal-progress">
-        <div
-          class="${g.isAchieved ? 'goal-progress-fill goal-progress-fill--achieved' : 'goal-progress-fill'}"
-          style="width:${g.progress}%"
-        ></div>
+      <div class="flex items-end justify-between w-full mt-1 mb-2">
+        <div class="text-[12px] font-medium tracking-wide">
+          <span class="text-gray-200 text-[16px] font-semibold">${formatMoney(g.saved)}</span>
+          <span class="text-gray-600 mx-1">/</span>
+          <span class="text-gray-500">${formatMoney(g.target)}</span>
+        </div>
+        <div class="text-[14px] font-bold ${g.isAchieved ? 'text-[#30D158]' : 'text-blue-400'}">${g.progress}%</div>
       </div>
 
-      <div class="goal-amounts">
-        <span>${formatMoney(g.saved)}</span>
-        <span>из ${formatMoney(g.target)}</span>
+      <div class="w-full bg-[rgba(255,255,255,0.06)] h-[5px] rounded-full overflow-hidden">
+        <div class="h-full rounded-full transition-all ${g.isAchieved ? 'bg-[#30D158]' : 'bg-blue-500'}" style="width:${g.progress}%"></div>
       </div>
-    </div>`).join('');
+    </div>
+  `).join('');
+  
+  if(typeof lucide !== 'undefined') lucide.createIcons();
 }
-
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
