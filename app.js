@@ -709,6 +709,7 @@ function updateCategorySelect(containerOrRow, type) {
   `;
 
   menu.innerHTML = itemsHtml;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 
   // Открытие меню со смарт-позиционированием (вниз / вверх)
   btn.onclick = (e) => {
@@ -723,6 +724,7 @@ function updateCategorySelect(containerOrRow, type) {
       row.style.zIndex = '30';
       smartPositionDropdown(menu, btn);
       menu.classList.remove('hidden');
+      if (typeof lucide !== 'undefined') lucide.createIcons();
     } else {
       row.style.zIndex = '';
     }
@@ -1167,7 +1169,23 @@ function renderTransactions() {
     return { ...m, items, expense, income };
   }).filter(Boolean);
 
-  // 4. Обновляем виджеты «Расходы / Доходы» в шапке (с учётом фильтров и без копеек)
+  // 4. Обновляем виджеты «Расходы / Доходы» в шапке и поясняем, что именно рассчитано
+  let periodText = 'Тек. мес';
+  if (currentFilterMonth === 'all') {
+    periodText = 'Все время';
+  } else {
+    const selectedMonthObj = data.find(m => m.id === currentFilterMonth);
+    if (selectedMonthObj) periodText = selectedMonthObj.label;
+  }
+  if (currentFilterCategory !== 'all') {
+    periodText += ` • ${currentFilterCategory}`;
+  }
+
+  const expLabel = document.getElementById('month-expense-label');
+  const incLabel = document.getElementById('month-income-label');
+  if (expLabel) expLabel.innerText = `Расходы (${periodText})`;
+  if (incLabel) incLabel.innerText = `Доходы (${periodText})`;
+
   document.getElementById('month-expense').innerText = formatMoney(filteredMonths.reduce((a, b) => a + b.expense, 0));
   document.getElementById('month-income').innerText = formatMoney(filteredMonths.reduce((a, b) => a + b.income, 0));
 
@@ -1572,17 +1590,6 @@ function drawBrokerChart() {
         mode: 'index',
         intersect: false
       },
-      // Интерактивный скраббинг: при ведении пальцем меняется заголовок
-      onHover: (event, activeElements) => {
-        const balEl = document.getElementById('broker-balance');
-        if (!balEl) return;
-        if (activeElements && activeElements.length > 0) {
-          const pt = data[activeElements[0].index];
-          if (pt) balEl.innerText = formatMoney(pt.y);
-        } else {
-          balEl.innerText = formatMoney(br.balance);
-        }
-      },
       plugins: {
         legend: { display: false },
         datalabels: { display: false },
@@ -1691,7 +1698,7 @@ function renderDeposits() {
       class="card w-full mb-4 flex flex-col p-4 cursor-pointer overflow-hidden ${isCls ? 'opacity-50 grayscale' : ''}"
       data-id="${dep.id}"
       data-table="Deposits"
-      ${!isCls ? `onclick="openDepositSheet('${dep.id}','${escapeHtml(dep.name)}',${dep.amount},${dep.rate},'${dep.rawStart}','${dep.rawEnd}','${dep.goalId}')"` : ''}
+      ${!isCls ? `onclick="openCardContextMenu(event, '${escapeHtml(dep.name)}', () => editDep('${dep.id}','${escapeHtml(dep.name)}',${dep.amount},${dep.rate},'${dep.rawStart}','${dep.rawEnd}','${dep.goalId}'), () => deleteRecord('Deposits', '${dep.id}'))"` : ''}
     >
       <input type="checkbox" class="select-checkbox" data-id="${dep.id}">
 
@@ -1924,9 +1931,9 @@ function renderGoals() {
     }
 
     return `
-      <div class="card w-full flex flex-col p-4.5 cursor-pointer overflow-hidden mb-3.5 ${g.isAchieved ? 'ring-1 ring-[#30D158]/40 bg-[#30D158]/5' : 'bg-[#181B24]'}" 
+      <div class="card w-full flex flex-col p-5 cursor-pointer overflow-hidden mb-4 ${g.isAchieved ? 'ring-1 ring-[#30D158]/40 bg-[#30D158]/5' : 'bg-[#181B24]'}" 
            data-id="${g.id}" data-table="Goals"
-           onclick="openGoalSheet('${g.id}', '${escapeHtml(g.name)}', ${g.target}, '${g.rawDeadline}')">
+           onclick="openCardContextMenu(event, '${escapeHtml(g.name)}', () => editGoal('${g.id}', '${escapeHtml(g.name)}', ${g.target}, '${g.rawDeadline}'), () => deleteRecord('Goals', '${g.id}'))">
         
         <div class="flex justify-between items-start w-full mb-3">
           <div class="flex items-center gap-3 min-w-0">
@@ -2362,8 +2369,10 @@ window.openSubModalFromProfile = function(type) {
 };
 
 // -------------------------------------------------------------
-// ПЛАВАЮЩЕЕ КОНТЕКСТНОЕ МЕНЮ (У КАРТОЧКИ)
+// ПЛАВАЮЩЕЕ КОНТЕКСТНОЕ МЕНЮ (С ТОГГЛОМ И СКРЫТИЕМ ПРИ СКРОЛЛЕ)
 // -------------------------------------------------------------
+let activeContextCard = null;
+
 function openCardContextMenu(e, title, onEdit, onDelete) {
   if (e) e.stopPropagation();
   const menu = document.getElementById('card-context-menu');
@@ -2372,12 +2381,20 @@ function openCardContextMenu(e, title, onEdit, onDelete) {
   const deleteBtn = document.getElementById('context-btn-delete');
   if (!menu) return;
 
+  const card = e ? (e.currentTarget || (e.target && e.target.closest('.card'))) : null;
+  if (!card) return;
+
+  // Тоггл: повторный клик по той же карточке закрывает меню
+  if (activeContextCard === card && !menu.classList.contains('hidden')) {
+    closeCardContextMenu();
+    return;
+  }
+  activeContextCard = card;
+
   titleEl.innerText = title || 'Действия';
   editBtn.onclick = () => { closeCardContextMenu(); onEdit(); };
   deleteBtn.onclick = () => { closeCardContextMenu(); onDelete(); };
 
-  // Позиционирование ровно у карточки (сверху или снизу)
-  const card = e.currentTarget;
   const rect = card.getBoundingClientRect();
   menu.classList.remove('hidden');
 
@@ -2396,14 +2413,16 @@ function openCardContextMenu(e, title, onEdit, onDelete) {
 function closeCardContextMenu() {
   const menu = document.getElementById('card-context-menu');
   if (menu) menu.classList.add('hidden');
+  activeContextCard = null;
 }
 
-// Для совместимости с Вкладами и Целями:
-function openActionSheet(id, title, subtitle, onEditClick, onDeleteClick) {
-  openCardContextMenu(window.event, title, onEditClick, onDeleteClick);
-}
+// При скролле страницы или списков меню и календарь мгновенно закрываются
+window.addEventListener('scroll', () => {
+  closeCardContextMenu();
+  closeCustomDatePicker();
+}, { passive: true, capture: true });
 
-// Закрытие контекстного меню при клике мимо
+// Закрытие при клике мимо
 document.addEventListener('click', (e) => {
   if (!e.target.closest('#card-context-menu')) {
     closeCardContextMenu();
