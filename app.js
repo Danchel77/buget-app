@@ -1489,12 +1489,27 @@ function updateAnalyticsForMonth(monthId) {
   });
 }
 
-  function drawBrokerChart() {
+// -------------------------------------------------------------
+// ГРАФИК БРОКЕРА С ТАЙМФРЕЙМАМИ, ГРАДИЕНТОМ И СКРАББИНГОМ
+// -------------------------------------------------------------
+let currentBrokerTimeframe = 'ALL';
+
+function setBrokerTimeframe(tf) {
+  currentBrokerTimeframe = tf;
+  document.querySelectorAll('.broker-tf-btn').forEach(btn => {
+    const isAct = btn.dataset.tf === tf;
+    btn.className = `broker-tf-btn flex-1 py-1 text-center rounded-lg transition-all cursor-pointer ${isAct ? 'bg-[#212430] text-white font-semibold' : 'text-[#848D99] hover:text-white'}`;
+  });
+  drawBrokerChart();
+}
+window.setBrokerTimeframe = setBrokerTimeframe;
+
+function drawBrokerChart() {
   const br = Cache?.broker;
   const canvas = document.getElementById('brokerChart');
   if (!canvas) return;
 
-  const data = br?.chartData || [];
+  const rawData = br?.chartData || [];
   const ctx = canvas.getContext('2d');
 
   if (brokerChartObj) {
@@ -1502,36 +1517,70 @@ function updateAnalyticsForMonth(monthId) {
     brokerChartObj = null;
   }
 
-  if (data.length === 0) return;
+  if (rawData.length === 0) return;
+
+  // 1. Фильтрация по выбранному таймфрейму
+  const now = Date.now();
+  let timeLimit = 0;
+  if (currentBrokerTimeframe === '1M') timeLimit = now - 30 * 86400000;
+  else if (currentBrokerTimeframe === '3M') timeLimit = now - 90 * 86400000;
+  else if (currentBrokerTimeframe === '6M') timeLimit = now - 180 * 86400000;
+  else if (currentBrokerTimeframe === '1Y') timeLimit = now - 365 * 86400000;
+
+  let data = timeLimit > 0 ? rawData.filter(d => d.timestamp >= timeLimit) : rawData.slice();
+  if (data.length === 0 && rawData.length > 0) {
+    data = [rawData[rawData.length - 1]];
+  }
+
+  // 2. Короткие понятные имена месяцев по оси X вместо длинных дат
+  const shortMonths = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+  const labels = data.map(d => {
+    const dt = new Date(d.timestamp);
+    return isNaN(dt.getTime()) ? d.x : shortMonths[dt.getMonth()];
+  });
+
+  // 3. Мягкий вертикальный градиент под кривой Безье
+  const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+  gradient.addColorStop(0, 'rgba(108, 93, 211, 0.32)');
+  gradient.addColorStop(1, 'rgba(108, 93, 211, 0.0)');
 
   brokerChartObj = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: data.map(d => d.x),
+      labels: labels,
       datasets: [{
         label: 'Баланс',
         data: data.map(d => d.y),
-        borderColor: '#7b83ff',
-        backgroundColor: 'rgba(123, 131, 255, 0.12)',
-        borderWidth: 2,
+        borderColor: '#6C5DD3',
+        borderWidth: 2.2,
+        backgroundColor: gradient,
         fill: true,
-        tension: 0.2,
-        // Точки пополнения делаем крупнее и зелёными
-        pointRadius: data.map(d => d.type === 'Пополнение' ? 6 : 4),
-        pointHoverRadius: data.map(d => d.type === 'Пополнение' ? 8 : 6),
-        pointBackgroundColor: data.map(d => d.type === 'Пополнение' ? '#36d69b' : '#7b83ff'),
-        pointBorderColor: data.map(d => d.type === 'Пополнение' ? '#ffffff' : '#171d24'),
-        pointBorderWidth: 2
+        tension: 0.38, // Bézier smoothing
+        pointRadius: 0, // Убираем точки, оставляем чистую гладкую линию
+        pointHoverRadius: 6,
+        pointHoverBackgroundColor: '#6C5DD3',
+        pointHoverBorderColor: '#ffffff',
+        pointHoverBorderWidth: 2
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       interaction: {
-        mode: 'nearest',
+        mode: 'index',
         intersect: false
       },
-      events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
+      // Интерактивный скраббинг: при ведении пальцем меняется заголовок
+      onHover: (event, activeElements) => {
+        const balEl = document.getElementById('broker-balance');
+        if (!balEl) return;
+        if (activeElements && activeElements.length > 0) {
+          const pt = data[activeElements[0].index];
+          if (pt) balEl.innerText = formatMoney(pt.y);
+        } else {
+          balEl.innerText = formatMoney(br.balance);
+        }
+      },
       plugins: {
         legend: { display: false },
         datalabels: { display: false },
@@ -1539,9 +1588,11 @@ function updateAnalyticsForMonth(monthId) {
           backgroundColor: '#1b222a',
           borderColor: 'rgba(255, 255, 255, 0.12)',
           borderWidth: 1,
-          titleColor: '#ffffff',
-          bodyColor: '#c9ced5',
-          padding: 10,
+          titleColor: '#848D99',
+          titleFont: { size: 11, weight: '500' },
+          bodyColor: '#ffffff',
+          bodyFont: { size: 13, weight: 'bold' },
+          padding: 9,
           cornerRadius: 12,
           displayColors: false,
           callbacks: {
@@ -1564,20 +1615,31 @@ function updateAnalyticsForMonth(monthId) {
       },
       scales: {
         x: {
-          grid: { color: 'rgba(255,255,255,0.05)' },
-          ticks: { color: '#8d97a4', font: { size: 10 } }
+          grid: { display: false },
+          ticks: {
+            color: '#848D99',
+            font: { size: 11 },
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 6
+          }
         },
         y: {
-          grid: { color: 'rgba(255,255,255,0.05)' },
-          ticks: {
-            color: '#8d97a4',
-            font: { size: 10 },
-            callback: v => formatCompactChartMoney(v)
-          }
+          display: false // Скрываем ось Y для чистоты минималистичного брокерского графика
         }
       }
     }
   });
+
+  // Сброс баланса при завершении скраббинга
+  canvas.onmouseleave = () => {
+    const balEl = document.getElementById('broker-balance');
+    if (balEl && br) balEl.innerText = formatMoney(br.balance);
+  };
+  canvas.ontouchend = () => {
+    const balEl = document.getElementById('broker-balance');
+    if (balEl && br) balEl.innerText = formatMoney(br.balance);
+  };
 }
 
 function submitDeposit(e) {
@@ -1719,37 +1781,66 @@ function submitBrokerGoal(e) {
 function renderBroker() {
   const br = Cache?.broker;
   if (!br) return;
+
+  // Основной баланс и сумма депозитов
   document.getElementById('broker-balance').innerText = formatMoney(br.balance);
   document.getElementById('broker-deposits').innerText = formatMoney(br.totalDeposits);
-  const p = document.getElementById('broker-profit');
-  p.innerText = (br.profit > 0 ? '+' : '') + formatMoney(br.profit);
-  p.className = `text-xs font-bold ${br.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
-  const b = document.getElementById('broker-goal-badge');
-  if (br.goalName) {
-    b.innerText = 'Цель: ' + br.goalName;
-    b.classList.remove('hidden');
-  } else {
-    b.classList.add('hidden');
+
+  // Единый финансовый бейдж: +X% (+Y ₽) за всё время
+  const yieldPct = br.totalDeposits > 0 ? ((br.profit / br.totalDeposits) * 100).toFixed(1) : 0;
+  const isPos = br.profit >= 0;
+  const yieldBadge = document.getElementById('broker-yield-badge');
+  if (yieldBadge) {
+    yieldBadge.innerText = `${isPos ? '+' : ''}${yieldPct}% (${isPos ? '+' : ''}${formatMoney(br.profit)}) за всё время`;
+    yieldBadge.className = `px-2.5 py-0.5 rounded-full text-xs font-semibold ${isPos ? 'bg-[#30D158]/15 text-[#30D158]' : 'bg-[#FF453A]/15 text-[#FF453A]'}`;
   }
 
-  // Отрисовка карточек пополнений под графиком
+  // Бейдж привязанной цели
+  const b = document.getElementById('broker-goal-badge');
+  if (b) {
+    if (br.goalName) {
+      b.innerText = 'Цель: ' + br.goalName;
+      b.classList.remove('hidden');
+    } else {
+      b.classList.add('hidden');
+    }
+  }
+
+  // Отрисовка списка пополнений или аккуратного пустого экрана (Empty State)
   const list = document.getElementById('broker-deposits-list');
   if (list) {
     const deps = br.deposits || [];
     if (deps.length === 0) {
-      list.innerHTML = '<div class="text-center text-gray-500 py-3 text-xs">Пополнений пока нет</div>';
+      list.innerHTML = `
+        <div class="card p-6 text-center flex flex-col items-center justify-center gap-3 mt-4 border border-[rgba(255,255,255,0.06)] bg-[#181B24]">
+          <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
+            <i data-lucide="arrow-down-circle" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-gray-200">Пополнений пока нет</p>
+            <p class="text-xs text-[#848D99] mt-0.5">Внесите первое пополнение, чтобы зафиксировать баланс</p>
+          </div>
+          <button type="button" onclick="toggleForm('broker-form-container', 'broker-submit-btn', 'Сохранить', 'broker-form', 'broker-add')" class="mt-1 px-4 py-2.5 rounded-xl bg-[#6C5DD3] hover:bg-[#5b4ec2] text-white text-xs font-semibold transition-all active:scale-95 cursor-pointer">
+            + Внести первое пополнение
+          </button>
+        </div>
+      `;
     } else {
       list.innerHTML = `
-        <h3 class="text-xs uppercase font-bold tracking-wider text-gray-400 mt-4 mb-2">История пополнений</h3>
-        <div class="space-y-2.5">
+        <h3 class="text-[11px] uppercase font-bold tracking-wider text-[#848D99] mt-5 mb-2.5 px-1">История пополнений</h3>
+        <div class="space-y-2">
           ${deps.map(d => `
-            <div class="card bg-gray-800 rounded-2xl border border-gray-700 p-3.5 flex justify-between items-center" data-id="${d.id}" data-table="Broker">
-              <div>
+            <div class="card bg-[#181B24] rounded-2xl border border-[rgba(255,255,255,0.06)] p-3.5 flex justify-between items-center" data-id="${d.id}" data-table="Broker">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-[#30D158]/10 text-[#30D158] flex items-center justify-center flex-shrink-0">
+                  <i data-lucide="arrow-down-left" class="w-4 h-4"></i>
+                </div>
                 <div>
-                <p class="text-sm font-bold text-emerald-400">+${formatMoney(d.amount)}</p>
-                <p class="text-[11px] text-gray-400 mt-0.5">${d.formattedDate} • Баланс: ${formatMoney(d.balance)}</p>
+                  <p class="text-[15px] font-semibold text-[#30D158]">+${formatMoney(d.amount)}</p>
+                  <p class="text-[11px] text-[#848D99] mt-0.5">${d.formattedDate} • Баланс: ${formatMoney(d.balance)}</p>
+                </div>
               </div>
-              <button onclick="deleteRecord('Broker','${d.id}')" class="delete-btn text-gray-500 hover:text-[#FF453A] p-2 cursor-pointer transition-colors" title="Удалить" aria-label="Удалить пополнение"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+              <button type="button" onclick="deleteRecord('Broker','${d.id}')" class="text-gray-500 hover:text-[#FF453A] p-2 cursor-pointer transition-colors" title="Удалить"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
             </div>
           `).join('')}
         </div>
@@ -1757,7 +1848,9 @@ function renderBroker() {
     }
   }
 
-  // Обновляем график, если вкладка открыта
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  // Отрисовываем график, если вкладка открыта
   const brokerTab = document.getElementById('broker-tab');
   if (brokerTab && !brokerTab.classList.contains('hidden')) {
     drawBrokerChart();
@@ -1795,42 +1888,80 @@ function openGoalSheet(id, name, target, rawDeadline) {
   );
 }
 
+// Умный определитель векторной иконки цели по смыслу названия
+function getGoalIcon(name) {
+  const n = (name || '').toLowerCase();
+  if (/квартир|дом|ремонт|жиль/i.test(n)) return 'home';
+  if (/машин|авто|тачк|мото/i.test(n)) return 'car';
+  if (/отпуск|море|путешеств|билет|тур/i.test(n)) return 'plane';
+  if (/учеб|курс|образов/i.test(n)) return 'graduation-cap';
+  if (/подушк|безопасн|резерв/i.test(n)) return 'shield-check';
+  if (/инвест|акци/i.test(n)) return 'trending-up';
+  if (/телефон|ноут|комп|айфон|гаджет/i.test(n)) return 'smartphone';
+  return 'target';
+}
+
 function renderGoals() {
   const data = Cache.goals || [];
   if (data.length === 0) {
     document.getElementById('goals-list').innerHTML = '<div class="text-center text-[#848D99] py-10 text-[13px]">Целей нет</div>';
     return;
   }
-  document.getElementById('goals-list').innerHTML = data.map(g => `
-    <div class="card w-full flex flex-col p-4 cursor-pointer overflow-hidden ${g.isAchieved ? 'ring-1 ring-[#30D158]/50 bg-[#30D158]/5' : ''}" 
-         data-id="${g.id}" data-table="Goals"
-         onclick="openGoalSheet('${g.id}', '${escapeHtml(g.name)}', ${g.target}, '${g.rawDeadline}')">
-      
-      <div class="flex justify-between items-center w-full mb-3">
-        <h3 class="text-[16px] font-semibold text-gray-200 truncate pr-3">${escapeHtml(g.name)}</h3>
-        ${g.isAchieved 
-          ? `<span class="px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase bg-[#30D158]/20 text-[#30D158] rounded-full flex-shrink-0">Выполнена</span>`
-          : `<span class="text-[12px] text-[#848D99] whitespace-nowrap">До ${escapeHtml(g.deadlineStr)}</span>`
-        }
-      </div>
+  document.getElementById('goals-list').innerHTML = data.map(g => {
+    const goalIcon = getGoalIcon(g.name);
 
-      <div class="flex items-end justify-between w-full mt-1 mb-2">
-        <div class="text-[12px] font-medium tracking-wide">
-          <span class="text-gray-200 text-[16px] font-semibold">${formatMoney(g.saved)}</span>
-          <span class="text-gray-600 mx-1">/</span>
-          <span class="text-gray-500">${formatMoney(g.target)}</span>
+    // Расчет темпа накопления (сколько месяцев осталось и сколько откладывать в месяц)
+    let paceBadge = '';
+    if (g.rawDeadline && !g.isAchieved) {
+      const now = new Date();
+      const dl = new Date(g.rawDeadline);
+      const monthsRemaining = Math.max(1, Math.round((dl - now) / (1000 * 60 * 60 * 24 * 30.4)));
+      const remainingSum = Math.max(0, g.target - g.saved);
+      const monthlyNeed = Math.round(remainingSum / monthsRemaining);
+      paceBadge = `<span class="text-[11px] text-[#848D99] font-normal">Осталось ~${monthsRemaining} мес. • ~${formatMoney(monthlyNeed)}/мес.</span>`;
+    }
+
+    return `
+      <div class="card w-full flex flex-col p-4.5 cursor-pointer overflow-hidden mb-3.5 ${g.isAchieved ? 'ring-1 ring-[#30D158]/40 bg-[#30D158]/5' : 'bg-[#181B24]'}" 
+           data-id="${g.id}" data-table="Goals"
+           onclick="openGoalSheet('${g.id}', '${escapeHtml(g.name)}', ${g.target}, '${g.rawDeadline}')">
+        
+        <div class="flex justify-between items-start w-full mb-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-10 h-10 rounded-2xl ${g.isAchieved ? 'bg-[#30D158]/15 text-[#30D158]' : 'bg-[#6C5DD3]/15 text-[#6C5DD3]'} flex items-center justify-center flex-shrink-0">
+              <i data-lucide="${goalIcon}" class="w-5 h-5"></i>
+            </div>
+            <div class="min-w-0">
+              <h3 class="text-[16px] font-semibold text-gray-100 truncate leading-tight">${escapeHtml(g.name)}</h3>
+              <div class="mt-0.5">${paceBadge || `<span class="text-[11px] text-[#848D99]">До ${escapeHtml(g.deadlineStr)}</span>`}</div>
+            </div>
+          </div>
+
+          ${g.isAchieved 
+            ? `<span class="px-2.5 py-0.5 text-[10px] font-bold tracking-wider uppercase bg-[#30D158]/20 text-[#30D158] rounded-full flex-shrink-0">Выполнена</span>`
+            : `<span class="text-[15px] font-bold ${g.progress >= 75 ? 'text-emerald-400' : 'text-[#6C5DD3]'}">${g.progress}%</span>`
+          }
         </div>
-        <div class="text-[14px] font-bold ${g.isAchieved ? 'text-[#30D158]' : 'text-blue-400'}">${g.progress}%</div>
-      </div>
 
-      <div class="w-full bg-[rgba(255,255,255,0.06)] h-[5px] rounded-full overflow-hidden">
-        <div class="h-full rounded-full transition-all ${g.isAchieved ? 'bg-[#30D158]' : 'bg-blue-500'}" style="width:${g.progress}%"></div>
+        <div class="flex items-end justify-between w-full mt-2 mb-2">
+          <div class="text-[13px] font-medium tracking-wide">
+            <span class="text-white text-[17px] font-bold">${formatMoney(g.saved)}</span>
+            <span class="text-gray-600 mx-1">из</span>
+            <span class="text-gray-400">${formatMoney(g.target)}</span>
+          </div>
+        </div>
+
+        <!-- Выразительный градиентный прогресс-бар высотой 8.5px -->
+        <div class="w-full bg-[rgba(255,255,255,0.06)] h-[8.5px] rounded-full overflow-hidden">
+          <div class="h-full rounded-full transition-all duration-500 ${g.isAchieved ? 'bg-[#30D158]' : 'bg-gradient-to-r from-[#6C5DD3] to-[#32ADE6]'}" style="width:${g.progress}%"></div>
+        </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
   
   if(typeof lucide !== 'undefined') lucide.createIcons();
 }
+
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
