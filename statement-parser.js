@@ -392,7 +392,7 @@ async function handleStatementUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  if (file.type !== 'application/pdf') {
+  if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
     showToast('Пожалуйста, выберите файл в формате PDF', true);
     return;
   }
@@ -400,20 +400,24 @@ async function handleStatementUpload(event) {
   showToast('Обработка выписки...', false, true);
 
   try {
-    // 1. Вытягиваем строки
     const lines = await StatementExtractor.extractLinesFromPDF(file);
+
+    if (!lines || lines.length === 0) {
+      throw new Error('Файл пуст или не содержит читаемого текста');
+    }
 
     const result = StatementDispatcher.parse(lines);
     renderParsedTransactionsView(file.name, result.transactions, result.bank);
 
-    event.target.value = '';
-    document.getElementById('toast-container').classList.add('hidden');
-
+    document.getElementById('toast-container')?.classList.add('hidden');
   } catch (err) {
     console.error('Ошибка обработки PDF:', err);
     showToast('Ошибка: ' + err.message, true);
+  } finally {
+    event.target.value = '';
   }
 }
+window.handleStatementUpload = handleStatementUpload;
 
 // -------------------------------------------------------------
 // 4. ПРОВЕРКА ДУБЛИКАТОВ И ИМПОРТ В FIREBASE
