@@ -81,9 +81,9 @@ function getDynamicCategoryIcon(catName) {
   if (cats) {
     const all = [...(cats.expense || []), ...(cats.income || [])];
     const found = all.find(c => c.name === catName);
-    if (found && found.icon) return found.icon;
+    if (found && found.icon && found.icon !== '📦') return found.icon;
   }
-  return CATEGORY_ICONS[catName] || '📦';
+  return 'tag'; // Глобальный вектор-дефолт, вместо эмодзи коробки
 }
 
 // -------------------------------------------------------------
@@ -499,11 +499,7 @@ function renderParsedTransactionsView(fileName, transactions, bankConfig) {
     const amountColor = isInactive ? 'text-gray-500 font-medium' : (isExp ? 'text-white font-bold' : 'text-emerald-400 font-bold');
     const cats = isExp ? expenseCategories : incomeCategories;
     const currentIcon = getDynamicCategoryIcon(tx.category);
-
-    const optionsHtml = cats.map(cat => 
-      `<option value="${escapeHtml(cat)}" ${cat === tx.category ? 'selected' : ''}>${getDynamicCategoryIcon(cat)} ${escapeHtml(cat)}</option>`
-    ).join('');
-
+    
     html += `
       <!-- Карточка: активная выделяется ярче, неактивная (перевод/дубль) становится глубоко-серой -->
       <div class="card-parsed-row border ${isInactive ? 'bg-[#0e1217] border-gray-800/90' : 'bg-gray-900 border-gray-700/80 shadow-sm'} p-3 rounded-2xl space-y-2 relative" id="card-tx-${tx._id}">
@@ -546,34 +542,39 @@ function renderParsedTransactionsView(fileName, transactions, bankConfig) {
             <button type="button" 
                     onclick="toggleImportCatMenu('${tx._id}')" 
                     id="cat-btn-${tx._id}"
-                    class="w-44 ${isInactive ? 'bg-[#14181f] border-gray-800 text-gray-400' : 'bg-gray-800 border-gray-700 text-blue-200'} text-xs rounded-xl px-2.5 py-1.5 flex items-center justify-between outline-none cursor-pointer hover:border-gray-600 transition-colors">
-              <span id="cat-label-${tx._id}" class="truncate">${getDynamicCategoryIcon(tx.category)} ${escapeHtml(tx.category)}</span>
-              <span class="text-gray-400 text-[8px] ml-1">▼</span>
+                    class="w-44 ${isInactive ? 'bg-transparent border-gray-700/50 text-gray-400' : 'bg-[#181B24] border-[rgba(255,255,255,0.12)] text-[#F2F4F7] shadow-sm'} text-xs font-medium rounded-xl px-2.5 py-2 flex items-center justify-between outline-none transition-colors">
+              <span id="cat-label-${tx._id}" class="truncate flex items-center gap-1.5">
+                <i data-lucide="${currentIcon}" class="w-[14px] h-[14px]"></i> 
+                ${escapeHtml(tx.category)}
+              </span>
+              <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-500"></i>
             </button>
             
             <div id="cat-menu-${tx._id}" 
-                 class="custom-dropdown-menu hidden absolute left-0 w-48 max-h-56 overflow-y-auto bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-50 p-1 space-y-0.5">
+                 class="custom-dropdown-menu hidden absolute left-0 w-52 max-h-60 overflow-y-auto bg-[#181B24] border border-[rgba(255,255,255,0.06)] rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] z-50 p-1.5 space-y-0.5">
               ${cats.map(cat => {
                 const defaultList = ['Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Развлечения', 'Другое', 'Зарплата', 'Возврат', 'Кэшбек'];
                 const isCustom = !defaultList.includes(cat);
+                const loopIcon = getDynamicCategoryIcon(cat);
                 return `
-                  <div class="flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors ${cat === tx.category ? 'bg-blue-600/20 text-blue-300 font-semibold' : 'text-gray-300 hover:bg-gray-700/70'}">
+                  <div class="flex items-center justify-between hover:bg-[#2A2D3C] rounded-lg px-2.5 py-1.5 transition-colors group">
                     <button type="button" 
-                            onclick="selectImportCat('${tx._id}', '${escapeHtml(cat)}')" 
-                            class="flex-1 text-left text-xs flex items-center gap-2 cursor-pointer truncate min-w-0">
-                      <span>${getDynamicCategoryIcon(cat)}</span>
+                            onclick="selectImportCat('${tx._id}', '${escapeHtml(cat)}', '${loopIcon}')" 
+                            class="flex-1 text-left text-[13px] font-medium text-gray-200 flex items-center gap-2.5 cursor-pointer truncate min-w-0">
+                      <i data-lucide="${loopIcon}" class="w-4 h-4 text-[#848D99]"></i>
                       <span class="truncate">${escapeHtml(cat)}</span>
                     </button>
                     ${isCustom ? `
-                      <button type="button" onclick="event.stopPropagation(); deleteCategoryFromImport('${escapeHtml(cat)}', '${tx.type}')" class="text-gray-500 hover:text-red-400 p-1 text-[11px] leading-none ml-1 cursor-pointer" title="Удалить категорию">✕</button>
+                      <button type="button" onclick="event.stopPropagation(); deleteCategoryFromImport('${escapeHtml(cat)}', '${tx.type}')" class="text-gray-500 hover:text-[#FF453A] p-1 flex-shrink-0 cursor-pointer"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
                     ` : ''}
                   </div>
                 `;
               }).join('')}
 
-              <div class="border-t border-gray-700/80 pt-1 mt-1">
-                <button type="button" onclick="event.stopPropagation(); addCategoryFromImport('${tx.type}')" class="w-full text-left px-2 py-1.5 text-xs text-blue-400 hover:bg-gray-700/60 rounded-lg flex items-center gap-1.5 font-semibold cursor-pointer transition-colors">
-                  <span>+</span> <span>Добавить категорию</span>
+              <div class="border-t border-[rgba(255,255,255,0.06)] pt-1.5 mt-1.5">
+                <button type="button" onclick="event.stopPropagation(); addCategoryFromImport('${tx.type}')" class="w-full text-left px-2.5 py-2 text-[13px] text-blue-400 hover:bg-[#2A2D3C] rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors">
+                  <i data-lucide="plus" class="w-4 h-4"></i>
+                  <span>Добавить категорию</span>
                 </button>
               </div>
             </div>
@@ -631,13 +632,14 @@ function toggleImportCatMenu(txId) {
   }
 }
 
-function selectImportCat(txId, newCat) {
+function selectImportCat(txId, newCat, icon) {
   const tx = window._lastParsedTransactions?.find(t => t._id === txId);
   if (tx) {
     tx.category = newCat;
     const labelEl = document.getElementById(`cat-label-${txId}`);
     if (labelEl) {
-      labelEl.innerHTML = `${getDynamicCategoryIcon(newCat)} ${escapeHtml(newCat)}`;
+      labelEl.innerHTML = `<i data-lucide="${icon}" class="w-[14px] h-[14px]"></i> ${escapeHtml(newCat)}`;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
     }
   }
   const menu = document.getElementById(`cat-menu-${txId}`);
