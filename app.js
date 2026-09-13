@@ -525,7 +525,7 @@ function processCategories(cats) {
 function showAddCategoryDialog(type, selectEl) {
   currentCategoryType = type;
   currentCategorySelect = selectEl;
-  selectedCategoryIcon = '📦';
+  selectedCategoryIcon = 'package';
   document.getElementById('category-dialog-title').innerText = `Новая категория (${type})`;
   document.getElementById('category-name-input').value = '';
   renderIconGrid();
@@ -534,14 +534,33 @@ function showAddCategoryDialog(type, selectEl) {
 
 function renderIconGrid() {
   const grid = document.getElementById('category-icon-grid');
+  
+  // Вставляем векторные иконки через i
   grid.innerHTML = availableIcons.map(icon => `
-    <button type="button" class="icon-option ${icon === selectedCategoryIcon ? 'selected' : ''}" data-icon="${icon}">${icon}</button>
+    <button type="button" class="icon-option flex items-center justify-center h-[42px] rounded-xl transition-all border ${icon === selectedCategoryIcon ? 'bg-[#6C5DD3]/15 text-[#6C5DD3] border-[#6C5DD3]/30 scale-105 shadow-sm' : 'bg-[#181B24] border-[rgba(255,255,255,0.06)] text-[#848D99] hover:bg-[#212430]'}" data-icon="${icon}">
+      <i data-lucide="${icon}" class="w-5 h-5"></i>
+    </button>
   `).join('');
+
+  // Заставляем Lucide нарисовать векторы в добавленном HTML
+  if(typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+
+  // Обновляем логику выбора иконки (изменение цветов Tailwind при тапе)
   grid.querySelectorAll('.icon-option').forEach(btn => {
     btn.addEventListener('click', () => {
       selectedCategoryIcon = btn.dataset.icon;
-      grid.querySelectorAll('.icon-option').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
+      
+      // Сбрасываем все кнопки в неактивное состояние
+      grid.querySelectorAll('.icon-option').forEach(b => {
+         b.classList.remove('bg-[#6C5DD3]/15', 'text-[#6C5DD3]', 'border-[#6C5DD3]/30', 'scale-105', 'shadow-sm');
+         b.classList.add('bg-[#181B24]', 'border-[rgba(255,255,255,0.06)]', 'text-[#848D99]');
+      });
+
+      // Делаем нажатую кнопку активной
+      btn.classList.remove('bg-[#181B24]', 'border-[rgba(255,255,255,0.06)]', 'text-[#848D99]');
+      btn.classList.add('bg-[#6C5DD3]/15', 'text-[#6C5DD3]', 'border-[#6C5DD3]/30', 'scale-105', 'shadow-sm');
     });
   });
 }
@@ -1071,37 +1090,96 @@ function selectFilterValue(type, value, label) {
 
 function renderTransactions() {
   const data = Cache.transactions || [];
-  // ... фильтрация месяцев ... 
-  
-  let filteredMonths = data.map(m => {
-     // тот же код фильтрации month, cat ...
-     if (currentFilterMonth !== 'all' && m.id !== currentFilterMonth) return null;
-     let items = m.items;
-     if (currentFilterCategory !== 'all') { items = items.filter(tx => tx.category === currentFilterCategory); }
-     if (items.length === 0) return null;
-     return { ...m, items };
-  }).filter(Boolean);
 
-  if (filteredMonths.length === 0) {
-    document.getElementById('transactions-list').innerHTML = '<div class="text-center text-gray-500 py-10 text-xs">Операции не найдены</div>';
-    lucide.createIcons(); return;
+  // 1. Формируем меню выбора месяцев
+  const monthMenu = document.getElementById('menu-filter-month');
+  if (monthMenu && data.length > 0) {
+    let mHtml = `
+      <button type="button" onclick="selectFilterValue('month', 'all', 'Все месяцы')" class="w-full text-left px-3 py-2 text-xs rounded-xl transition-colors ${currentFilterMonth === 'all' ? 'bg-blue-600/20 text-blue-300 font-semibold' : 'text-gray-300 hover:bg-gray-700/60'}">
+        Все месяцы
+      </button>
+    `;
+    data.forEach(m => {
+      const active = (currentFilterMonth === m.id);
+      mHtml += `
+        <button type="button" onclick="selectFilterValue('month', '${m.id}', '${escapeHtml(m.label)}')" class="w-full text-left px-3 py-2 text-xs rounded-xl transition-colors ${active ? 'bg-blue-600/20 text-blue-300 font-semibold' : 'text-gray-300 hover:bg-gray-700/60'}">
+          ${escapeHtml(m.label)}
+        </button>
+      `;
+    });
+    monthMenu.innerHTML = mHtml;
   }
 
-  // Обновляем шапку дашборда (Уже убрали там копейки благодаря formatMoney)
-  document.getElementById('month-expense').innerText = formatMoney(filteredMonths.reduce((a,b)=>a+b.expense,0));
-  // ... логика наполнения пунктов меню фильтров остается...
+  // 2. Формируем меню выбора категорий (с новыми иконками Lucide)
+  const catMenu = document.getElementById('menu-filter-cat');
+  if (catMenu && Cache.categories) {
+    const allCats = [
+      ...Cache.categories.expense.map(c => ({ name: c.name, icon: c.icon || 'tag' })),
+      ...Cache.categories.income.map(c => ({ name: c.name, icon: c.icon || 'tag' }))
+    ];
+    // Оставляем только уникальные категории
+    const map = new Map();
+    allCats.forEach(c => { if (!map.has(c.name)) map.set(c.name, c.icon); });
 
+    let cHtml = `
+      <button type="button" onclick="selectFilterValue('cat', 'all', 'Все категории')" class="w-full text-left px-3 py-2 text-xs rounded-xl transition-colors ${currentFilterCategory === 'all' ? 'bg-blue-600/20 text-blue-300 font-semibold' : 'text-gray-300 hover:bg-gray-700/60'}">
+        Все категории
+      </button>
+    `;
+    Array.from(map.entries()).sort((a,b) => a[0].localeCompare(b[0])).forEach(([name, icon]) => {
+      const active = (currentFilterCategory === name);
+      cHtml += `
+        <button type="button" onclick="selectFilterValue('cat', '${escapeHtml(name)}', '${escapeHtml(name)}')" class="w-full text-left px-3 py-2 text-xs rounded-xl transition-colors flex items-center gap-2 ${active ? 'bg-blue-600/20 text-blue-300 font-semibold' : 'text-gray-300 hover:bg-gray-700/60'}">
+          <i data-lucide="${icon}" class="w-4 h-4"></i>
+          <span class="truncate">${escapeHtml(name)}</span>
+        </button>
+      `;
+    });
+    catMenu.innerHTML = cHtml;
+  }
+
+  // 3. Фильтруем данные согласно выбранным пунктам из меню
+  let filteredMonths = data.map(m => {
+    if (currentFilterMonth !== 'all' && m.id !== currentFilterMonth) return null;
+
+    let items = m.items;
+    if (currentFilterCategory !== 'all') {
+      items = items.filter(tx => tx.category === currentFilterCategory);
+    }
+
+    if (items.length === 0) return null;
+
+    // Пересчитываем итоги конкретно для отфильтрованных данных
+    const expense = items.filter(i => i.type === 'Расход').reduce((sum, i) => sum + i.amount, 0);
+    const income = items.filter(i => i.type === 'Доход').reduce((sum, i) => sum + i.amount, 0);
+
+    return { ...m, items, expense, income };
+  }).filter(Boolean);
+
+  // 4. Обновляем виджеты «Расходы / Доходы» в шапке (с учётом фильтров и без копеек)
+  document.getElementById('month-expense').innerText = formatMoney(filteredMonths.reduce((a, b) => a + b.expense, 0));
+  document.getElementById('month-income').innerText = formatMoney(filteredMonths.reduce((a, b) => a + b.income, 0));
+
+  // 5. Отрисовка списка (Пустое состояние)
+  if (filteredMonths.length === 0) {
+    document.getElementById('transactions-list').innerHTML = '<div class="text-center text-gray-500 py-10 text-[13px]">Операции не найдены</div>';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    return;
+  }
+
+  // Хелпер: переводит дату (28.09.2023) в понятный день (Вчера / Сегодня / 28 сентября)
   const getRelativeDayName = (dateStr) => {
     const d = new Date(dateStr.split('.').reverse().join('-'));
-    const tday = new Date(); tday.setHours(0,0,0,0);
-    const yday = new Date(tday); yday.setDate(tday.getDate()-1);
-    if(d.getTime() === tday.getTime()) return 'Сегодня';
-    if(d.getTime() === yday.getTime()) return 'Вчера';
-    return d.toLocaleDateString('ru-RU', { day:'numeric', month:'long' });
+    const tday = new Date(); tday.setHours(0, 0, 0, 0);
+    const yday = new Date(tday); yday.setDate(tday.getDate() - 1);
+    
+    if (d.getTime() === tday.getTime()) return 'Сегодня';
+    if (d.getTime() === yday.getTime()) return 'Вчера';
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
   };
 
+  // 6. Основная сборка DOM (группировка по дням)
   document.getElementById('transactions-list').innerHTML = filteredMonths.map(month => {
-    // Группируем по дням внутри
     const daysObj = {};
     month.items.forEach(tx => { 
        if(!daysObj[tx.formattedDate]) daysObj[tx.formattedDate] = [];
@@ -1116,14 +1194,21 @@ function renderTransactions() {
             const isExp = tx.type === 'Расход';
             const catArr = isExp ? Cache.categories.expense : Cache.categories.income;
             const catInfo = catArr.find(c => c.name === tx.category);
-            const iconStr = catInfo ? catInfo.icon : 'tag';
-            // Аккуратная подложка иконки (цвета iOS)
+            
+            // Если иконки нет (старая запись с удаленной категории) — ставим 'tag' по умолчанию
+            const iconStr = catInfo && catInfo.icon ? catInfo.icon : 'tag';
+            // Цвет фона иконки (Красный = расход, Зеленый = доход)
             const iconBg = isExp ? 'bg-[#FF453A]/10 text-[#FF453A]' : 'bg-[#30D158]/10 text-[#30D158]';
 
             return `
               <div class="card cursor-pointer w-full py-[14px] px-4 flex items-center justify-between"
+                   data-id="${tx.id}"
+                   data-table="Transactions"
                    onclick="openTransactionSheet('${tx.id}', '${tx.type}', '${tx.amount}', '${escapeHtml(tx.category)}', '${escapeHtml(tx.comment)}', '${tx.rawDate}')">
                 
+                <!-- Чекбокс для мультиселекта долгого нажатия -->
+                <input type="checkbox" class="select-checkbox hidden" data-id="${tx.id}">
+
                 <div class="flex items-center gap-3.5 min-w-0">
                    <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}">
                       <i data-lucide="${iconStr}" class="w-[22px] h-[22px] stroke-[1.75px]"></i>
@@ -1145,7 +1230,8 @@ function renderTransactions() {
     `).join('');
   }).join('');
 
-  lucide.createIcons(); // Отрисовка новых иконок
+  // 7. Конвертируем все сгенерированные теги <i> в красивые SVG
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function switchTransactionView(view) {
@@ -1515,7 +1601,8 @@ function renderDeposits() {
 
   if (data.length === 0) {
     document.getElementById('deposits-list').innerHTML =
-      '<div class="text-center text-gray-500 py-4">Вкладов нет</div>';
+      '<div class="text-center text-[#848D99] py-10 text-[13px]">Открытых вкладов нет</div>';
+    if(typeof lucide !== 'undefined') lucide.createIcons();
     return;
   }
 
@@ -1526,84 +1613,68 @@ function renderDeposits() {
 
   const renderCard = (dep, isCls) => `
     <div
-      class="card deposit-card ${isCls ? 'opacity-60 grayscale' : ''}"
+      class="card w-full mb-4 flex flex-col p-4 cursor-pointer overflow-hidden ${isCls ? 'opacity-50 grayscale' : ''}"
       data-id="${dep.id}"
-      data-table="Deposits">
+      data-table="Deposits"
+      ${!isCls ? `onclick="openDepositSheet('${dep.id}','${escapeHtml(dep.name)}',${dep.amount},${dep.rate},'${dep.rawStart}','${dep.rawEnd}','${dep.goalId}')"` : ''}
+    >
+      <input type="checkbox" class="select-checkbox" data-id="${dep.id}">
 
-      <input
-        type="checkbox"
-        class="select-checkbox"
-        data-id="${dep.id}">
-
-      <button
-        onclick="deleteRecord('Deposits','${dep.id}')"
-        class="delete-btn deposit-delete-btn"
-        title="Удалить"
-        aria-label="Удалить вклад">✕</button>
-
-      ${dep.goalName ? `
-        <div class="deposit-goal-badge">
-          Цель: ${escapeHtml(dep.goalName)}
+      <div class="flex justify-between items-start w-full">
+        <div class="flex items-center gap-3.5 min-w-0">
+          <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center flex-shrink-0">
+            <i data-lucide="vault" class="w-5 h-5"></i>
+          </div>
+          <div class="min-w-0">
+            <h3 class="text-[16px] font-semibold text-gray-200 truncate leading-tight">${escapeHtml(dep.name)}</h3>
+            <p class="text-[12px] text-[#848D99] mt-0.5">${isCls ? 'Закрыт' : `До ${dep.endDateStr}`} • ${dep.rate}% годовых</p>
+          </div>
         </div>
-      ` : ''}
-
-      <div class="deposit-main">
-        <h3>${escapeHtml(dep.name)}</h3>
-        <p>
-          ${isCls ? 'Закрыт ' : 'До '}
-          ${dep.endDateStr} • ${dep.rate}%
-        </p>
+        
+        ${dep.goalName ? `
+          <div class="flex-shrink-0 ml-2">
+            <span class="px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase bg-indigo-500/15 text-indigo-400 rounded-full border border-indigo-500/20 truncate max-w-[80px] inline-block">
+              ${escapeHtml(dep.goalName)}
+            </span>
+          </div>
+        ` : ''}
       </div>
 
-      <p class="deposit-amount">
-        ${formatMoney(dep.amount)}
-      </p>
-
-      ${!isCls ? `
-        <button
-          onclick="editDep('${dep.id}','${escapeHtml(dep.name)}',${dep.amount},${dep.rate},'${dep.rawStart}','${dep.rawEnd}','${dep.goalId}')"
-          class="deposit-edit-btn"
-          aria-label="Редактировать">✎</button>
-      ` : ''}
-
-      <div class="deposit-interest">
-        <p class="deposit-current-interest">
-          +${formatMoney(dep.currentInterest)}
-        </p>
-
-        <p class="deposit-expected-interest">
-          +${formatMoney(dep.expectedInterest)}
-        </p>
+      <div class="mt-4 flex items-end justify-between w-full">
+        <div class="flex flex-col">
+          <span class="text-[11px] text-[#848D99] font-medium tracking-wide mb-1 uppercase">Вложено: ${formatMoney(dep.amount)}</span>
+          <div class="flex items-center gap-1.5 text-[14px]">
+             <span class="text-[#30D158] font-semibold">+${formatMoney(dep.currentInterest)}</span>
+             <span class="text-gray-700">/</span>
+             <span class="text-gray-400">+${formatMoney(dep.expectedInterest)}</span>
+          </div>
+        </div>
       </div>
 
-      <div class="deposit-progress">
-        <div style="width:${dep.progress}%"></div>
+      <!-- Тонкая полоска прогресса (Material/iOS) -->
+      <div class="w-full bg-[rgba(255,255,255,0.06)] h-[5px] rounded-full overflow-hidden mt-3">
+        <div class="bg-[#32ADE6] h-full rounded-full transition-all" style="width:${dep.progress}%"></div>
       </div>
 
     </div>
   `;
 
   if (active.length > 0) {
-    html += `
-      <h3 class="deposit-section-title">
-        Активные
-      </h3>
-    `;
-
+    html += `<h3 class="font-semibold text-[#848D99] text-[13px] mb-3 px-1 tracking-wide mt-2">Активные вклады</h3>`;
     html += active.map(d => renderCard(d, false)).join('');
   }
 
   if (closed.length > 0) {
-    html += `
-      <h3 class="deposit-section-title deposit-section-title--closed">
-        Завершенные
-      </h3>
-    `;
-
+    html += `<h3 class="font-semibold text-[#848D99] text-[13px] mb-3 px-1 tracking-wide mt-4">Завершенные</h3>`;
     html += closed.map(d => renderCard(d, true)).join('');
   }
 
   document.getElementById('deposits-list').innerHTML = html;
+  
+  // Рендерим иконки Lucide внутри сгенерированного HTML
+  if(typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
 }
 
 function submitBrokerOperation(e) {
@@ -1765,12 +1836,12 @@ let longPressTriggered = false;
 let suppressClick = false;
 let currentCategoryType = 'Расход';
 let currentCategorySelect = null;
-let selectedCategoryIcon = '📦';
+let selectedCategoryIcon = 'package';
 const availableIcons = [
-  '🍔', '🚗', '🏠', '🎬', '📦', '💼', '🎓', '👶', '🐾', '💊',
-  '🛒', '✈️', '🏋️', '🎮', '📚', '🎵', '🎁', '☕', '🍕', '👕',
-  '💡', '🔧', '📱', '💻', '🖥️', '📷', '🎨', '🎸', '⚽', '🏀',
-  '🚌', '🚇', '🚕', '⛽', '🛁', '🧹', '🧺', '🪴', '🌍', '💳'
+  'shopping-cart', 'utensils', 'car', 'home', 'film', 'package', 'briefcase', 'baby', 'paw-print', 'pill',
+  'shopping-bag', 'plane', 'dumbbell', 'gamepad-2', 'book', 'music', 'gift', 'coffee', 'pizza', 'shirt',
+  'lightbulb', 'wrench', 'smartphone', 'laptop', 'monitor', 'camera', 'palette', 'headphones', 'target', 'trophy',
+  'bus', 'train', 'navigation', 'zap', 'bath', 'sparkles', 'archive', 'leaf', 'globe', 'credit-card'
 ];
 
 function enableSelectionMode() {
@@ -2185,6 +2256,13 @@ function openTransactionSheet(id, type, amount, cat, comment, rawDate) {
   );
 }
 
-// Нужно аналогично вызывать openActionSheet в методе `renderDeposits()` у карточки:
-// onclick="openActionSheet('${dep.id}', '${escapeHtml(dep.name)}', 'Остаток: ${formatMoney(dep.amount)}', () => editDep(...), () => deleteRecord(...))"
-// и убрать кнопки с самой карточки!
+// Wrapper for clicking Deposits
+function openDepositSheet(id, name, amount, rate, start, end, goalId) {
+  openActionSheet(
+    id, 
+    name, 
+    `Текущий остаток: ${formatMoney(amount, true)}`, // Показываем точные копейки внутри шторки
+    () => editDep(id, name, amount, rate, start, end, goalId),
+    () => deleteRecord('Deposits', id)
+  );
+}
