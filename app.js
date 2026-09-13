@@ -2144,6 +2144,27 @@ const availableIcons = [
   'bus', 'train', 'navigation', 'zap', 'bath', 'sparkles', 'archive', 'leaf', 'globe', 'credit-card'
 ];
 
+function attachSelectionPanelDirectEvents() {
+  const cancelBtn = document.getElementById('cancel-selection');
+  const deleteBtn = document.getElementById('delete-selected');
+  if (!cancelBtn || !deleteBtn) return;
+
+  const onCancel = (e) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    cancelSelection();
+  };
+
+  const onDelete = (e) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    deleteSelectedItems();
+  };
+
+  cancelBtn.onclick = onCancel;
+  cancelBtn.ontouchend = onCancel;
+  deleteBtn.onclick = onDelete;
+  deleteBtn.ontouchend = onDelete;
+}
+
 function enableSelectionMode() {
   selectionMode = true;
   document.body.classList.add('selection-mode');
@@ -2159,14 +2180,15 @@ function enableSelectionMode() {
         <span id="selected-count">Выбрано: 0</span>
       </div>
       <div class="selection-panel__actions">
-        <button id="cancel-selection" type="button" onclick="cancelSelection()">Отмена</button>
-        <button id="delete-selected" type="button" onclick="deleteSelectedItems()">Удалить</button>
+        <button id="cancel-selection" type="button">Отмена</button>
+        <button id="delete-selected" type="button">Удалить</button>
       </div>
     `;
     document.body.appendChild(panel);
   }
   panel.style.display = 'flex';
   document.getElementById('selected-count').textContent = `Выбрано: ${selectedItems.size}`;
+  attachSelectionPanelDirectEvents();
 }
 
 function disableSelectionMode() {
@@ -2194,16 +2216,16 @@ function toggleItemSelection(id, table) {
     if (checkbox) checkbox.checked = selectedItems.has(key);
   }
   
-  // Обновляем счётчик
-  document.getElementById('selected-count').textContent = `Выбрано: ${selectedItems.size}`;
+  const countEl = document.getElementById('selected-count');
+  if (countEl) countEl.textContent = `Выбрано: ${selectedItems.size}`;
   
-  // Если не осталось выбранных элементов — выключаем режим выбора
   if (selectedItems.size === 0 && selectionMode) {
     disableSelectionMode();
   }
 }
 
 function cancelSelection() {
+  longPressTriggered = false;
   suppressClick = false;
   disableSelectionMode();
 }
@@ -2252,18 +2274,29 @@ function handleTouchStart(e) {
   startLongPress(card);
 }
 
+function handleTouchStart(e) {
+  // Касания по плавающей панели выбора и ее кнопкам не должны инициировать события карточек
+  if (e.target.closest('#selection-panel')) return;
+  const card = e.target.closest('.card');
+  if (!card) return;
+  startLongPress(card);
+}
+
 function handleTouchEnd(e) {
   clearTimeout(longPressTimer);
   if (longPressTriggered) {
-    e.preventDefault(); // предотвращаем последующий click
+    e.preventDefault();
+    longPressTriggered = false;
   }
 }
 
 function handleTouchMove(e) {
   clearTimeout(longPressTimer);
+  longPressTriggered = false;
 }
 
 function handleMouseDown(e) {
+  if (e.target.closest('#selection-panel')) return;
   const card = e.target.closest('.card');
   if (!card) return;
   startLongPress(card);
@@ -2271,12 +2304,12 @@ function handleMouseDown(e) {
 
 function handleMouseUp(e) {
   clearTimeout(longPressTimer);
+  longPressTriggered = false;
 }
 
 function handleMouseMove(e) {
   clearTimeout(longPressTimer);
 }
-
 // Регистрация глобальных обработчиков
 document.addEventListener('touchstart', handleTouchStart, { passive: true });
 document.addEventListener('touchend', handleTouchEnd);
