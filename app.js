@@ -970,9 +970,48 @@ function updateGoalDropdowns() {
   Cache.goals.forEach(g => {
     if (!g.isAchieved) html += `<option value="${g.id}">${g.name}</option>`;
   });
-  document.getElementById('dep-goal').innerHTML = html;
-  document.getElementById('broker-goal-select').innerHTML = html;
+  const depGoal = document.getElementById('dep-goal');
+  if (depGoal) depGoal.innerHTML = html;
+
+  // Меню быстрого выбора цели в брокере
+  const brokerMenu = document.getElementById('broker-goal-dropdown');
+  if (brokerMenu) {
+    let bHtml = `
+      <button type="button" onclick="selectBrokerGoal('')" class="w-full text-left px-3 py-2 text-xs rounded-xl text-gray-400 hover:bg-[#212430] hover:text-white transition-colors cursor-pointer">
+        Без привязки к цели
+      </button>
+    `;
+    Cache.goals.forEach(g => {
+      const isCur = Cache.broker?.goalId === g.id;
+      bHtml += `
+        <button type="button" onclick="selectBrokerGoal('${g.id}')" class="w-full text-left px-3 py-2 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${isCur ? 'bg-[#6C5DD3]/15 text-[#6C5DD3] font-semibold' : 'text-gray-200 hover:bg-[#212430]'}">
+          <span class="truncate">${escapeHtml(g.name)}</span>
+          ${isCur ? '<i data-lucide="check" class="w-3.5 h-3.5"></i>' : ''}
+        </button>
+      `;
+    });
+    brokerMenu.innerHTML = bHtml;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
 }
+
+function toggleBrokerGoalDropdown(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('broker-goal-dropdown');
+  if (menu) menu.classList.toggle('hidden');
+}
+window.toggleBrokerGoalDropdown = toggleBrokerGoalDropdown;
+
+async function selectBrokerGoal(goalId) {
+  const menu = document.getElementById('broker-goal-dropdown');
+  if (menu) menu.classList.add('hidden');
+  await submitAction('broker-goal-btn', 'Broker', {
+    type: 'Цель',
+    date: new Date().toISOString().split('T')[0],
+    goalId: goalId
+  });
+}
+window.selectBrokerGoal = selectBrokerGoal;
 
 function addTxRow() {
   const clone = document.getElementById('tx-row-template').content.cloneNode(true);
@@ -1054,8 +1093,24 @@ function editTx(id, type, amount, cat, comment, rawDate) {
   row.querySelector('.tx-amount').value = amount;
   formatSumInput(row.querySelector('.tx-amount'));
   row.querySelector('.tx-date').value = rawDate;
+  
   updateCategorySelect(row.querySelector('.tx-category'), type);
-  row.querySelector('.tx-category').value = cat;
+  
+  // Корректно подставляем значение и визуальный лейбл выбранной категории
+  const catInput = row.querySelector('.tx-category');
+  const catLabel = row.querySelector('.tx-category-label');
+  catInput.value = cat;
+  
+  const catArr = Cache.categories[type === 'Расход' ? 'expense' : 'income'] || [];
+  const foundCat = catArr.find(c => c.name === cat);
+  const icon = foundCat && foundCat.icon && foundCat.icon !== '📦' ? foundCat.icon : 'tag';
+  if (catLabel) {
+    catLabel.innerHTML = `<i data-lucide="${icon}" class="w-4 h-4 mr-1.5 inline-block align-text-bottom"></i> ${escapeHtml(cat)}`;
+    catLabel.classList.remove('text-gray-400');
+    catLabel.classList.add('text-white');
+  }
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
   row.querySelector('.tx-comment').value = (comment && comment !== 'undefined') ? comment : '';
   document.getElementById('tx-submit-btn').innerText = 'Сохранить изменения';
   window.scrollTo(0, 0);
@@ -1250,9 +1305,9 @@ function renderTransactions() {
                    </div>
                 </div>
 
-                <div class="flex-shrink-0 text-right font-medium ml-2 ${isExp ? 'text-gray-200' : 'text-[#30D158]'} text-[16px]">
-                  ${isExp ? '-' : '+'}${formatMoney(tx.amount)}
-                </div>
+               <div class="tx-amount flex-shrink-0 text-right font-medium ml-2 ${isExp ? 'text-gray-200' : 'text-[#30D158]'} text-[16px]">
+                      ${isExp ? '-' : '+'}${formatMoney(tx.amount)}
+                  </div>
               </div>
             `;
           }).join('')}
@@ -1575,12 +1630,12 @@ function drawBrokerChart() {
         borderWidth: 2.2,
         backgroundColor: gradient,
         fill: true,
-        tension: 0.38, // Bézier smoothing
-        pointRadius: 0, // Убираем точки, оставляем чистую гладкую линию
-        pointHoverRadius: 6,
-        pointHoverBackgroundColor: '#6C5DD3',
-        pointHoverBorderColor: '#ffffff',
-        pointHoverBorderWidth: 2
+        tension: 0.38,
+        pointRadius: data.map(d => d.type === 'Пополнение' ? 5 : 3.5),
+        pointHoverRadius: 7,
+        pointBackgroundColor: data.map(d => d.type === 'Пополнение' ? '#30D158' : '#6C5DD3'),
+        pointBorderColor: '#181B24',
+        pointBorderWidth: 1.5
       }]
     },
     options: {
@@ -1791,14 +1846,36 @@ function renderBroker() {
   const br = Cache?.broker;
   if (!br) return;
 
-  // Основной баланс и сумма депозитов
+  // Основной баланс
   document.getElementById('broker-balance').innerText = formatMoney(br.balance);
-  document.getElementById('broker-deposits').innerText = formatMoney(br.totalDeposits);
 
-  // Единый финансовый бейдж: +X% (+Y ₽) за всё время
-  const yieldPct = br.totalDeposits > 0 ? ((br.profit / br.totalDeposits) * 100).toFixed(1) : 0;
-  const isPos = br.profit >= 0;
+  // Расчет доходности от первой исторической отметки (Базового капитала)
+  const pts = br.chartData || [];
+  let baseCapital = 0;
+  if (pts.length > 0) {
+    const firstPoint = pts[0];
+    if (firstPoint.type === 'Баланс') {
+      // Стартовая сумма + все последующие пополнения
+      const subsequentDeposits = pts.slice(1).filter(p => p.type === 'Пополнение').reduce((s, p) => s + (p.depositAmount || 0), 0);
+      baseCapital = firstPoint.y + subsequentDeposits;
+    } else {
+      baseCapital = br.totalDeposits;
+    }
+  } else {
+    baseCapital = br.totalDeposits;
+  }
+
+  const profit = br.balance - baseCapital;
+  const yieldPct = baseCapital > 0 ? ((profit / baseCapital) * 100).toFixed(1) : 0;
+  const isPos = profit >= 0;
+
+  document.getElementById('broker-deposits').innerText = formatMoney(baseCapital);
+
   const yieldBadge = document.getElementById('broker-yield-badge');
+  if (yieldBadge) {
+    yieldBadge.innerText = `${isPos ? '+' : ''}${yieldPct}% (${isPos ? '+' : ''}${formatMoney(profit)}) за всё время`;
+    yieldBadge.className = `px-2.5 py-0.5 rounded-full text-xs font-semibold ${isPos ? 'bg-[#30D158]/15 text-[#30D158]' : 'bg-[#FF453A]/15 text-[#FF453A]'}`;
+  }
   if (yieldBadge) {
     yieldBadge.innerText = `${isPos ? '+' : ''}${yieldPct}% (${isPos ? '+' : ''}${formatMoney(br.profit)}) за всё время`;
     yieldBadge.className = `px-2.5 py-0.5 rounded-full text-xs font-semibold ${isPos ? 'bg-[#30D158]/15 text-[#30D158]' : 'bg-[#FF453A]/15 text-[#FF453A]'}`;
@@ -1919,15 +1996,15 @@ function renderGoals() {
   document.getElementById('goals-list').innerHTML = data.map(g => {
     const goalIcon = getGoalIcon(g.name);
 
-    // Расчет темпа накопления (сколько месяцев осталось и сколько откладывать в месяц)
+    // Расчет ежемесячного плана пополнений для достижения цели в срок
     let paceBadge = '';
     if (g.rawDeadline && !g.isAchieved) {
       const now = new Date();
       const dl = new Date(g.rawDeadline);
-      const monthsRemaining = Math.max(1, Math.round((dl - now) / (1000 * 60 * 60 * 24 * 30.4)));
+      const monthsRemaining = Math.max(1, Math.round((dl - now) / (1000 * 60 * 60 * 24 * 30.4375)));
       const remainingSum = Math.max(0, g.target - g.saved);
-      const monthlyNeed = Math.round(remainingSum / monthsRemaining);
-      paceBadge = `<span class="text-[11px] text-[#848D99] font-normal">Осталось ~${monthsRemaining} мес. • ~${formatMoney(monthlyNeed)}/мес.</span>`;
+      const monthlyNeed = Math.ceil(remainingSum / monthsRemaining);
+      paceBadge = `<span class="text-[11px] text-[#848D99] font-normal">Осталось ${monthsRemaining} мес. • Вносить ~${formatMoney(monthlyNeed)}/мес.</span>`;
     }
 
     return `
@@ -2079,7 +2156,6 @@ async function deleteSelectedItems() {
   });
 }
 
-// Обработчики долгого нажатия
 function startLongPress(card) {
   longPressTriggered = false;
   clearTimeout(longPressTimer);
@@ -2087,6 +2163,12 @@ function startLongPress(card) {
     longPressTriggered = true;
     suppressClick = true;
     setTimeout(() => { suppressClick = false; }, 400);
+    
+    // Снимаем возможное системное выделение текста в мобильном браузере
+    if (window.getSelection) {
+      window.getSelection().removeAllRanges();
+    }
+
     if (!selectionMode) enableSelectionMode();
     toggleItemSelection(card.dataset.id, card.dataset.table);
   }, 500);
@@ -2374,6 +2456,15 @@ window.openSubModalFromProfile = function(type) {
 let activeContextCard = null;
 
 function openCardContextMenu(e, title, onEdit, onDelete) {
+  if (selectionMode) {
+    if (e) e.stopPropagation();
+    const card = e ? (e.currentTarget || (e.target && e.target.closest('.card'))) : null;
+    if (card) {
+      toggleItemSelection(card.dataset.id, card.dataset.table);
+    }
+    return;
+  }
+
   if (e) e.stopPropagation();
   const menu = document.getElementById('card-context-menu');
   const titleEl = document.getElementById('context-menu-title');
