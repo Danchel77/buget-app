@@ -261,7 +261,7 @@ const BANK_REGISTRY = [
     slug: 'gazprombank',
     badgeColor: 'bg-blue-900/60 text-blue-300 border-blue-700/60',
     // Генеральная лицензия ЦБ РФ № 354 либо Банк ГПБ (АО) в шапке документа
-    detect: (header, tableHeader) => header.includes('354') || header.includes('банк гпб') || header.includes('пао «газпромбанк»') || (tableHeader.includes('дата отражения') && tableHeader.includes('содержание операции')),
+    detect: (header, tableHeader) => header.includes('354') || header.includes('банк гпб') || header.includes('газпромбанк')),
     isTxStart: (l) => /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})/.test(l),
     extract: (lines) => {
       const first = lines[0];
@@ -293,7 +293,7 @@ const BANK_REGISTRY = [
     slug: 'sberbank',
     badgeColor: 'bg-emerald-900/60 text-emerald-300 border-emerald-700/60',
     // Генеральная лицензия ЦБ РФ № 1481 либо sberbank.ru в шапке
-    detect: (header) => header.includes('1481') || header.includes('sberbank.ru') || header.includes('пао сбербанк') || header.includes('сбербанк онлайн'),
+    detect: (header) => header.includes('1481') || header.includes('sberbank.ru') || header.includes('сбербанк') || header.includes('сбербанк онлайн'),
     isTxStart: (l) => /^(\d{2}\.\d{2}\.\d{4})\s+\d{2}:\d{2}/.test(l) && !/^\d{2}\.\d{2}\.\d{4}\s+\d{6}/.test(l),
     extract: (lines) => {
       const first = lines[0];
@@ -324,8 +324,8 @@ const BANK_REGISTRY = [
     name: 'Озон Банк',
     slug: 'ozonbank',
     badgeColor: 'bg-sky-900/60 text-sky-300 border-sky-700/60',
-    // Базовая лицензия ЦБ РФ № 359 либо ООО «Озон Банк» в шапке
-    detect: (header) => header.includes('359') || header.includes('озон банк') || header.includes('ozon bank'),
+    // Базовая лицензия ЦБ РФ № 3542 либо ООО «Озон Банк» в шапке
+    detect: (header) => header.includes('3542') || header.includes('ozon банк') || header.includes('ozon bank') || header.includes('озон банк'),
     isTxStart: (l) => /^\d{2}\.\d{2}\.\d{4}/.test(l),
     extract: (lines) => {
       const first = lines[0];
