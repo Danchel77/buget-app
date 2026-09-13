@@ -1745,10 +1745,11 @@ function renderBroker() {
           ${deps.map(d => `
             <div class="card bg-gray-800 rounded-2xl border border-gray-700 p-3.5 flex justify-between items-center" data-id="${d.id}" data-table="Broker">
               <div>
+                <div>
                 <p class="text-sm font-bold text-emerald-400">+${formatMoney(d.amount)}</p>
                 <p class="text-[11px] text-gray-400 mt-0.5">${d.formattedDate} • Баланс: ${formatMoney(d.balance)}</p>
               </div>
-              <button onclick="deleteRecord('Broker','${d.id}')" class="delete-btn text-gray-500 hover:text-red-400 p-2 text-sm leading-none" title="Удалить" aria-label="Удалить пополнение">✕</button>
+              <button onclick="deleteRecord('Broker','${d.id}')" class="delete-btn text-gray-500 hover:text-[#FF453A] p-2 cursor-pointer transition-colors" title="Удалить" aria-label="Удалить пополнение"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
             </div>
           `).join('')}
         </div>
