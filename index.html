@@ -331,23 +331,50 @@
 
     <!-- ЭКРАН БРОКЕРА -->
     <div id="broker-tab" class="hidden space-y-4 animate-fade-in">
-      <div class="bg-gray-800 p-5 rounded-2xl border border-gray-700 shadow-sm relative overflow-hidden">
-        <div id="broker-goal-badge" class="absolute top-0 right-0 bg-blue-600/20 text-blue-300 text-[9px] px-3 py-1 rounded-bl-lg font-bold uppercase tracking-wide border-b border-l border-blue-600/30 hidden"></div>
-        <p class="text-xs text-gray-400 uppercase tracking-wider mb-1 font-bold">Баланс счета</p>
-        <div class="flex justify-between items-end mb-4">
-          <p id="broker-balance" class="text-3xl font-bold text-white">0 ₽</p>
-          <div class="text-right">
-            <p class="text-[10px] text-gray-500 mb-0.5">Внесено: <span id="broker-deposits">0 ₽</span></p>
-            <p id="broker-profit" class="text-xs font-bold text-emerald-400">+0 ₽</p>
-          </div>
+      <div class="bg-[#181B24] p-5 rounded-3xl border border-[rgba(255,255,255,0.06)] shadow-sm relative overflow-hidden">
+        <div id="broker-goal-badge" class="absolute top-4 right-4 bg-indigo-500/15 text-indigo-400 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider border border-indigo-500/20 hidden"></div>
+        
+        <p class="text-[11px] text-[#848D99] uppercase tracking-wider font-bold mb-1">Брокерский портфель</p>
+        
+        <!-- Основной баланс (динамически меняется при скраббинге пальцем) -->
+        <p id="broker-balance" class="text-3xl font-bold text-white tracking-tight">0 ₽</p>
+        
+        <!-- Финтех-бейдж доходности -->
+        <div class="flex items-center gap-2 mt-2 mb-5 flex-wrap">
+          <span id="broker-yield-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#30D158]/15 text-[#30D158]">
+            +0% (+0 ₽) за всё время
+          </span>
+          <span class="text-xs text-[#848D99]">
+            Внесено: <span id="broker-deposits" class="text-gray-300 font-medium">0 ₽</span>
+          </span>
         </div>
         
+        <!-- Иерархия действий: Primary + Secondary -->
         <div class="flex gap-2 mb-4">
-          <button onclick="toggleForm('broker-form-container', 'broker-submit-btn', 'Сохранить', 'broker-form', 'broker-add')" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-xs font-semibold py-2 rounded-lg transition-colors">+ Пополнить</button>
-          <button onclick="toggleForm('broker-form-container', 'broker-submit-btn', 'Сохранить', 'broker-form', 'broker-bal')" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-xs font-semibold py-2 rounded-lg transition-colors"><i data-lucide="scale" class="w-4 h-4 inline-block mr-1"></i>Баланс</button>
-          <button onclick="toggleForm('broker-goal-container', 'broker-goal-btn', 'Привязать', 'broker-goal-form', 'broker-goal')" class="flex-1 bg-blue-900/40 text-blue-300 border border-blue-800/50 font-semibold rounded-lg text-xs py-2">Цель</button>
+          <button type="button" onclick="toggleForm('broker-form-container', 'broker-submit-btn', 'Сохранить', 'broker-form', 'broker-add')" class="flex-1 bg-[#6C5DD3] hover:bg-[#5b4ec2] text-white text-xs font-semibold py-2.5 rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
+            <i data-lucide="plus" class="w-4 h-4"></i> Пополнить
+          </button>
+          <button type="button" onclick="toggleForm('broker-form-container', 'broker-submit-btn', 'Сохранить', 'broker-form', 'broker-bal')" class="flex-1 bg-[#212430] hover:bg-[#2A2D3C] text-gray-200 border border-[rgba(255,255,255,0.06)] text-xs font-medium py-2.5 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
+            <i data-lucide="scale" class="w-4 h-4 text-gray-400"></i> Баланс
+          </button>
+          <button type="button" onclick="toggleForm('broker-goal-container', 'broker-goal-btn', 'Привязать', 'broker-goal-form', 'broker-goal')" class="px-3.5 bg-[#212430] hover:bg-[#2A2D3C] text-gray-200 border border-[rgba(255,255,255,0.06)] text-xs font-medium py-2.5 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
+            <i data-lucide="target" class="w-4 h-4 text-gray-400"></i> Цель
+          </button>
         </div>
-        <div class="w-full h-40 mt-2"><canvas id="brokerChart"></canvas></div>
+
+        <!-- Переключатель таймфреймов -->
+        <div class="flex items-center justify-between bg-[#12151C] p-1 rounded-xl border border-[rgba(255,255,255,0.04)] mb-2 text-xs font-medium text-[#848D99]">
+          <button type="button" onclick="setBrokerTimeframe('1M')" class="broker-tf-btn flex-1 py-1 text-center rounded-lg transition-all cursor-pointer" data-tf="1M">1М</button>
+          <button type="button" onclick="setBrokerTimeframe('3M')" class="broker-tf-btn flex-1 py-1 text-center rounded-lg transition-all cursor-pointer" data-tf="3M">3М</button>
+          <button type="button" onclick="setBrokerTimeframe('6M')" class="broker-tf-btn flex-1 py-1 text-center rounded-lg transition-all cursor-pointer" data-tf="6M">6М</button>
+          <button type="button" onclick="setBrokerTimeframe('1Y')" class="broker-tf-btn flex-1 py-1 text-center rounded-lg transition-all cursor-pointer" data-tf="1Y">1Г</button>
+          <button type="button" onclick="setBrokerTimeframe('ALL')" class="broker-tf-btn flex-1 py-1 text-center rounded-lg bg-[#212430] text-white transition-all cursor-pointer" data-tf="ALL">Всё</button>
+        </div>
+
+        <!-- Холст графика с поддержкой скраббинга -->
+        <div class="w-full h-44 relative">
+          <canvas id="brokerChart"></canvas>
+        </div>
       </div>
 
       <div id="broker-form-container" class="hidden bg-gray-800 p-5 rounded-2xl border border-gray-700 shadow-sm animate-fade-in">
@@ -453,39 +480,65 @@
 </template>
 
   <!-- Модальное окно предпросмотра сырых данных PDF -->
-  <div id="pdf-debug-dialog" class="fixed inset-0 bg-black/80 z-[130] hidden flex flex-col justify-center items-center p-4">
-    <div class="bg-gray-800 border border-gray-700 w-full max-w-2xl rounded-3xl p-5 shadow-2xl flex flex-col max-h-[85vh]">
-      <div class="flex items-center justify-between pb-3 border-b border-gray-700 w-full min-w-0">
-        <div class="min-w-0 flex-1">
-          <h3 class="font-bold text-white text-base">Импорт выписки</h3>
-          <div id="pdf-debug-info" class="text-xs text-gray-400 mt-1 min-w-0">Файл не выбран</div>
+  <div id="pdf-debug-dialog" class="fixed inset-0 bg-black/85 z-[130] hidden flex flex-col justify-center items-center p-3 sm:p-4 backdrop-blur-sm animate-fade-in">
+    <div class="bg-[#181B24] border border-[rgba(255,255,255,0.06)] w-full max-w-2xl rounded-3xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+      
+      <!-- Фиксированная шапка выписки -->
+      <div class="p-4 border-b border-[rgba(255,255,255,0.06)] bg-[#181B24] z-10 flex flex-col gap-3">
+        <div class="flex items-center justify-between w-full min-w-0">
+          <div class="min-w-0 flex-1">
+            <h3 class="font-bold text-white text-base">Импорт выписки</h3>
+            <div id="pdf-debug-info" class="text-xs text-[#848D99] mt-0.5 min-w-0 truncate">Файл не выбран</div>
+          </div>
+          <button type="button" onclick="openRulesEditorModal()" class="text-gray-400 hover:text-white bg-[#212430] hover:bg-[#2A2D3C] border border-[rgba(255,255,255,0.06)] p-2 rounded-xl text-sm transition-colors flex-shrink-0 ml-2 cursor-pointer flex items-center justify-center" title="Словарь категорий парсера">
+            <i data-lucide="settings" class="w-4 h-4"></i>
+          </button>
         </div>
-        <button type="button" onclick="openRulesEditorModal()" class="text-gray-400 hover:text-white bg-[#212430] hover:bg-[#2A2D3C] border border-[rgba(255,255,255,0.06)] p-2 rounded-xl text-sm transition-colors flex-shrink-0 ml-2 cursor-pointer flex items-center justify-center" title="Словарь категорий парсера">
-          <i data-lucide="settings" class="w-4 h-4"></i>
-        </button>
+
+        <!-- Компактная горизонтальная карточка со статистикой -->
+        <div id="pdf-stats-row" class="bg-[#12151C] border border-[rgba(255,255,255,0.06)] px-3 py-2 rounded-xl flex items-center justify-between text-xs font-medium">
+          <span class="text-gray-300">К импорту: <b id="pdf-stat-count" class="text-white">0</b></span>
+          <span class="text-[#FF453A]">Расход: <b id="pdf-stat-exp" class="font-semibold">0 ₽</b></span>
+          <span class="text-[#30D158]">Доход: <b id="pdf-stat-inc" class="font-semibold">0 ₽</b></span>
+        </div>
+
+        <!-- Фильтр-табы (Новые / В базе / Все) и кнопка «Выбрать все новые» -->
+        <div class="flex items-center justify-between gap-2 pt-1">
+          <div class="flex bg-[#12151C] p-0.5 rounded-xl border border-[rgba(255,255,255,0.04)] text-xs">
+            <button type="button" id="tab-import-new" onclick="setImportFilter('new')" class="px-2.5 py-1 rounded-lg font-semibold bg-[#212430] text-white transition-all">Новые</button>
+            <button type="button" id="tab-import-dupes" onclick="setImportFilter('dupes')" class="px-2.5 py-1 rounded-lg font-medium text-[#848D99] hover:text-white transition-all">В базе</button>
+            <button type="button" id="tab-import-all" onclick="setImportFilter('all')" class="px-2.5 py-1 rounded-lg font-medium text-[#848D99] hover:text-white transition-all">Все</button>
+          </div>
+          
+          <button type="button" onclick="toggleSelectAllNew()" class="text-xs text-blue-400 hover:text-blue-300 font-medium px-2 py-1 rounded-lg hover:bg-[#212430] transition-colors cursor-pointer">
+            Выбрать новые
+          </button>
+        </div>
       </div>
 
-      <div id="pdf-debug-output" class="flex-1 overflow-y-auto mt-4 font-mono text-xs text-gray-300 space-y-2 select-text">
-        <!-- Сюда выведутся строки и колонки -->
+      <!-- Скроллируемый уплотненный список строк -->
+      <div id="pdf-debug-output" class="flex-1 overflow-y-auto px-4 py-2 space-y-1.5 select-text bg-[#0F1117]">
+        <!-- Сюда динамически выводятся компактные строки высотой ~52px -->
       </div>
       
-      <!-- Найди в index.html блок кнопок внизу #pdf-debug-dialog -->
-      <div class="pt-4 mt-2 border-t border-gray-700 flex justify-between items-center gap-2">
-        <button type="button" onclick="downloadParsedJSON()" class="bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 px-3 py-2 rounded-xl text-xs font-semibold transition-colors">
-          ⬇ JSON
+      <!-- Фиксированный прижатый низ (Sticky Footer) с размытием -->
+      <div class="p-4 border-t border-[rgba(255,255,255,0.06)] bg-[#181B24]/95 backdrop-blur-md flex justify-between items-center gap-2 z-10">
+        <button type="button" onclick="downloadParsedJSON()" class="bg-[#212430] hover:bg-[#2A2D3C] text-gray-300 border border-[rgba(255,255,255,0.06)] px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-colors">
+          JSON
         </button>
 
         <div class="flex gap-2">
-          <button type="button" onclick="document.getElementById('pdf-debug-dialog').classList.add('hidden')" class="bg-gray-700 text-white px-4 py-2 rounded-xl text-xs font-medium">
+          <button type="button" onclick="document.getElementById('pdf-debug-dialog').classList.add('hidden')" class="bg-[#212430] hover:bg-[#2A2D3C] text-gray-300 px-4 py-2.5 rounded-xl text-xs font-medium transition-colors cursor-pointer">
             Отмена
           </button>
-          <button type="button" id="btn-import-transactions" onclick="importSelectedTransactions()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-md transition-colors">
+          <button type="button" id="btn-import-transactions" onclick="importSelectedTransactions()" class="bg-[#6C5DD3] hover:bg-[#5b4ec2] text-white px-5 py-2.5 rounded-xl text-xs font-semibold shadow-md transition-all active:scale-95 cursor-pointer disabled:opacity-50">
             Импортировать
           </button>
         </div>
       </div>
     </div>
   </div>
+  
     <!-- Модальное окно создания правила категории -->
   <div id="remember-rule-dialog" class="fixed inset-0 bg-black/80 z-[140] hidden flex flex-col justify-center items-center p-4">
     <div class="bg-gray-800 border border-gray-700 w-full max-w-sm rounded-3xl p-5 shadow-2xl">
