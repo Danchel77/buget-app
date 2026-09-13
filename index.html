@@ -8,7 +8,9 @@
   <!-- PWA настройки -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0b0e12">
-  <!-- Поддержка iOS -->
+  <meta name="theme-color" content="#0b0e12">
+  <!-- Поддержка PWA (современный стандарт и iOS) -->
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Бюджет">
@@ -30,6 +32,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <link rel="stylesheet" href="style.css?v=11">
+  <script defer src="iconsSVG.js?v=1"></script>
   <script defer src="statement-parser.js?v=2"></script>
   <script defer src="app.js?v=11"></script>
 </head>
@@ -500,21 +503,17 @@
         </div>
         <div class="text-[11px] text-gray-300 leading-snug">
           <b class="text-[#30D158] font-semibold block mb-0.5">100% локальная обработка</b>
-          Файл никуда не передаётся и не загружается на сервер. Парсинг чеков происходит прямо в вашем браузере.
+          Файл никуда не передаётся и не загружается на сервер. Обработка выписок происходит прямо в вашем браузере.
         </div>
       </div>
 
-      <!-- Поддерживаемые банки с векторными логотипами -->
+      <!-- Поддерживаемые банки -->
       <p class="text-[10px] uppercase font-bold tracking-wider text-[#848D99] mb-2 px-1">Поддерживаемые банки</p>
       
       <div class="grid grid-cols-2 gap-2 mb-5">
         <!-- Сбербанк -->
         <div class="flex items-center gap-2.5 p-2 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.04)]">
-          <svg viewBox="0 0 32 32" class="w-6 h-6 flex-shrink-0" fill="none">
-            <circle cx="16" cy="16" r="16" fill="#21A038"/>
-            <path d="M14.2 21.8l-5.3-5.3 1.9-1.9 3.4 3.4 8.7-8.7 1.9 1.9-10.6 10.6z" fill="#fff"/>
-            <circle cx="16" cy="16" r="11" stroke="#fff" stroke-width="1.8" fill="none" stroke-dasharray="52" stroke-dashoffset="15"/>
-          </svg>
+          <div data-bank-icon="sber" class="w-7 h-7 flex items-center justify-center flex-shrink-0"></div>
           <div class="min-w-0">
             <div class="text-xs font-semibold text-white truncate">Сбербанк</div>
             <div class="text-[9px] text-[#848D99] truncate">Выписка по счёту</div>
@@ -523,10 +522,7 @@
 
         <!-- Яндекс Банк -->
         <div class="flex items-center gap-2.5 p-2 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.04)]">
-          <svg viewBox="0 0 32 32" class="w-6 h-6 flex-shrink-0" fill="none">
-            <circle cx="16" cy="16" r="16" fill="#FC3F1D"/>
-            <path d="M17.8 8h2.3v16h-2.7v-6.6h-2.1l-3.2 6.6H9.1l3.5-7.1C11.1 16.1 10 14.7 10 12.6c0-2.8 2-4.6 5.5-4.6h2.3zm0 2.2h-2c-2 0-3.1 1-3.1 2.6 0 1.5 1 2.5 3.1 2.5h2v-5.1z" fill="#fff"/>
-          </svg>
+          <div data-bank-icon="yandex" class="w-7 h-7 flex items-center justify-center flex-shrink-0"></div>
           <div class="min-w-0">
             <div class="text-xs font-semibold text-white truncate">Яндекс Банк</div>
             <div class="text-[9px] text-[#848D99] truncate">По договору</div>
@@ -535,11 +531,7 @@
 
         <!-- Газпромбанк -->
         <div class="flex items-center gap-2.5 p-2 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.04)]">
-          <svg viewBox="0 0 32 32" class="w-6 h-6 flex-shrink-0" fill="none">
-            <rect width="32" height="32" rx="8" fill="#0E3692"/>
-            <path d="M16 6.5c-4 5.5-6.5 9-6.5 12.5a6.5 6.5 0 0013 0c0-3.5-2.5-7-6.5-12.5z" fill="#4B88FF"/>
-            <path d="M16 11c-2 3.5-3.5 5.5-3.5 8a3.5 3.5 0 007 0c0-2.5-1.5-4.5-3.5-8z" fill="#fff"/>
-          </svg>
+          <div data-bank-icon="gpb" class="w-7 h-7 flex items-center justify-center flex-shrink-0"></div>
           <div class="min-w-0">
             <div class="text-xs font-semibold text-white truncate">Газпромбанк</div>
             <div class="text-[9px] text-[#848D99] truncate">По карте / счёту</div>
@@ -548,10 +540,7 @@
 
         <!-- Озон Банк -->
         <div class="flex items-center gap-2.5 p-2 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.04)]">
-          <svg viewBox="0 0 32 32" class="w-6 h-6 flex-shrink-0" fill="none">
-            <rect width="32" height="32" rx="8" fill="#005BFF"/>
-            <path d="M16 9c-4.4 0-8 3.1-8 7s3.6 7 8 7 8-3.1 8-7-3.6-7-8-7zm0 10.5c-2.4 0-4.3-1.6-4.3-3.5s1.9-3.5 4.3-3.5 4.3 1.6 4.3 3.5-1.9 3.5-4.3 3.5z" fill="#fff"/>
-          </svg>
+          <div data-bank-icon="ozon" class="w-7 h-7 flex items-center justify-center flex-shrink-0"></div>
           <div class="min-w-0">
             <div class="text-xs font-semibold text-white truncate">Озон Банк</div>
             <div class="text-[9px] text-[#848D99] truncate">О движении</div>
