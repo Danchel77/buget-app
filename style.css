@@ -106,14 +106,11 @@ body.selection-mode .deposit-goal-tag {
   transition: margin-right 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Отдельные карточки (Вклады, Цели) получают контурную рамку */
-.card.selected {
-  box-shadow: inset 0 0 0 2px #6C5DD3 !important;
-  background: rgba(108, 93, 211, 0.14) !important;
-}
-
-/* В сгруппированном списке трат строка подсвечивается равномерно без ломаных внешних рамок */
-#transactions-list .card.selected {
+/* Единый стиль мультивыбора для всех карточек: мягкая заливка без резких контуров */
+.card.selected,
+#transactions-list .card.selected,
+#deposits-list .card.selected,
+#goals-list .card.selected {
   box-shadow: none !important;
   outline: none !important;
   background: rgba(108, 93, 211, 0.22) !important;
