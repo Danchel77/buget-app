@@ -527,16 +527,18 @@ function renderFilteredRows(transactions) {
           </div>
 
           <div class="flex items-center gap-2 flex-shrink-0">
-            <!-- Чипс категории -->
+            <!-- Чипс категории с фиксированной шириной 130px -->
             <div class="relative custom-dropdown-wrap" id="cat-wrap-${tx._id}">
               <button type="button" 
                       onclick="toggleImportCatMenu('${tx._id}')" 
                       id="cat-btn-${tx._id}"
-                      class="bg-[#212430] border border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.15)] text-[#F2F4F7] text-[11px] font-medium rounded-full px-2.5 py-1 flex items-center gap-1.5 outline-none transition-colors cursor-pointer max-w-[150px]">
-                <i data-lucide="${currentIcon}" class="w-3.5 h-3.5 text-[#848D99] flex-shrink-0"></i> 
-                <span id="cat-label-${tx._id}" class="truncate">${escapeHtml(tx.category)}</span>
+                      class="w-[130px] bg-[#212430] border border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.15)] text-[#F2F4F7] text-[11px] font-medium rounded-full px-2.5 py-1 flex items-center justify-between outline-none transition-colors cursor-pointer flex-shrink-0">
+                <span id="cat-label-${tx._id}" class="truncate flex items-center gap-1.5 min-w-0 pr-1">
+                  <i data-lucide="${currentIcon}" class="w-3.5 h-3.5 text-[#848D99] flex-shrink-0"></i> 
+                  <span class="truncate">${escapeHtml(tx.category)}</span>
+                </span>
                 <i data-lucide="chevron-down" class="w-3 h-3 text-gray-500 flex-shrink-0"></i>
-              </button>
+              </button> 
               
               <div id="cat-menu-${tx._id}" 
                    class="custom-dropdown-menu hidden absolute right-0 bottom-full mb-1.5 w-52 max-h-60 overflow-y-auto bg-[#181B24] border border-[rgba(255,255,255,0.08)] rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.85)] z-50 p-1.5 space-y-0.5">
