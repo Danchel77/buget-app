@@ -599,6 +599,8 @@ function renderParsedTransactionsView(fileName, transactions, bankConfig) {
   window._updateHeaderSummary = updateHeaderSummary;
 
   dialog.classList.remove('hidden');
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function toggleImportCatMenu(txId) {
@@ -886,20 +888,20 @@ function renderRulesList() {
   Object.keys(grouped).sort().forEach(cat => {
     const catIcon = getDynamicCategoryIcon(cat);
     html += `
-      <div class="bg-gray-900/70 border border-gray-700/60 rounded-2xl p-3">
-        <div class="text-xs font-bold text-gray-200 mb-2 flex items-center gap-1.5 border-b border-gray-800 pb-1">
-          <span>${catIcon}</span>
+      <div class="bg-[#181B24] border border-[rgba(255,255,255,0.06)] rounded-2xl p-3 mb-3">
+        <div class="text-[13px] font-bold text-gray-200 mb-2.5 flex items-center gap-2 border-b border-[rgba(255,255,255,0.06)] pb-2">
+          <i data-lucide="${catIcon}" class="w-4 h-4 text-[#848D99]"></i>
           <span>${escapeHtml(cat)}</span>
-          <span class="text-[10px] text-gray-500 font-normal">(${grouped[cat].length})</span>
+          <span class="text-[11px] text-[#848D99] font-normal">(${grouped[cat].length})</span>
         </div>
-        <div class="flex flex-wrap gap-1.5">
+        <div class="flex flex-wrap gap-2">
     `;
 
     grouped[cat].forEach(r => {
       html += `
-        <span class="inline-flex items-center gap-1 bg-gray-800 border border-gray-700 text-gray-300 text-xs px-2.5 py-1 rounded-lg">
+        <span class="inline-flex items-center gap-1.5 bg-[#212430] border border-[rgba(255,255,255,0.06)] text-gray-300 text-[12px] px-2.5 py-1.5 rounded-lg">
           <span>${escapeHtml(r.pattern)}</span>
-          <button type="button" onclick="deleteRuleFromEditor('${r.id}')" class="text-gray-500 hover:text-red-400 font-bold ml-1 text-xs cursor-pointer" title="Удалить слово">✕</button>
+          <button type="button" onclick="deleteRuleFromEditor('${r.id}')" class="text-gray-500 hover:text-[#FF453A] cursor-pointer"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
         </span>
       `;
     });
@@ -911,6 +913,7 @@ function renderRulesList() {
   });
 
   container.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 async function addRuleFromEditor() {
@@ -985,13 +988,15 @@ function selectModalCat(type, catName, catIcon) {
 
   if (input) input.value = catName;
   if (label) {
-    label.innerHTML = `${catIcon || '📦'} ${escapeHtml(catName)}`;
+    label.innerHTML = `<i data-lucide="${catIcon || 'tag'}" class="w-4 h-4 inline-block mr-1 align-text-bottom"></i> ${escapeHtml(catName)}`;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
     label.classList.remove('text-gray-400');
     label.classList.add('text-white');
   }
   if (menu) menu.classList.add('hidden');
 }
 
+// Универсальная функция генерации списка для модального меню
 // Универсальная функция генерации списка для модального меню
 function populateModalCatMenu(type, categories, selectedCat) {
   const menu = document.getElementById(`${type}-category-menu`);
@@ -1004,7 +1009,7 @@ function populateModalCatMenu(type, categories, selectedCat) {
 
   if (input) input.value = defaultCat;
   if (label) {
-    label.innerHTML = `${defaultIcon} ${escapeHtml(defaultCat)}`;
+    label.innerHTML = `<i data-lucide="${defaultIcon}" class="w-4 h-4 inline-block mr-1 align-text-bottom"></i> ${escapeHtml(defaultCat)}`;
     label.classList.remove('text-gray-400');
     label.classList.add('text-white');
   }
@@ -1015,12 +1020,14 @@ function populateModalCatMenu(type, categories, selectedCat) {
     return `
       <button type="button" 
               onclick="selectModalCat('${type}', '${escapeHtml(cat)}', '${icon}')" 
-              class="w-full text-left px-3 py-2 text-xs rounded-xl transition-colors flex items-center gap-2 cursor-pointer ${isSelected ? 'bg-blue-600/20 text-blue-300 font-semibold' : 'text-gray-300 hover:bg-gray-700/70'}">
-        <span>${icon}</span>
+              class="w-full text-left px-3 py-2 text-[13px] rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer ${isSelected ? 'bg-[#6C5DD3]/15 text-[#6C5DD3] font-semibold' : 'text-gray-300 hover:bg-[#2A2D3C]'}">
+        <i data-lucide="${icon}" class="w-4 h-4 ${isSelected ? 'text-[#6C5DD3]' : 'text-[#848D99]'}"></i>
         <span class="truncate">${escapeHtml(cat)}</span>
       </button>
     `;
   }).join('');
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 // Глобальное закрытие любых открытых кастомных меню при клике в любое место мимо
