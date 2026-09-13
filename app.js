@@ -594,25 +594,34 @@ function showManageCategoriesDialog() {
 
 function renderManageCategories() {
   const container = document.getElementById('categories-list-container');
-  let html = `<p class="text-xs text-gray-400 mb-2">Расходы</p>`;
+  let html = `<p class="text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-2">Расходы</p>`;
   Cache.categories.expense.forEach(cat => {
     const isDefault = ['Продукты', 'Транспорт', 'Жилье', 'Развлечения', 'Другое'].includes(cat.name);
+    const iconName = cat.icon && cat.icon !== '📦' ? cat.icon : 'tag';
     html += `
-      <div class="flex justify-between items-center py-2 border-b border-gray-700">
-        <span>${cat.icon} ${escapeHtml(cat.name)}</span>
-        ${!isDefault ? `<button class="text-red-400 text-xs" onclick="deleteCategory('${escapeHtml(cat.name)}', 'Расход')">✕</button>` : ''}
+      <div class="flex justify-between items-center py-2.5 border-b border-[rgba(255,255,255,0.06)]">
+        <span class="flex items-center gap-2.5 text-sm font-medium text-gray-200">
+          <i data-lucide="${iconName}" class="w-4 h-4 text-[#848D99]"></i>
+          ${escapeHtml(cat.name)}
+        </span>
+        ${!isDefault ? `<button type="button" class="text-gray-500 hover:text-[#FF453A] p-1 cursor-pointer transition-colors" onclick="deleteCategory('${escapeHtml(cat.name)}', 'Расход')"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
       </div>`;
   });
-  html += `<p class="text-xs text-gray-400 mt-4 mb-2">Доходы</p>`;
+  html += `<p class="text-[11px] uppercase tracking-wider text-gray-500 font-bold mt-5 mb-2">Доходы</p>`;
   Cache.categories.income.forEach(cat => {
     const isDefault = ['Зарплата', 'Другое'].includes(cat.name);
+    const iconName = cat.icon && cat.icon !== '📦' ? cat.icon : 'tag';
     html += `
-      <div class="flex justify-between items-center py-2 border-b border-gray-700">
-        <span>${cat.icon} ${escapeHtml(cat.name)}</span>
-        ${!isDefault ? `<button class="text-red-400 text-xs" onclick="deleteCategory('${escapeHtml(cat.name)}', 'Доход')">✕</button>` : ''}
+      <div class="flex justify-between items-center py-2.5 border-b border-[rgba(255,255,255,0.06)]">
+        <span class="flex items-center gap-2.5 text-sm font-medium text-gray-200">
+          <i data-lucide="${iconName}" class="w-4 h-4 text-[#848D99]"></i>
+          ${escapeHtml(cat.name)}
+        </span>
+        ${!isDefault ? `<button type="button" class="text-gray-500 hover:text-[#FF453A] p-1 cursor-pointer transition-colors" onclick="deleteCategory('${escapeHtml(cat.name)}', 'Доход')"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
       </div>`;
   });
   container.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 async function deleteCategory(name, type) {
