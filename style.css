@@ -87,6 +87,7 @@ header button { background:var(--surface) !important; border:1px solid var(--lin
   height:22px !important;
   z-index:8;
   accent-color:var(--accent);
+  pointer-events: none !important;
 }
 
 body.selection-mode .select-checkbox {
@@ -193,7 +194,8 @@ nav button.text-blue-400::before, nav button.text-blue-500::before { content:"";
   transform: translateX(-50%) !important;
   width: calc(100% - 32px) !important;
   max-width: 500px !important;
-  z-index: 50 !important;
+  z-index: 150 !important;
+  touch-action: manipulation;
 
   align-items: center !important;
   justify-content: space-between !important;
