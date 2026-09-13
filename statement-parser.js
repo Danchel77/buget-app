@@ -261,7 +261,7 @@ const BANK_REGISTRY = [
     slug: 'gazprombank',
     badgeColor: 'bg-blue-900/60 text-blue-300 border-blue-700/60',
     // Генеральная лицензия ЦБ РФ № 354 либо Банк ГПБ (АО) в шапке документа
-    detect: (header, tableHeader) => header.includes('354') || header.includes('банк гпб') || header.includes('газпромбанк')),
+    detect: (header, tableHeader) => header.includes('354') || header.includes('банк гпб') || header.includes('газпромбанк'),
     isTxStart: (l) => /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})/.test(l),
     extract: (lines) => {
       const first = lines[0];
@@ -1065,7 +1065,6 @@ function selectModalCat(type, catName, catIcon) {
   if (menu) menu.classList.add('hidden');
 }
 
-// Универсальная функция генерации списка для модального меню
 // Универсальная функция генерации списка для модального меню
 function populateModalCatMenu(type, categories, selectedCat) {
   const menu = document.getElementById(`${type}-category-menu`);
