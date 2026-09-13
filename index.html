@@ -391,8 +391,8 @@
 
           <!-- Поле баланса -->
           <div class="mb-6">
-            <label id="broker-balance-label" class="block text-xs text-gray-400 mb-1">Баланс счета (₽)</label>
-            <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="broker-balance-input" placeholder="0 ₽" required class="w-full text-2xl font-bold bg-transparent border-b-2 border-gray-700 focus:border-blue-500 text-white outline-none py-1">
+            <label id="broker-balance-label" class="block text-xs text-[#848D99] mb-1.5 font-medium">Баланс счета (₽)</label>
+            <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="broker-balance-input" placeholder="0 ₽" required class="w-full text-2xl font-bold bg-[#12151C] border border-[rgba(255,255,255,0.08)] rounded-xl text-white outline-none px-4 py-3 focus:border-[#6C5DD3] transition-colors">
           </div>
 
           <div class="flex gap-2">
@@ -661,22 +661,34 @@
     </div>
   </div>
 </div>
-  <!-- УНИВЕРСАЛЬНАЯ ШТОРКА (Bottom Sheet) -->
-<div id="action-sheet" class="fixed inset-0 z-[200] hidden items-end bottom-sheet-overlay opacity-0 transition-opacity">
-  <div class="absolute inset-0 w-full h-full cursor-pointer" onclick="closeActionSheet()"></div>
-  <div class="bottom-sheet relative w-full bg-[#181B24] rounded-t-3xl border-t border-[rgba(255,255,255,0.06)] pb-safe-area flex flex-col p-5 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-    <div class="w-12 h-1 bg-[rgba(255,255,255,0.1)] rounded-full mx-auto mb-5"></div>
-    <div id="action-sheet-header" class="text-center mb-6"></div>
-    
-    <div class="space-y-3 pb-8">
-      <button id="action-sheet-edit" class="w-full flex items-center justify-center gap-2 bg-[#212430] hover:bg-[#2A2D3C] text-white py-4 rounded-xl text-[15px] font-semibold transition-colors">
-        <i data-lucide="pencil" class="w-4 h-4 text-gray-400"></i> Редактировать
-      </button>
-      <button id="action-sheet-delete" class="w-full flex items-center justify-center gap-2 bg-[rgba(255,69,58,0.1)] hover:bg-[rgba(255,69,58,0.15)] text-[#FF453A] py-4 rounded-xl text-[15px] font-semibold transition-colors">
-        <i data-lucide="trash-2" class="w-4 h-4"></i> Удалить
-      </button>
+  <!-- ПЛАВАЮЩЕЕ КОНТЕКСТНОЕ МИНИ-МЕНЮ (ПОЯВЛЯЕТСЯ ПРЯМО У КАРТОЧКИ) -->
+  <div id="card-context-menu" class="card-context-menu hidden flex flex-col p-1.5">
+    <div id="context-menu-title" class="px-3 py-2 text-xs font-semibold text-gray-400 border-b border-[rgba(255,255,255,0.06)] truncate mb-1">
+      Действия
+    </div>
+    <button type="button" id="context-btn-edit" class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-[#212430] text-[13px] font-medium text-gray-200 transition-colors cursor-pointer text-left">
+      <i data-lucide="pencil" class="w-4 h-4 text-[#848D99]"></i> Редактировать
+    </button>
+    <button type="button" id="context-btn-delete" class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-[#FF453A]/10 text-[13px] font-medium text-[#FF453A] transition-colors cursor-pointer text-left">
+      <i data-lucide="trash-2" class="w-4 h-4"></i> Удалить
+    </button>
+  </div>
+
+  <!-- КАСТОМНЫЙ АККУРАТНЫЙ КАЛЕНДАРЬ-ПОПОВЕР -->
+  <div id="custom-datepicker" class="fixed z-[160] hidden bg-[#181B24] border border-[rgba(255,255,255,0.08)] rounded-2xl shadow-2xl p-3.5 w-72 backdrop-blur-md">
+    <div class="flex items-center justify-between mb-3 pb-2 border-b border-[rgba(255,255,255,0.06)]">
+      <button type="button" onclick="changeCustomDatePickerMonth(-1)" class="w-7 h-7 rounded-lg hover:bg-[#212430] flex items-center justify-center text-gray-400 hover:text-white cursor-pointer"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+      <span id="datepicker-month-year" class="text-xs font-bold text-white tracking-wide">Сентябрь 2026</span>
+      <button type="button" onclick="changeCustomDatePickerMonth(1)" class="w-7 h-7 rounded-lg hover:bg-[#212430] flex items-center justify-center text-gray-400 hover:text-white cursor-pointer"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+    </div>
+    <div class="grid grid-cols-7 gap-1 text-center text-[10px] text-gray-500 font-bold mb-1.5">
+      <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+    </div>
+    <div id="datepicker-days-grid" class="grid grid-cols-7 gap-1 text-center text-xs"></div>
+    <div class="mt-2.5 pt-2 border-t border-[rgba(255,255,255,0.06)] flex justify-between items-center text-[11px]">
+      <button type="button" onclick="selectCustomDatePickerToday()" class="text-blue-400 hover:underline font-semibold cursor-pointer">Сегодня</button>
+      <button type="button" onclick="closeCustomDatePicker()" class="text-gray-400 hover:text-white cursor-pointer">Закрыть</button>
     </div>
   </div>
-</div>
 </body>
 </html>
