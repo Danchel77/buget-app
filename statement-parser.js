@@ -504,7 +504,7 @@ function renderParsedTransactionsView(fileName, transactions, bankConfig) {
       <!-- Карточка: активная выделяется ярче, неактивная (перевод/дубль) становится глубоко-серой -->
       <div class="card-parsed-row border ${isInactive ? 'bg-[#0e1217] border-gray-800/90' : 'bg-gray-900 border-gray-700/80 shadow-sm'} p-3 rounded-2xl space-y-2 relative" id="card-tx-${tx._id}">
         
-        <!-- СТРОКА 1: Чекбокс, наименование и кнопка запоминания 📌 -->
+        <!-- СТРОКА 1: Чекбокс, наименование и кнопка запоминания -->
         <div class="flex items-center justify-between gap-2 min-w-0">
           <div class="flex items-center gap-2.5 min-w-0 flex-1">
             <input type="checkbox" 
@@ -520,9 +520,9 @@ function renderParsedTransactionsView(fileName, transactions, bankConfig) {
 
           <button type="button" 
                   onclick="openRememberRuleModal('${tx._id}')" 
-                  class="text-xs text-gray-400 hover:text-blue-400 bg-gray-800 hover:bg-gray-700 border border-gray-700 px-2 py-0.5 rounded-lg transition-colors cursor-pointer flex-shrink-0" 
+                  class="text-xs text-[#848D99] hover:text-[#6C5DD3] bg-[#212430] hover:bg-[#2A2D3C] border border-[rgba(255,255,255,0.06)] px-2 py-1.5 rounded-lg transition-colors cursor-pointer flex-shrink-0 flex items-center justify-center" 
                   title="Запомнить правило для этой точки">
-            📌
+            <i data-lucide="pin" class="w-3.5 h-3.5"></i>
           </button>
         </div>
 
