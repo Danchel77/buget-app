@@ -997,9 +997,15 @@ function updateGoalDropdowns() {
 
 function toggleBrokerGoalDropdown(e) {
   if (e) e.stopPropagation();
-  closeAllBrokerPopovers();
   const menu = document.getElementById('broker-goal-dropdown');
-  if (menu) menu.classList.toggle('hidden');
+  if (!menu) return;
+
+  const isClosed = menu.classList.contains('hidden');
+  closeAllBrokerPopovers();
+
+  if (isClosed) {
+    menu.classList.remove('hidden');
+  }
 }
 window.toggleBrokerGoalDropdown = toggleBrokerGoalDropdown;
 
@@ -2198,8 +2204,10 @@ function toggleItemSelection(id, table) {
 }
 
 function cancelSelection() {
+  suppressClick = false;
   disableSelectionMode();
 }
+window.cancelSelection = cancelSelection;
 
 async function deleteSelectedItems() {
   if (selectedItems.size === 0) return;
@@ -2278,7 +2286,19 @@ document.addEventListener('mouseup', handleMouseUp);
 document.addEventListener('mousemove', handleMouseMove);
 
 document.addEventListener('click', (e) => {
-  // Игнорируем первый клик после долгого нажатия
+  // Кнопки панели мультивыбора должны срабатывать ВСЕГДА, даже если выделена всего одна карточка
+  if (e.target.id === 'cancel-selection' || e.target.closest('#cancel-selection')) {
+    if (e) e.stopPropagation();
+    cancelSelection();
+    return;
+  }
+  if (e.target.id === 'delete-selected' || e.target.closest('#delete-selected')) {
+    if (e) e.stopPropagation();
+    deleteSelectedItems();
+    return;
+  }
+
+  // Игнорируем клик после долгого нажатия только для прочих элементов
   if (suppressClick) {
     suppressClick = false;
     return;
@@ -2295,16 +2315,6 @@ document.addEventListener('click', (e) => {
     const type = row.querySelector('.tx-type:checked').value;
     const select = row.querySelector('.tx-category');
     showAddCategoryDialog(type, select);
-    return;
-  }
-
-  // Обработка кнопок панели выбора
-  if (e.target.id === 'delete-selected' || e.target.closest('#delete-selected')) {
-    deleteSelectedItems();
-    return;
-  }
-  if (e.target.id === 'cancel-selection' || e.target.closest('#cancel-selection')) {
-    cancelSelection();
     return;
   }
 
