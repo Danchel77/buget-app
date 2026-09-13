@@ -997,14 +997,78 @@ function updateGoalDropdowns() {
 
 function toggleBrokerGoalDropdown(e) {
   if (e) e.stopPropagation();
+  closeAllBrokerPopovers();
   const menu = document.getElementById('broker-goal-dropdown');
   if (menu) menu.classList.toggle('hidden');
 }
 window.toggleBrokerGoalDropdown = toggleBrokerGoalDropdown;
 
+function toggleBrokerPopover(type, e) {
+  if (e) e.stopPropagation();
+  const popDep = document.getElementById('broker-popover-deposit');
+  const popBal = document.getElementById('broker-popover-balance');
+  const goalMenu = document.getElementById('broker-goal-dropdown');
+  if (goalMenu) goalMenu.classList.add('hidden');
+
+  const today = new Date().toISOString().split('T')[0];
+
+  if (type === 'deposit') {
+    if (popBal) popBal.classList.add('hidden');
+    if (popDep) {
+      const isHidden = popDep.classList.contains('hidden');
+      popDep.classList.toggle('hidden', !isHidden);
+      if (isHidden) {
+        document.getElementById('popover-dep-date').value = today;
+        document.getElementById('popover-dep-amount').value = '';
+        document.getElementById('popover-dep-balance').value = '';
+      }
+    }
+  } else {
+    if (popDep) popDep.classList.add('hidden');
+    if (popBal) {
+      const isHidden = popBal.classList.contains('hidden');
+      popBal.classList.toggle('hidden', !isHidden);
+      if (isHidden) {
+        document.getElementById('popover-bal-date').value = today;
+        document.getElementById('popover-bal-input').value = '';
+      }
+    }
+  }
+}
+window.toggleBrokerPopover = toggleBrokerPopover;
+
+function closeAllBrokerPopovers() {
+  const popDep = document.getElementById('broker-popover-deposit');
+  const popBal = document.getElementById('broker-popover-balance');
+  const goalMenu = document.getElementById('broker-goal-dropdown');
+  if (popDep) popDep.classList.add('hidden');
+  if (popBal) popBal.classList.add('hidden');
+  if (goalMenu) goalMenu.classList.add('hidden');
+}
+window.closeAllBrokerPopovers = closeAllBrokerPopovers;
+
+async function submitBrokerPopover(type) {
+  if (type === 'Пополнение') {
+    const date = document.getElementById('popover-dep-date').value;
+    const amount = getUnformattedVal(document.getElementById('popover-dep-amount'));
+    const balance = getUnformattedVal(document.getElementById('popover-dep-balance')) || amount;
+    if (!amount) return showToast('Введите сумму пополнения', true);
+    
+    closeAllBrokerPopovers();
+    await submitAction('broker-submit-btn', 'Broker', { type: 'Пополнение', date, amount, balance });
+  } else {
+    const date = document.getElementById('popover-bal-date').value;
+    const balance = getUnformattedVal(document.getElementById('popover-bal-input'));
+    if (!balance && balance !== 0) return showToast('Введите баланс', true);
+
+    closeAllBrokerPopovers();
+    await submitAction('broker-submit-btn', 'Broker', { type: 'Баланс', date, amount: balance, balance });
+  }
+}
+window.submitBrokerPopover = submitBrokerPopover;
+
 async function selectBrokerGoal(goalId) {
-  const menu = document.getElementById('broker-goal-dropdown');
-  if (menu) menu.classList.add('hidden');
+  closeAllBrokerPopovers();
   await submitAction('broker-goal-btn', 'Broker', {
     type: 'Цель',
     date: new Date().toISOString().split('T')[0],
