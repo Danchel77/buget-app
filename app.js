@@ -1750,7 +1750,7 @@ function renderDeposits() {
 
   const renderCard = (dep, isCls) => `
     <div
-      class="card w-full mb-4 flex flex-col p-4 cursor-pointer overflow-hidden ${isCls ? 'opacity-50 grayscale' : ''}"
+      class="card bg-[#181B24] border border-[rgba(255,255,255,0.06)] rounded-2xl w-full mb-3 flex flex-col p-4 cursor-pointer overflow-hidden ${isCls ? 'opacity-50 grayscale' : ''}"
       data-id="${dep.id}"
       data-table="Deposits"
       ${!isCls ? `onclick="openCardContextMenu(event, '${escapeHtml(dep.name)}', () => editDep('${dep.id}','${escapeHtml(dep.name)}',${dep.amount},${dep.rate},'${dep.rawStart}','${dep.rawEnd}','${dep.goalId}'), () => deleteRecord('Deposits', '${dep.id}'))"` : ''}
@@ -1769,8 +1769,8 @@ function renderDeposits() {
         </div>
         
         ${dep.goalName ? `
-          <div class="flex-shrink-0 ml-2">
-            <span class="px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase bg-indigo-500/15 text-indigo-400 rounded-full border border-indigo-500/20 truncate max-w-[80px] inline-block">
+          <div class="deposit-goal-tag flex-shrink-0 ml-2">
+            <span class="px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase bg-indigo-500/15 text-indigo-400 rounded-full border border-indigo-500/20 truncate max-w-[90px] inline-block">
               ${escapeHtml(dep.goalName)}
             </span>
           </div>
@@ -1898,7 +1898,7 @@ function renderBroker() {
     const deps = br.deposits || [];
     if (deps.length === 0) {
       list.innerHTML = `
-        <div class="card p-6 text-center flex flex-col items-center justify-center gap-3 mt-4 border border-[rgba(255,255,255,0.06)] bg-[#181B24]">
+        <div class="card rounded-2xl p-6 text-center flex flex-col items-center justify-center gap-3 mt-4 border border-[rgba(255,255,255,0.06)] bg-[#181B24]">
           <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
             <i data-lucide="arrow-down-circle" class="w-6 h-6"></i>
           </div>
@@ -2004,11 +2004,11 @@ function renderGoals() {
       const monthsRemaining = Math.max(1, Math.round((dl - now) / (1000 * 60 * 60 * 24 * 30.4375)));
       const remainingSum = Math.max(0, g.target - g.saved);
       const monthlyNeed = Math.ceil(remainingSum / monthsRemaining);
-      paceBadge = `<span class="text-[11px] text-[#848D99] font-normal">Осталось ${monthsRemaining} мес. • Вносить ~${formatMoney(monthlyNeed)}/мес.</span>`;
+      paceBadge = `<span class="text-[11px] text-[#848D99] font-normal">Осталось ${monthsRemaining} мес. • <span class="whitespace-nowrap">Вносить ~${formatMoney(monthlyNeed)}/мес.</span></span>`;
     }
 
     return `
-      <div class="card w-full flex flex-col p-5 cursor-pointer overflow-hidden mb-4 ${g.isAchieved ? 'ring-1 ring-[#30D158]/40 bg-[#30D158]/5' : 'bg-[#181B24]'}" 
+      <div class="card rounded-2xl w-full flex flex-col p-5 cursor-pointer overflow-hidden mb-4 border border-[rgba(255,255,255,0.06)] ${g.isAchieved ? 'ring-1 ring-[#30D158]/40 bg-[#30D158]/5' : 'bg-[#181B24]'}" 
            data-id="${g.id}" data-table="Goals"
            onclick="openCardContextMenu(event, '${escapeHtml(g.name)}', () => editGoal('${g.id}', '${escapeHtml(g.name)}', ${g.target}, '${g.rawDeadline}'), () => deleteRecord('Goals', '${g.id}'))">
         
@@ -2089,8 +2089,8 @@ function enableSelectionMode() {
         <span id="selected-count">Выбрано: 0</span>
       </div>
       <div class="selection-panel__actions">
-        <button id="cancel-selection" type="button">Отмена</button>
-        <button id="delete-selected" type="button">Удалить</button>
+        <button id="cancel-selection" type="button" onclick="cancelSelection()">Отмена</button>
+        <button id="delete-selected" type="button" onclick="deleteSelectedItems()">Удалить</button>
       </div>
     `;
     document.body.appendChild(panel);
@@ -2507,10 +2507,20 @@ function closeCardContextMenu() {
   activeContextCard = null;
 }
 
-// При скролле страницы или списков меню и календарь мгновенно закрываются
+// Скрытие тултипа графика Брокера
+function hideBrokerChartTooltip() {
+  if (brokerChartObj && typeof brokerChartObj.setActiveElements === 'function') {
+    brokerChartObj.setActiveElements([]);
+    brokerChartObj.tooltip?.setActiveElements([], { x: 0, y: 0 });
+    brokerChartObj.update('none');
+  }
+}
+
+// При скролле страницы скрываются меню, календарь и всплывающая точка графика
 window.addEventListener('scroll', () => {
   closeCardContextMenu();
   closeCustomDatePicker();
+  hideBrokerChartTooltip();
 }, { passive: true, capture: true });
 
 // Закрытие при клике мимо
@@ -2520,6 +2530,9 @@ document.addEventListener('click', (e) => {
   }
   if (!e.target.closest('#custom-datepicker') && !e.target.closest('input[type="date"]')) {
     closeCustomDatePicker();
+  }
+  if (!e.target.closest('#brokerChart')) {
+    hideBrokerChartTooltip();
   }
 });
 
