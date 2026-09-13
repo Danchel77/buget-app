@@ -167,11 +167,11 @@
     <div id="transactions-tab" class="space-y-4 hidden animate-fade-in">
       <div class="grid grid-cols-2 gap-3 mb-2">
         <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700 shadow-sm">
-          <p class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Расходы (Тек. мес)</p>
+          <p id="month-expense-label" class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1 truncate">Расходы (Тек. мес)</p>
           <p id="month-expense" class="font-bold text-white text-lg">0 ₽</p>
         </div>
         <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700 shadow-sm">
-          <p class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Доходы (Тек. мес)</p>
+          <p id="month-income-label" class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1 truncate">Доходы (Тек. мес)</p>
           <p id="month-income" class="font-bold text-emerald-400 text-lg">0 ₽</p>
         </div>
       </div>
@@ -460,8 +460,8 @@
       <input type="text" inputmode="decimal" oninput="formatSumInput(this)" required class="tx-amount w-full text-2xl font-bold bg-gray-800 border border-gray-600 focus:border-blue-500 text-white rounded-lg p-3 outline-none" placeholder="0 ₽">
     </div>
 
-      <div class="grid grid-cols-[110px_1fr] gap-2 mb-3">
-      <input type="date" required class="tx-date w-full min-w-0 bg-gray-800 border border-gray-600 text-white rounded-lg p-2 outline-none text-xs">
+      <div class="grid grid-cols-[130px_1fr] gap-2 mb-3">
+      <input type="date" required class="tx-date w-full min-w-0 bg-gray-800 border border-gray-600 text-white rounded-lg p-2.5 outline-none text-xs">
       
       <!-- Кастомный селектор категории на всю ширину -->
       <div class="relative w-full min-w-0 custom-dropdown-wrap">
