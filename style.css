@@ -24,13 +24,17 @@ body {
 }
 body::before { display: none; /* Убираем дешевое фоновое свечение */ }
 
+/* ---------- Базовый стиль для всех карточек ---------- */
+.card, .card * {
+  position: relative;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
 .card {
-  position:relative !important;
-  background: var(--surface) !important;
-  border: 1px solid var(--line) !important;
-  border-radius: 18px !important;
-  box-shadow: none !important; /* Убираем размытые тени - flat дизайн */
-  transition: background 0.2s, transform 0.1s;
+  position: relative !important;
+  transition: background-color 0.2s ease, transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .card:active {
   background: var(--surface-2) !important;
@@ -89,10 +93,11 @@ body.selection-mode .select-checkbox {
   display:block !important;
 }
 
+body.selection-mode .tx-amount,
 body.selection-mode #transactions-list .tx-delete-btn,
 body.selection-mode #transactions-list .tx-edit-btn,
 body.selection-mode #transactions-list .tx-amount {
-  display:none !important;
+  display: none !important;
 }
 
 .card.selected {
