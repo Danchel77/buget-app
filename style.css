@@ -100,9 +100,16 @@ body.selection-mode #transactions-list .tx-amount {
   display: none !important;
 }
 
+/* При мультивыборе бейдж цели плавно сдвигается левее, чтобы флажок его не перекрывал */
+body.selection-mode .deposit-goal-tag {
+  margin-right: 28px !important;
+  transition: margin-right 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Идеальная внутренняя скругленная обводка с подсветкой */
 .card.selected {
-  outline:2px solid var(--accent) !important;
-  background:rgba(123,131,255,.10) !important;
+  box-shadow: inset 0 0 0 2px #6C5DD3 !important;
+  background: rgba(108, 93, 211, 0.14) !important;
 }
 
 /* ---------- top transaction controls ---------- */
