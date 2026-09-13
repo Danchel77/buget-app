@@ -2771,6 +2771,7 @@ function openPdfInfoModal() {
   const dlg = document.getElementById('pdf-info-dialog');
   if (dlg) {
     dlg.classList.remove('hidden');
+    if (typeof renderBankIcons === 'function') renderBankIcons();
     if (typeof lucide !== 'undefined') lucide.createIcons();
   }
 }
