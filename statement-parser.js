@@ -296,8 +296,15 @@ const BANK_REGISTRY = [
         'Скачайте сформированный PDF-документ'
       ]
     },
-    // Лицензия ЦБ РФ № 3027 либо официальное юрлицо в шапке документа
-    detect: (header) => header.includes('3027') || header.includes('яндекс банк') || header.includes('yabank.yandex.ru'),
+    getScore: (p) => {
+      let score = 0;
+      if (/лицензи[яи][^\d]*3027\b/i.test(p) || p.includes('3027')) score += 10;
+      if (p.includes('яндекс банк') || p.includes('кб яндекс') || p.includes('yandex bank') || p.includes('ао яндекс')) score += 8;
+      if (p.includes('yabank.yandex.ru') || p.includes('yandex.ru/bank') || p.includes('yandex pay') || p.includes('яндекс пэй')) score += 5;
+      if (p.includes('договору сейва') || p.includes('сейв') || p.includes('справка об остатке')) score += 4;
+      return score;
+    },
+    detect: function(p) { return this.getScore(p) >= 5; },
     isTxStart: (l) => /\d{2}\.\d{2}\.\d{4}/.test(l) && /[\d\s\xa0]+[.,]\d{2}\s*₽/.test(l),
     isServiceLine: (l) => (l.includes('операции') && l.includes('мск')) || (l.includes('обработки') && l.includes('договора')),
     extract: (lines) => {
@@ -332,8 +339,15 @@ const BANK_REGISTRY = [
         'Сформируйте и сохраните файл в формате PDF'
       ]
     },
-    // Генеральная лицензия ЦБ РФ № 354 либо Банк ГПБ (АО) в шапке документа
-    detect: (header, tableHeader) => header.includes('354') || header.includes('банк гпб') || header.includes('газпромбанк'),
+    getScore: (p) => {
+      let score = 0;
+      if (/лицензи[яи][^\d]*354\b/i.test(p)) score += 10;
+      if (p.includes('банк гпб') || p.includes('газпромбанк') || p.includes('гпб (ао)') || p.includes('гпб (акционерное')) score += 8;
+      if (p.includes('gazprombank.ru')) score += 5;
+      if (p.includes('дата отражения') || p.includes('номер банковского счета')) score += 4;
+      return score;
+    },
+    detect: function(p) { return this.getScore(p) >= 5; },
     isTxStart: (l) => /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})/.test(l),
     extract: (lines) => {
       const first = lines[0];
@@ -375,8 +389,16 @@ const BANK_REGISTRY = [
         'Нажмите «Сохранить» или отправьте файл на e-mail'
       ]
     },
-    // Генеральная лицензия ЦБ РФ № 1481 либо sberbank.ru в шапке
-    detect: (header) => header.includes('1481') || header.includes('sberbank.ru') || header.includes('сбербанк') || header.includes('сбербанк онлайн'),
+    getScore: (p) => {
+      let score = 0;
+      if (/лицензи[яи][^\d]*1481\b/i.test(p) || p.includes('1481')) score += 10;
+      if (p.includes('пао сбербанк') || p.includes('сбербанк россии') || p.includes('сбербанк онлайн') || p.includes('sberbank online')) score += 8;
+      else if (p.includes('сбербанк')) score += 5;
+      if (p.includes('sberbank.ru') || p.includes('sber.ru')) score += 5;
+      if (p.includes('отчет по счету') || p.includes('выписка по счету дебетовой карты') || p.includes('выписка по счету карты')) score += 4;
+      return score;
+    },
+    detect: function(p) { return this.getScore(p) >= 5; },
     isTxStart: (l) => /^(\d{2}\.\d{2}\.\d{4})\s+\d{2}:\d{2}/.test(l) && !/^\d{2}\.\d{2}\.\d{4}\s+\d{6}/.test(l),
     extract: (lines) => {
       const first = lines[0];
@@ -418,8 +440,15 @@ const BANK_REGISTRY = [
         'Нажмите кнопку «Скачать PDF»'
       ]
     },
-    // Базовая лицензия ЦБ РФ № 3542 либо ООО «Озон Банк» в шапке
-    detect: (header) => header.includes('3542') || header.includes('ozon банк') || header.includes('ozon bank') || header.includes('озон банк'),
+    getScore: (p) => {
+      let score = 0;
+      if (/лицензи[яи][^\d]*3542\b/i.test(p) || p.includes('3542')) score += 10;
+      if (p.includes('озон банк') || p.includes('ozon банк') || p.includes('ozon bank') || p.includes('еком банк') || p.includes('ecom bank')) score += 8;
+      if (p.includes('finance.ozon.ru') || p.includes('ozon.ru')) score += 5;
+      if (p.includes('справка о движении денежных средств') || p.includes('справка о движении средств') || p.includes('движении средств')) score += 4;
+      return score;
+    },
+    detect: function(p) { return this.getScore(p) >= 5; },
     isTxStart: (l) => /^\d{2}\.\d{2}\.\d{4}/.test(l),
     extract: (lines) => {
       const first = lines[0];
@@ -503,24 +532,51 @@ window.closeBankGuide = closeBankGuide;
 // 3. ДИСПЕТЧЕР (НАХОДИТ БАНК И ЗАПУСКАЕТ ПАРСИНГ)
 // =============================================================
 class StatementDispatcher {
-  static parse(rawLines) {
-    // 1. Шапка документа: строго первые 12 строк. Здесь находятся реквизиты эмитента и лицензия,
-    // но ещё гарантированно не начались строки с операциями переводов.
-    const header = rawLines.slice(0, 12).join(' ').toLowerCase();
+  /**
+   * Интеллектуально выделяет шапку документа строго до начала таблицы операций,
+   * чтобы захватить лицензии и реквизиты, исключив строки переводов СБП.
+   */
+  static extractPreamble(rawLines) {
+    let cutoffIndex = Math.min(rawLines.length, 50);
 
-    // 2. Зона таблицы: первые 30 строк для проверки названий колонок (например, "дата отражения")
-    const tableHeader = rawLines.slice(0, 30).join(' ').toLowerCase();
-    
-    // Ищем подходящий банк по юридическим реквизитам шапки
-    const config = BANK_REGISTRY.find(bank => bank.detect(header, tableHeader));
-
-    if (!config) {
-      const supported = BANK_REGISTRY.map(b => b.name).join(', ');
-      throw new Error(`Банк не поддерживается. На данный момент доступны: ${supported}.`);
+    for (let i = 0; i < cutoffIndex; i++) {
+      const line = rawLines[i].toLowerCase();
+      // Остановка перед заголовком таблицы или первой транзакцией
+      if (
+        line.includes('дата операции') ||
+        line.includes('дата списания') ||
+        line.includes('дата отражения') ||
+        (/\d{2}\.\d{2}\.\d{4}/.test(line) && /[\d\s\xa0]+[.,]\d{2}/.test(line))
+      ) {
+        cutoffIndex = Math.max(i, 8);
+        break;
+      }
     }
 
-    const transactions = UniversalStatementParser.parse(rawLines, config);
-    return { bank: config, transactions };
+    return rawLines.slice(0, cutoffIndex).join(' ').toLowerCase();
+  }
+
+  static parse(rawLines) {
+    const preamble = this.extractPreamble(rawLines);
+
+    let bestBank = null;
+    let maxScore = 0;
+
+    for (const bank of BANK_REGISTRY) {
+      const score = bank.getScore ? bank.getScore(preamble) : (bank.detect(preamble) ? 10 : 0);
+      if (score > maxScore) {
+        maxScore = score;
+        bestBank = bank;
+      }
+    }
+
+    if (!bestBank || maxScore < 5) {
+      const supported = BANK_REGISTRY.map(b => b.name).join(', ');
+      throw new Error(`Не удалось определить банк выписки. Поддерживаются: ${supported}.`);
+    }
+
+    const transactions = UniversalStatementParser.parse(rawLines, bestBank);
+    return { bank: bestBank, transactions };
   }
 }
 
