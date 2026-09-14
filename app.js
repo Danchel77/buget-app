@@ -2368,9 +2368,11 @@ document.addEventListener('click', (e) => {
 async function processOrSeedRules(snapshot) {
   const userDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+  const norm = (str) => typeof StatementCategorizer !== 'undefined' ? StatementCategorizer.normalize(str) : String(str || '').toLowerCase().trim();
+
   // Маркеры подавленных пользователем системных слов
   const disabledPatterns = new Set(
-    userDocs.filter(d => d.disabled).map(d => (d.pattern || '').toLowerCase().trim())
+    userDocs.filter(d => d.disabled).map(d => norm(d.pattern))
   );
 
   // Пользовательские добавленные правила
@@ -2382,18 +2384,16 @@ async function processOrSeedRules(snapshot) {
   }));
 
   const customMap = new Map();
-  customRules.forEach(r => customMap.set(r.pattern.toLowerCase(), r));
+  customRules.forEach(r => customMap.set(norm(r.pattern), r));
 
   // Берем системные правила из default-rules.js
   const systemDefaults = window.DEFAULT_CATEGORY_RULES || [];
   const combined = [];
 
   systemDefaults.forEach((rule, idx) => {
-    const patKey = (rule.pattern || '').toLowerCase().trim();
-    // Пропускаем, если пользователь нажал крестик (подавил правило)
+    const patKey = norm(rule.pattern);
     if (disabledPatterns.has(patKey)) return;
 
-    // Если пользователь переназначил категорию для системного слова — берем версию пользователя
     if (customMap.has(patKey)) {
       combined.push(customMap.get(patKey));
       customMap.delete(patKey);
@@ -2407,7 +2407,6 @@ async function processOrSeedRules(snapshot) {
     }
   });
 
-  // Добавляем оставшиеся созданные пользователем слова
   customMap.forEach(rule => combined.push(rule));
 
   return combined;
