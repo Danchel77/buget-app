@@ -46,13 +46,6 @@ async function initNewUserIfNeeded(user) {
 async function seedNewUserInitialData(user) {
   try {
     const batch = db.batch();
-    
-    // Начальные правила словаря
-    if (typeof StatementCategorizer !== 'undefined' && StatementCategorizer.DEFAULT_RULES) {
-      StatementCategorizer.DEFAULT_RULES.forEach(r => {
-        batch.set(getUserCol('CategoryRules').doc(), r);
-      });
-    }
 
     // Документ пользователя
     batch.set(db.collection('users').doc(user.uid), {
@@ -2371,29 +2364,53 @@ document.addEventListener('click', (e) => {
   toggleItemSelection(card.dataset.id, card.dataset.table);
 });
 
-// Автозаполнение словаря в Firebase при первом запуске
+// Гибридная загрузка: системный словарь из файла + пользовательские оверрайды из Firestore
 async function processOrSeedRules(snapshot) {
-  if (!snapshot.empty) {
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  }
+  const userDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-  // Базовый словарь берется из внешнего файла default-rules.js
-  const defaultRules = window.DEFAULT_CATEGORY_RULES || [];
+  // Маркеры подавленных пользователем системных слов
+  const disabledPatterns = new Set(
+    userDocs.filter(d => d.disabled).map(d => (d.pattern || '').toLowerCase().trim())
+  );
 
-  try {
-    const batch = db.batch();
-    const rules = [];
-    defaultRules.forEach(rule => {
-      const docRef = db.collection('CategoryRules').doc();
-      batch.set(docRef, rule);
-      rules.push({ id: docRef.id, ...rule });
-    });
-    await batch.commit();
-    return rules;
-  } catch (e) {
-    console.error("Ошибка заполнения словаря:", e);
-    return defaultRules;
-  }
+  // Пользовательские добавленные правила
+  const customRules = userDocs.filter(d => !d.disabled && d.pattern && d.category).map(d => ({
+    id: d.id,
+    pattern: d.pattern.trim(),
+    category: d.category,
+    isSystem: false
+  }));
+
+  const customMap = new Map();
+  customRules.forEach(r => customMap.set(r.pattern.toLowerCase(), r));
+
+  // Берем системные правила из default-rules.js
+  const systemDefaults = window.DEFAULT_CATEGORY_RULES || [];
+  const combined = [];
+
+  systemDefaults.forEach((rule, idx) => {
+    const patKey = (rule.pattern || '').toLowerCase().trim();
+    // Пропускаем, если пользователь нажал крестик (подавил правило)
+    if (disabledPatterns.has(patKey)) return;
+
+    // Если пользователь переназначил категорию для системного слова — берем версию пользователя
+    if (customMap.has(patKey)) {
+      combined.push(customMap.get(patKey));
+      customMap.delete(patKey);
+    } else {
+      combined.push({
+        id: 'sys_' + idx,
+        pattern: rule.pattern,
+        category: rule.category,
+        isSystem: true
+      });
+    }
+  });
+
+  // Добавляем оставшиеся созданные пользователем слова
+  customMap.forEach(rule => combined.push(rule));
+
+  return combined;
 }
 
 // =============================================================
