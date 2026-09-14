@@ -575,7 +575,6 @@ document.getElementById('category-save-btn').addEventListener('click', async () 
     arr.push({ name, icon: selectedCategoryIcon });
     updateCategorySelect(currentCategorySelect, currentCategoryType);
     document.getElementById('category-dialog').classList.add('hidden');
-    showToast('Категория добавлена');
   } catch (e) {
     showToast('Ошибка', true);
   }
@@ -1072,11 +1071,10 @@ async function submitBrokerPopover(type) {
     if (!amount) return showToast('Введите сумму пополнения', true);
     
     closeAllBrokerPopovers();
-    showToast('Сохранение пополнения...', false, true);
     try {
       await getUserCol('Broker').add({ type: 'Пополнение', date, amount, balance });
       await fetchAllData();
-      showToast('Пополнение сохранено');
+      
     } catch (e) {
       showToast('Ошибка сохранения: ' + e.message, true);
     }
@@ -1084,13 +1082,11 @@ async function submitBrokerPopover(type) {
     const date = document.getElementById('popover-bal-date').value || new Date().toISOString().split('T')[0];
     const balance = getUnformattedVal(document.getElementById('popover-bal-input'));
     if (!balance && balance !== 0) return showToast('Введите баланс', true);
-
     closeAllBrokerPopovers();
-    showToast('Фиксация баланса...', false, true);
+   
     try {
       await getUserCol('Broker').add({ type: 'Баланс', date, amount: balance, balance });
       await fetchAllData();
-      showToast('Баланс зафиксирован');
     } catch (e) {
       showToast('Ошибка сохранения: ' + e.message, true);
     }
@@ -1100,7 +1096,6 @@ window.submitBrokerPopover = submitBrokerPopover;
 
 async function selectBrokerGoal(goalId) {
   closeAllBrokerPopovers();
-  showToast('Сохранение цели...', false, true);
   try {
     const col = getUserCol('Broker');
     await col.add({
@@ -1109,7 +1104,6 @@ async function selectBrokerGoal(goalId) {
       goalId: goalId
     });
     await fetchAllData();
-    showToast(goalId ? 'Цель привязана к портфелю' : 'Цель отвязана');
   } catch (err) {
     showToast('Ошибка привязки цели: ' + err.message, true);
   }
@@ -2425,7 +2419,6 @@ async function processOrSeedRules(snapshot) {
 // =============================================================
 // ЛИЧНЫЙ КАБИНЕТ И НАСТРОЙКИ ПОЛЬЗОВАТЕЛЯ
 // =============================================================
-
 function openProfileModal() {
   const user = auth.currentUser;
   if (!user) return;
