@@ -532,15 +532,14 @@ function isTransactionDuplicate(tx) {
   return false;
 }
 
-
 // -------------------------------------------------------------
 // ОБНОВЛЕННЫЙ УПЛОТНЕННЫЙ РЕНДЕР КАРТОЧЕК ВЫПИСКИ (~52px)
 // -------------------------------------------------------------
-let currentImportFilter = 'new'; // 'new' | 'dupes' | 'all'
+let currentImportFilter = 'new'; // 'new' | 'transfers' | 'dupes' | 'all'
 
 function setImportFilter(filter) {
   currentImportFilter = filter;
-  ['new', 'dupes', 'all'].forEach(f => {
+  ['new', 'transfers', 'dupes', 'all'].forEach(f => {
     const btn = document.getElementById(`tab-import-${f}`);
     if (btn) {
       btn.className = f === filter
@@ -575,12 +574,14 @@ function renderFilteredRows(transactions) {
   const expenseCategories = getActiveCategories('Расход');
   const incomeCategories = getActiveCategories('Доход');
 
-  // Фильтрация по статусам
+  // Фильтрация по статусам: разделяем переводы и дубликаты
   let visibleTxs = transactions;
   if (currentImportFilter === 'new') {
     visibleTxs = transactions.filter(t => !t.isDuplicate && !t.isTransfer);
+  } else if (currentImportFilter === 'transfers') {
+    visibleTxs = transactions.filter(t => t.isTransfer);
   } else if (currentImportFilter === 'dupes') {
-    visibleTxs = transactions.filter(t => t.isDuplicate || t.isTransfer);
+    visibleTxs = transactions.filter(t => t.isDuplicate && !t.isTransfer);
   }
 
   if (visibleTxs.length === 0) {
@@ -648,7 +649,7 @@ function renderFilteredRows(transactions) {
               <div id="cat-menu-${tx._id}" 
                    class="custom-dropdown-menu hidden absolute right-0 bottom-full mb-1.5 w-52 max-h-60 overflow-y-auto bg-[#181B24] border border-[rgba(255,255,255,0.08)] rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.85)] z-50 p-1.5 space-y-0.5">
                 ${cats.map(cat => {
-                  const defaultList = ['Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Развлечения', 'Другое', 'Зарплата', 'Возврат', 'Кэшбек'];
+                  const defaultList = ['Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Одежда', 'Здоровье', 'Развлечения', 'Другое', 'Зарплата', 'Возврат', 'Кэшбек'];
                   const isCustom = !defaultList.includes(cat);
                   const loopIcon = getDynamicCategoryIcon(cat);
                   return `
@@ -690,6 +691,74 @@ function renderFilteredRows(transactions) {
   });
 
   output.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function renderParsedTransactionsView(fileName, transactions, bankConfig) {
+  window._lastActiveBank = bankConfig;
+
+  // Сортировка по убыванию даты
+  transactions.sort((a, b) => b.date.localeCompare(a.date));
+  
+  const dialog = document.getElementById('pdf-debug-dialog');
+  const info = document.getElementById('pdf-debug-info');
+
+  transactions.forEach((tx, idx) => {
+    tx._id = 'tx_parsed_' + idx;
+    if (!tx.category || tx.category === 'Не определено') {
+      tx.category = StatementCategorizer.categorize(tx.merchant, tx.rawDetails, tx.type);
+    }
+    tx.isDuplicate = isTransactionDuplicate(tx);
+    tx.selected = !tx.isDuplicate && !tx.isTransfer;
+  });
+
+  window._lastParsedTransactions = transactions;
+
+  function updateHeaderSummary() {
+    const selectedTxs = transactions.filter(t => t.selected);
+    const totalExp = selectedTxs.filter(t => t.type === 'Расход').reduce((s, t) => s + t.amount, 0);
+    const totalInc = selectedTxs.filter(t => t.type === 'Доход').reduce((s, t) => s + t.amount, 0);
+
+    const bankName = bankConfig.name || 'Банк';
+    if (info) {
+      info.innerText = `${bankName} • ${fileName}`;
+    }
+
+    // Обновляем метрики в компактной горизонтальной карточке
+    const cntEl = document.getElementById('pdf-stat-count');
+    const expEl = document.getElementById('pdf-stat-exp');
+    const incEl = document.getElementById('pdf-stat-inc');
+    if (cntEl) cntEl.innerText = `${selectedTxs.length} из ${transactions.length}`;
+    if (expEl) expEl.innerText = formatMoney(totalExp);
+    if (incEl) incEl.innerText = formatMoney(totalInc);
+
+    // Обновляем бейджи табов с разделением переводов и дубликатов
+    const newCount = transactions.filter(t => !t.isDuplicate && !t.isTransfer).length;
+    const transfersCount = transactions.filter(t => t.isTransfer).length;
+    const dupesCount = transactions.filter(t => t.isDuplicate && !t.isTransfer).length;
+    
+    const tabNew = document.getElementById('tab-import-new');
+    const tabTransfers = document.getElementById('tab-import-transfers');
+    const tabDupes = document.getElementById('tab-import-dupes');
+    const tabAll = document.getElementById('tab-import-all');
+
+    if (tabNew) tabNew.innerText = `Новые (${newCount})`;
+    if (tabTransfers) tabTransfers.innerText = `Переводы (${transfersCount})`;
+    if (tabDupes) tabDupes.innerText = `В базе (${dupesCount})`;
+    if (tabAll) tabAll.innerText = `Все (${transactions.length})`;
+
+    const importBtn = document.getElementById('btn-import-transactions');
+    if (importBtn) {
+      importBtn.innerText = `Импортировать (${selectedTxs.length})`;
+      importBtn.disabled = selectedTxs.length === 0;
+    }
+  }
+
+  window._updateHeaderSummary = updateHeaderSummary;
+  setImportFilter('new'); // По умолчанию открываем только новые транзакции
+  updateHeaderSummary();
+
+  dialog.classList.remove('hidden');
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
