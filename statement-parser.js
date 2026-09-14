@@ -90,39 +90,89 @@ function getDynamicCategoryIcon(catName) {
 // 3. УНИВЕРСАЛЬНЫЙ ОПРЕДЕЛИТЕЛЬ (И ДОХОДЫ, И РАСХОДЫ ИЗ FIREBASE)
 // -------------------------------------------------------------
 class StatementCategorizer {
-  static categorize(merchant, rawDetails, type) {
-    const text = `${merchant} ${rawDetails}`.toLowerCase();
-    const rules = window.Cache?.categoryRules || [];
+  static normalize(str) {
+    if (!str) return '';
 
-    // Получаем ТОЛЬКО актуальные категории нужного типа из базы
+    // 1. Приведение к нижнему регистру и нормализация буквы ё
+    let s = String(str).toLowerCase().replace(/ё/g, 'е');
+
+    // 2. Транслитерация кириллицы в латиницу по стандарту банковских терминалов
+    const ruToEn = {
+      'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e',
+      'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l',
+      'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's',
+      'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch',
+      'ш': 'sh', 'щ': 'shch', 'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e',
+      'ю': 'yu', 'я': 'ya'
+    };
+
+    s = s.replace(/[а-я]/g, char => ruToEn[char] !== undefined ? ruToEn[char] : char);
+
+    // 3. Фонетическая гармонизация латиницы
+    s = s
+      .replace(/x/g, 'ks')       // taxi -> taksi, yandex -> yandeks
+      .replace(/w/g, 'v')       // wildberries / vkusvill
+      .replace(/ia/g, 'ya')     // piaterochka -> pyaterochka
+      .replace(/iu/g, 'yu')     // iulius -> yulius
+      .replace(/shch/g, 'sh')
+      .replace(/sch/g, 'sh')
+      .replace(/tc/g, 'ts')     // tc -> ts
+      .replace(/tz/g, 'ts')
+      .replace(/ph/g, 'f');     // pharmacy -> farmacy
+
+    // 4. Очистка спецсимволов и дублирующихся пробелов
+    s = s.replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+
+    return s;
+  }
+
+  static categorize(merchant, rawDetails, type) {
+    const rawText = `${merchant} ${rawDetails}`;
+    const normText = this.normalize(rawText);
+    const normTextNoSpaces = normText.replace(/\s+/g, '');
+
+    const rules = window.Cache?.categoryRules?.length
+      ? window.Cache.categoryRules
+      : (window.DEFAULT_CATEGORY_RULES || []);
+
     const allowedCategories = getActiveCategories(type);
 
-    // Сверяем с правилами из базы
     for (const rule of rules) {
       if (!rule.pattern || !rule.category) continue;
-
-      // Если категория правила не существует в категориях этого типа — пропускаем
       if (!allowedCategories.includes(rule.category)) continue;
 
-      const pattern = rule.pattern.toLowerCase().trim();
-      if (this._matches(text, pattern)) {
+      if (this._matches(normText, normTextNoSpaces, rule.pattern)) {
         return rule.category;
       }
     }
 
-    // Если ничего не подошло — ставим 'Другое' (или первую категорию из списка)
     return allowedCategories.includes('Другое') ? 'Другое' : (allowedCategories[0] || 'Другое');
   }
 
-  static _matches(text, pattern) {
-    if (pattern.length <= 4) {
-      const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(`(^|[^a-zA-Zа-яА-Я0-9])${escaped}([^a-zA-Zа-яА-Я0-9]|$)`, 'i');
-      return regex.test(text);
+  static _matches(normText, normTextNoSpaces, rawPattern) {
+    const normPat = this.normalize(rawPattern);
+    if (!normPat) return false;
+
+    // Для коротких паттернов (<= 4 символов) строго проверяем границы слов
+    if (normPat.length <= 4) {
+      const escaped = normPat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`);
+      return regex.test(normText);
     }
-    return text.includes(pattern);
+
+    // 1. Прямой поиск в нормализованном тексте
+    if (normText.includes(normPat)) return true;
+
+    // 2. Поиск без пробелов (например: "vkus vill" находит "vkusvill", "burger king" находит "burgerking")
+    const normPatNoSpaces = normPat.replace(/\s+/g, '');
+    if (normPatNoSpaces.length >= 5 && normTextNoSpaces.includes(normPatNoSpaces)) {
+      return true;
+    }
+
+    return false;
   }
 }
+window.StatementCategorizer = StatementCategorizer;
 
 // =============================================================
 // 1. УНИВЕРСАЛЬНЫЙ ДВИЖОК ПАРСИНГА ВЫПИСОК
@@ -1052,8 +1102,9 @@ async function saveCategoryRuleFromModal() {
     batch.set(newDocRef, { pattern: keyword, category: category });
     await batch.commit();
 
+    const normKeyword = StatementCategorizer.normalize(keyword);
     if (!window.Cache.categoryRules) window.Cache.categoryRules = [];
-    window.Cache.categoryRules = window.Cache.categoryRules.filter(r => r.pattern.toLowerCase() !== keyword.toLowerCase());
+    window.Cache.categoryRules = window.Cache.categoryRules.filter(r => StatementCategorizer.normalize(r.pattern) !== normKeyword);
     window.Cache.categoryRules.push({ id: newDocRef.id, pattern: keyword, category: category, isSystem: false });
 
     if (window._lastParsedTransactions) {
@@ -1197,7 +1248,8 @@ async function deleteRuleFromEditor(ruleId, isSystem, pattern) {
       await col.doc(ruleId).delete();
     }
 
-    window.Cache.categoryRules = (window.Cache.categoryRules || []).filter(r => r.id !== ruleId && r.pattern.toLowerCase() !== pattern.toLowerCase());
+    const normTarget = StatementCategorizer.normalize(pattern);
+    window.Cache.categoryRules = (window.Cache.categoryRules || []).filter(r => r.id !== ruleId && StatementCategorizer.normalize(r.pattern) !== normTarget);
     renderRulesList();
     showToast('Слово удалено из словаря');
   } catch (e) {
