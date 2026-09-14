@@ -501,6 +501,8 @@ function processCategories(cats) {
     { name: 'Маркетплейсы', icon: 'shopping-bag' },
     { name: 'Транспорт', icon: 'car' },
     { name: 'Жилье', icon: 'home' },
+    { name: 'Одежда', icon: 'shirt' },
+    { name: 'Здоровье', icon: 'heart-pulse' },
     { name: 'Развлечения', icon: 'gamepad-2' },
     { name: 'Другое', icon: 'package' }
   ];
@@ -513,11 +515,10 @@ function processCategories(cats) {
 
   const expense = [...defaultExpense];
   const income = [...defaultIncome];
-  // Заменим эмодзи при обработке кастомных на 'tag'
   cats.forEach(c => {
-    let rawIcon = c.icon && c.icon.length < 5 ? 'tag' : c.icon; // защищаемся от старых эмодзи из бд
+    let rawIcon = c.icon && c.icon.length < 5 ? 'tag' : c.icon;
     if (c.type === 'Расход') { if (!expense.some(item => item.name === c.name)) expense.push({ name: c.name, icon: rawIcon || 'tag' }); } 
-    else if (c.type === 'Доход') { if (!income.some(item => item.name === c.name)) income.push({ name: c.name, icon: rawIcon || 'tag' }); }
+    else if (c.type === 'Доход') { if (!income.push({ name: c.name, icon: rawIcon || 'tag' })) income.push({ name: c.name, icon: rawIcon || 'tag' }); }
   });
   return { expense, income };
 }
@@ -863,20 +864,35 @@ function processBroker(ops, goals) {
     }
   });
 
-  // Точки на графике сортируем строго от старых к новым
+  // Точки на графике сортируем от старых к новым
   points.sort((a, b) => a.timestamp - b.timestamp);
 
   // Карточки пополнений сортируем от новых к старым
   depositList.sort((a, b) => b.timestamp - a.timestamp);
 
-  // Текущий баланс — это последняя точка по времени
+  // Текущий баланс — последняя точка по времени
   const currentBalance = points.length > 0 ? points[points.length - 1].y : 0;
-  const profit = currentBalance - totalDeposits;
+
+  // Базовый капитал: если первая точка была фиксацией баланса, базовый капитал = баланс первой точки + последующие пополнения
+  let baseCapital = 0;
+  if (points.length > 0) {
+    const firstPoint = points[0];
+    if (firstPoint.type === 'Баланс') {
+      const subsequentDeposits = points.slice(1).filter(p => p.type === 'Пополнение').reduce((s, p) => s + (p.depositAmount || 0), 0);
+      baseCapital = firstPoint.y + subsequentDeposits;
+    } else {
+      baseCapital = totalDeposits;
+    }
+  } else {
+    baseCapital = totalDeposits;
+  }
+
+  const profit = currentBalance - baseCapital;
 
   return {
     balance: currentBalance,
-    totalDeposits,
-    profit,
+    totalDeposits: baseCapital,
+    profit: profit,
     goalId,
     goalName: goalsMap[goalId] || '',
     chartData: points,
@@ -1055,20 +1071,34 @@ window.closeAllBrokerPopovers = closeAllBrokerPopovers;
 
 async function submitBrokerPopover(type) {
   if (type === 'Пополнение') {
-    const date = document.getElementById('popover-dep-date').value;
+    const date = document.getElementById('popover-dep-date').value || new Date().toISOString().split('T')[0];
     const amount = getUnformattedVal(document.getElementById('popover-dep-amount'));
     const balance = getUnformattedVal(document.getElementById('popover-dep-balance')) || amount;
     if (!amount) return showToast('Введите сумму пополнения', true);
     
     closeAllBrokerPopovers();
-    await submitAction('broker-submit-btn', 'Broker', { type: 'Пополнение', date, amount, balance });
+    showToast('Сохранение пополнения...', false, true);
+    try {
+      await getUserCol('Broker').add({ type: 'Пополнение', date, amount, balance });
+      await fetchAllData();
+      showToast('Пополнение сохранено');
+    } catch (e) {
+      showToast('Ошибка сохранения: ' + e.message, true);
+    }
   } else {
-    const date = document.getElementById('popover-bal-date').value;
+    const date = document.getElementById('popover-bal-date').value || new Date().toISOString().split('T')[0];
     const balance = getUnformattedVal(document.getElementById('popover-bal-input'));
     if (!balance && balance !== 0) return showToast('Введите баланс', true);
 
     closeAllBrokerPopovers();
-    await submitAction('broker-submit-btn', 'Broker', { type: 'Баланс', date, amount: balance, balance });
+    showToast('Фиксация баланса...', false, true);
+    try {
+      await getUserCol('Broker').add({ type: 'Баланс', date, amount: balance, balance });
+      await fetchAllData();
+      showToast('Баланс зафиксирован');
+    } catch (e) {
+      showToast('Ошибка сохранения: ' + e.message, true);
+    }
   }
 }
 window.submitBrokerPopover = submitBrokerPopover;
@@ -1919,23 +1949,9 @@ function renderBroker() {
   // Основной баланс
   document.getElementById('broker-balance').innerText = formatMoney(br.balance);
 
-  // Расчет доходности от первой исторической отметки (Базового капитала)
-  const pts = br.chartData || [];
-  let baseCapital = 0;
-  if (pts.length > 0) {
-    const firstPoint = pts[0];
-    if (firstPoint.type === 'Баланс') {
-      // Стартовая сумма + все последующие пополнения
-      const subsequentDeposits = pts.slice(1).filter(p => p.type === 'Пополнение').reduce((s, p) => s + (p.depositAmount || 0), 0);
-      baseCapital = firstPoint.y + subsequentDeposits;
-    } else {
-      baseCapital = br.totalDeposits;
-    }
-  } else {
-    baseCapital = br.totalDeposits;
-  }
-
-  const profit = br.balance - baseCapital;
+  // Базовый капитал и чистая прибыль
+  const baseCapital = br.totalDeposits;
+  const profit = br.profit;
   const yieldPct = baseCapital > 0 ? ((profit / baseCapital) * 100).toFixed(1) : 0;
   const isPos = profit >= 0;
 
@@ -1944,10 +1960,6 @@ function renderBroker() {
   const yieldBadge = document.getElementById('broker-yield-badge');
   if (yieldBadge) {
     yieldBadge.innerText = `${isPos ? '+' : ''}${yieldPct}% (${isPos ? '+' : ''}${formatMoney(profit)}) за всё время`;
-    yieldBadge.className = `px-2.5 py-0.5 rounded-full text-xs font-semibold ${isPos ? 'bg-[#30D158]/15 text-[#30D158]' : 'bg-[#FF453A]/15 text-[#FF453A]'}`;
-  }
-  if (yieldBadge) {
-    yieldBadge.innerText = `${isPos ? '+' : ''}${yieldPct}% (${isPos ? '+' : ''}${formatMoney(br.profit)}) за всё время`;
     yieldBadge.className = `px-2.5 py-0.5 rounded-full text-xs font-semibold ${isPos ? 'bg-[#30D158]/15 text-[#30D158]' : 'bg-[#FF453A]/15 text-[#FF453A]'}`;
   }
 
@@ -1962,7 +1974,7 @@ function renderBroker() {
     }
   }
 
-  // Отрисовка списка пополнений или аккуратного пустого экрана (Empty State)
+  // Отрисовка списка пополнений
   const list = document.getElementById('broker-deposits-list');
   if (list) {
     const deps = br.deposits || [];
@@ -1976,7 +1988,7 @@ function renderBroker() {
             <p class="text-sm font-semibold text-gray-200">Пополнений пока нет</p>
             <p class="text-xs text-[#848D99] mt-0.5">Внесите первое пополнение, чтобы зафиксировать баланс</p>
           </div>
-          <button type="button" onclick="toggleForm('broker-form-container', 'broker-submit-btn', 'Сохранить', 'broker-form', 'broker-add')" class="mt-1 px-4 py-2.5 rounded-xl bg-[#6C5DD3] hover:bg-[#5b4ec2] text-white text-xs font-semibold transition-all active:scale-95 cursor-pointer">
+          <button type="button" onclick="toggleBrokerPopover('deposit', event)" class="mt-1 px-4 py-2.5 rounded-xl bg-[#6C5DD3] hover:bg-[#5b4ec2] text-white text-xs font-semibold transition-all active:scale-95 cursor-pointer">
             + Внести первое пополнение
           </button>
         </div>
@@ -2006,7 +2018,6 @@ function renderBroker() {
 
   if (typeof lucide !== 'undefined') lucide.createIcons();
 
-  // Отрисовываем график, если вкладка открыта
   const brokerTab = document.getElementById('broker-tab');
   if (brokerTab && !brokerTab.classList.contains('hidden')) {
     drawBrokerChart();
@@ -2430,6 +2441,63 @@ async function processOrSeedRules(snapshot) {
     { pattern: "wildberries", category: "Маркетплейсы" },
     { pattern: "ozon", category: "Маркетплейсы" },
     { pattern: "озон", category: "Маркетплейсы" },
+    { pattern: "zara", category: "Одежда" },
+    { pattern: "befree", category: "Одежда" },
+    { pattern: "lime", category: "Одежда" },
+    { pattern: "лайм", category: "Одежда" },
+    { pattern: "zarina", category: "Одежда" },
+    { pattern: "зарина", category: "Одежда" },
+    { pattern: "gloria", category: "Одежда" },
+    { pattern: "глория", category: "Одежда" },
+    { pattern: "ostin", category: "Одежда" },
+    { pattern: "остин", category: "Одежда" },
+    { pattern: "rendez", category: "Одежда" },
+    { pattern: "рандеву", category: "Одежда" },
+    { pattern: "sportmaster", category: "Одежда" },
+    { pattern: "спортмастер", category: "Одежда" },
+    { pattern: "ecco", category: "Одежда" },
+    { pattern: "экко", category: "Одежда" },
+    { pattern: "kari", category: "Одежда" },
+    { pattern: "кари", category: "Одежда" },
+    { pattern: "lamoda", category: "Одежда" },
+    { pattern: "ламода", category: "Одежда" },
+    { pattern: "colins", category: "Одежда" },
+    { pattern: "колинс", category: "Одежда" },
+    { pattern: "calzedonia", category: "Одежда" },
+    { pattern: "intimissimi", category: "Одежда" },
+    { pattern: "love republic", category: "Одежда" },
+    { pattern: "sinsay", category: "Одежда" },
+    { pattern: "reserved", category: "Одежда" },
+    { pattern: "одежда", category: "Одежда" },
+    { pattern: "обувь", category: "Одежда" },
+    // Здоровье и медицина
+    { pattern: "apteka", category: "Здоровье" },
+    { pattern: "аптека", category: "Здоровье" },
+    { pattern: "rigla", category: "Здоровье" },
+    { pattern: "ригла", category: "Здоровье" },
+    { pattern: "eapteka", category: "Здоровье" },
+    { pattern: "еаптека", category: "Здоровье" },
+    { pattern: "gorzdrav", category: "Здоровье" },
+    { pattern: "горздрав", category: "Здоровье" },
+    { pattern: "vita", category: "Здоровье" },
+    { pattern: "вита", category: "Здоровье" },
+    { pattern: "планета здоровья", category: "Здоровье" },
+    { pattern: "столички", category: "Здоровье" },
+    { pattern: "ozerki", category: "Здоровье" },
+    { pattern: "озерки", category: "Здоровье" },
+    { pattern: "невис", category: "Здоровье" },
+    { pattern: "helix", category: "Здоровье" },
+    { pattern: "хеликс", category: "Здоровье" },
+    { pattern: "invitro", category: "Здоровье" },
+    { pattern: "инвитро", category: "Здоровье" },
+    { pattern: "gemotest", category: "Здоровье" },
+    { pattern: "гемотест", category: "Здоровье" },
+    { pattern: "клиника", category: "Здоровье" },
+    { pattern: "clinic", category: "Здоровье" },
+    { pattern: "стоматолог", category: "Здоровье" },
+    { pattern: "stomatolog", category: "Здоровье" },
+    { pattern: "медицин", category: "Здоровье" },
+    { pattern: "оптика", category: "Здоровье" },
     // Доходы / Зарплата
     { pattern: "заработная плата", category: "Зарплата" },
     { pattern: "salary", category: "Зарплата" },
