@@ -333,12 +333,12 @@
 
     <!-- ЭКРАН БРОКЕРА -->
     <div id="broker-tab" class="hidden space-y-4 animate-fade-in">
-      <div class="bg-[#181B24] p-5 rounded-3xl border border-[rgba(255,255,255,0.06)] shadow-sm relative overflow-hidden">
+      <div class="bg-[#181B24] p-5 rounded-3xl border border-[rgba(255,255,255,0.06)] shadow-sm relative">
         <div id="broker-goal-badge" class="absolute top-4 right-4 bg-indigo-500/15 text-indigo-400 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider border border-indigo-500/20 hidden"></div>
         
         <p class="text-[11px] text-[#848D99] uppercase tracking-wider font-bold mb-1">Брокерский портфель</p>
         
-        <!-- Основной баланс (динамически меняется при скраббинге пальцем) -->
+        <!-- Основной баланс -->
         <p id="broker-balance" class="text-3xl font-bold text-white tracking-tight">0 ₽</p>
         
         <!-- Финтех-бейдж доходности -->
@@ -351,16 +351,47 @@
           </span>
         </div>
         
-        <!-- Иерархия действий с компактными кнопками -->
-        <div class="flex gap-2 mb-4 relative z-20">
-          <button type="button" onclick="toggleBrokerPopover('deposit', event)" class="flex-1 bg-[#6C5DD3] hover:bg-[#5b4ec2] text-white text-xs font-semibold py-2.5 rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
-            <i data-lucide="plus" class="w-4 h-4"></i> Пополнить
-          </button>
+        <!-- Иерархия действий с аккуратными поповерами под кнопками -->
+        <div class="flex gap-2 mb-4 relative z-30">
+          <!-- Кнопка и поповер: Пополнение -->
+          <div class="relative flex-1 custom-dropdown-wrap">
+            <button type="button" onclick="toggleBrokerPopover('deposit', event)" class="w-full bg-[#6C5DD3] hover:bg-[#5b4ec2] text-white text-xs font-semibold py-2.5 rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
+              <i data-lucide="plus" class="w-4 h-4"></i> Пополнить
+            </button>
+            
+            <div id="broker-popover-deposit" class="custom-dropdown-menu hidden absolute left-0 top-full mt-2 w-72 bg-[#181B24] border border-[rgba(255,255,255,0.08)] rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.85)] p-4 z-50 animate-fade-in">
+              <h4 class="text-xs font-bold text-white mb-3">Внести пополнение</h4>
+              <input type="date" id="popover-dep-date" class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white rounded-xl p-2.5 outline-none mb-3 text-xs">
+              <label class="block text-[10px] text-[#848D99] uppercase font-bold mb-1">Сумма пополнения (₽)</label>
+              <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="popover-dep-amount" placeholder="0 ₽" class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white rounded-xl p-2.5 outline-none mb-3 text-sm font-bold">
+              <label class="block text-[10px] text-[#848D99] uppercase font-bold mb-1">Баланс после пополнения (₽)</label>
+              <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="popover-dep-balance" placeholder="0 ₽" class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white rounded-xl p-2.5 outline-none mb-4 text-sm font-bold">
+              <div class="flex gap-2">
+                <button type="button" onclick="closeAllBrokerPopovers()" class="flex-1 bg-[#212430] hover:bg-[#2A2D3C] text-gray-300 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer">Отмена</button>
+                <button type="button" onclick="submitBrokerPopover('Пополнение')" class="flex-1 bg-[#6C5DD3] hover:bg-[#5b4ec2] text-white py-2 rounded-xl text-xs font-semibold shadow-md transition-all active:scale-95 cursor-pointer">Сохранить</button>
+              </div>
+            </div>
+          </div>
 
-          <button type="button" onclick="toggleBrokerPopover('balance', event)" class="flex-1 bg-[#212430] hover:bg-[#2A2D3C] text-gray-200 border border-[rgba(255,255,255,0.06)] text-xs font-medium py-2.5 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
-            <i data-lucide="scale" class="w-4 h-4 text-gray-400"></i> Баланс
-          </button>
+          <!-- Кнопка и поповер: Баланс -->
+          <div class="relative flex-1 custom-dropdown-wrap">
+            <button type="button" onclick="toggleBrokerPopover('balance', event)" class="w-full bg-[#212430] hover:bg-[#2A2D3C] text-gray-200 border border-[rgba(255,255,255,0.06)] text-xs font-medium py-2.5 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
+              <i data-lucide="scale" class="w-4 h-4 text-gray-400"></i> Баланс
+            </button>
 
+            <div id="broker-popover-balance" class="custom-dropdown-menu hidden absolute left-1/2 -translate-x-1/2 top-full mt-2 w-64 bg-[#181B24] border border-[rgba(255,255,255,0.08)] rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.85)] p-4 z-50 animate-fade-in">
+              <h4 class="text-xs font-bold text-white mb-3">Зафиксировать баланс</h4>
+              <input type="date" id="popover-bal-date" class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white rounded-xl p-2.5 outline-none mb-3 text-xs">
+              <label class="block text-[10px] text-[#848D99] uppercase font-bold mb-1">Баланс на дату (₽)</label>
+              <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="popover-bal-input" placeholder="0 ₽" class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white rounded-xl p-2.5 outline-none mb-4 text-sm font-bold">
+              <div class="flex gap-2">
+                <button type="button" onclick="closeAllBrokerPopovers()" class="flex-1 bg-[#212430] hover:bg-[#2A2D3C] text-gray-300 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer">Отмена</button>
+                <button type="button" onclick="submitBrokerPopover('Баланс')" class="flex-1 bg-[#6C5DD3] hover:bg-[#5b4ec2] text-white py-2 rounded-xl text-xs font-semibold shadow-md transition-all active:scale-95 cursor-pointer">Сохранить</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Кнопка и меню: Цель -->
           <div class="relative custom-dropdown-wrap">
             <button type="button" onclick="toggleBrokerGoalDropdown(event)" class="px-3.5 bg-[#212430] hover:bg-[#2A2D3C] text-gray-200 border border-[rgba(255,255,255,0.06)] text-xs font-medium py-2.5 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
               <i data-lucide="target" class="w-4 h-4 text-gray-400"></i> Цель
@@ -575,15 +606,15 @@
         </div>
 
         <!-- Фильтр-табы (Новые / Переводы / В базе / Все) и кнопка «Выбрать все новые» -->
-        <div class="flex items-center justify-between gap-2 pt-1">
-          <div class="flex bg-[#12151C] p-0.5 rounded-xl border border-[rgba(255,255,255,0.04)] text-xs">
-            <button type="button" id="tab-import-new" onclick="setImportFilter('new')" class="px-2.5 py-1 rounded-lg font-semibold bg-[#212430] text-white transition-all">Новые</button>
-            <button type="button" id="tab-import-transfers" onclick="setImportFilter('transfers')" class="px-2.5 py-1 rounded-lg font-medium text-[#848D99] hover:text-white transition-all">Переводы</button>
-            <button type="button" id="tab-import-dupes" onclick="setImportFilter('dupes')" class="px-2.5 py-1 rounded-lg font-medium text-[#848D99] hover:text-white transition-all">В базе</button>
-            <button type="button" id="tab-import-all" onclick="setImportFilter('all')" class="px-2.5 py-1 rounded-lg font-medium text-[#848D99] hover:text-white transition-all">Все</button>
+        <div class="flex items-center justify-between gap-2 pt-1 overflow-hidden">
+          <div class="flex bg-[#12151C] p-0.5 rounded-xl border border-[rgba(255,255,255,0.04)] text-xs overflow-x-auto no-scrollbar">
+            <button type="button" id="tab-import-new" onclick="setImportFilter('new')" class="whitespace-nowrap px-2.5 py-1 rounded-lg font-semibold bg-[#212430] text-white transition-all cursor-pointer">Новые (0)</button>
+            <button type="button" id="tab-import-transfers" onclick="setImportFilter('transfers')" class="whitespace-nowrap px-2.5 py-1 rounded-lg font-medium text-[#848D99] hover:text-white transition-all cursor-pointer">Переводы (0)</button>
+            <button type="button" id="tab-import-dupes" onclick="setImportFilter('dupes')" class="whitespace-nowrap px-2.5 py-1 rounded-lg font-medium text-[#848D99] hover:text-white transition-all cursor-pointer">В базе (0)</button>
+            <button type="button" id="tab-import-all" onclick="setImportFilter('all')" class="whitespace-nowrap px-2.5 py-1 rounded-lg font-medium text-[#848D99] hover:text-white transition-all cursor-pointer">Все (0)</button>
           </div>
           
-          <button type="button" onclick="toggleSelectAllNew()" class="text-xs text-blue-400 hover:text-blue-300 font-medium px-2 py-1 rounded-lg hover:bg-[#212430] transition-colors cursor-pointer">
+          <button type="button" onclick="toggleSelectAllNew()" class="text-xs text-blue-400 hover:text-blue-300 font-medium px-2 py-1 rounded-lg hover:bg-[#212430] transition-colors cursor-pointer whitespace-nowrap flex-shrink-0">
             Выбрать новые
           </button>
         </div>
@@ -761,44 +792,8 @@
       <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
     </div>
     <div id="datepicker-days-grid" class="grid grid-cols-7 gap-1 text-center text-xs"></div>
-    <div class="mt-2.5 pt-2 border-t border-[rgba(255,255,255,0.06)] flex justify-between items-center text-[11px]">
-      <button type="button" onclick="selectCustomDatePickerToday()" class="text-blue-400 hover:underline font-semibold cursor-pointer">Сегодня</button>
+    <button type="button" onclick="selectCustomDatePickerToday()" class="text-blue-400 hover:underline font-semibold cursor-pointer">Сегодня</button>
       <button type="button" onclick="closeCustomDatePicker()" class="text-gray-400 hover:text-white cursor-pointer">Закрыть</button>
-    </div>
-  </div>
-
-  <!-- МОДАЛЬНЫЕ ОКНА БРОКЕРА: ПОПОЛНЕНИЕ И ФИКСАЦИЯ БАЛАНСА (НЕ ОБРЕЗАЮТСЯ ИНТЕРФЕЙСОМ) -->
-  <div id="broker-popover-deposit" class="fixed inset-0 bg-black/80 z-[160] hidden flex flex-col justify-center items-center p-4 backdrop-blur-sm animate-fade-in">
-    <div class="bg-[#181B24] border border-[rgba(255,255,255,0.08)] w-full max-w-xs rounded-3xl p-5 shadow-2xl">
-      <div class="flex items-center justify-between pb-3 mb-3 border-b border-[rgba(255,255,255,0.06)]">
-        <h4 class="text-sm font-bold text-white">Внести пополнение</h4>
-        <button type="button" onclick="closeAllBrokerPopovers()" class="w-7 h-7 rounded-full bg-[#212430] text-gray-400 hover:text-white flex items-center justify-center cursor-pointer text-sm">✕</button>
-      </div>
-      <input type="date" id="popover-dep-date" class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white rounded-xl p-3 outline-none mb-3 text-xs">
-      <label class="block text-[10px] text-[#848D99] uppercase font-bold mb-1">Сумма пополнения (₽)</label>
-      <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="popover-dep-amount" placeholder="0 ₽" class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white rounded-xl p-3 outline-none mb-3 text-sm font-bold">
-      <label class="block text-[10px] text-[#848D99] uppercase font-bold mb-1">Баланс после пополнения (₽)</label>
-      <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="popover-dep-balance" placeholder="0 ₽" class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white rounded-xl p-3 outline-none mb-5 text-sm font-bold">
-      <div class="flex gap-2">
-        <button type="button" onclick="closeAllBrokerPopovers()" class="flex-1 bg-[#212430] hover:bg-[#2A2D3C] text-gray-300 py-3 rounded-xl text-xs font-semibold transition-colors cursor-pointer">Отмена</button>
-        <button type="button" onclick="submitBrokerPopover('Пополнение')" class="flex-1 bg-[#6C5DD3] hover:bg-[#5b4ec2] text-white py-3 rounded-xl text-xs font-semibold shadow-md transition-all active:scale-95 cursor-pointer">Сохранить</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="broker-popover-balance" class="fixed inset-0 bg-black/80 z-[160] hidden flex flex-col justify-center items-center p-4 backdrop-blur-sm animate-fade-in">
-    <div class="bg-[#181B24] border border-[rgba(255,255,255,0.08)] w-full max-w-xs rounded-3xl p-5 shadow-2xl">
-      <div class="flex items-center justify-between pb-3 mb-3 border-b border-[rgba(255,255,255,0.06)]">
-        <h4 class="text-sm font-bold text-white">Зафиксировать баланс</h4>
-        <button type="button" onclick="closeAllBrokerPopovers()" class="w-7 h-7 rounded-full bg-[#212430] text-gray-400 hover:text-white flex items-center justify-center cursor-pointer text-sm">✕</button>
-      </div>
-      <input type="date" id="popover-bal-date" class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white rounded-xl p-3 outline-none mb-3 text-xs">
-      <label class="block text-[10px] text-[#848D99] uppercase font-bold mb-1">Баланс на дату (₽)</label>
-      <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="popover-bal-input" placeholder="0 ₽" class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white rounded-xl p-3 outline-none mb-5 text-sm font-bold">
-      <div class="flex gap-2">
-        <button type="button" onclick="closeAllBrokerPopovers()" class="flex-1 bg-[#212430] hover:bg-[#2A2D3C] text-gray-300 py-3 rounded-xl text-xs font-semibold transition-colors cursor-pointer">Отмена</button>
-        <button type="button" onclick="submitBrokerPopover('Баланс')" class="flex-1 bg-[#6C5DD3] hover:bg-[#5b4ec2] text-white py-3 rounded-xl text-xs font-semibold shadow-md transition-all active:scale-95 cursor-pointer">Сохранить</button>
-      </div>
     </div>
   </div>
 </body>
