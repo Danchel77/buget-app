@@ -586,11 +586,16 @@ function showManageCategoriesDialog() {
   document.getElementById('manage-categories-dialog').classList.remove('hidden');
 }
 
+const DEFAULT_SYSTEM_CATEGORIES = [
+  'Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье',
+  'Одежда', 'Здоровье', 'Развлечения', 'Другое', 'Зарплата', 'Возврат', 'Кэшбек'
+];
+
 function renderManageCategories() {
   const container = document.getElementById('categories-list-container');
   let html = `<p class="text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-2">Расходы</p>`;
   Cache.categories.expense.forEach(cat => {
-    const isDefault = ['Продукты', 'Транспорт', 'Жилье', 'Развлечения', 'Другое'].includes(cat.name);
+    const isDefault = DEFAULT_SYSTEM_CATEGORIES.includes(cat.name);
     const iconName = cat.icon && cat.icon !== '📦' ? cat.icon : 'tag';
     html += `
       <div class="flex justify-between items-center py-2.5 border-b border-[rgba(255,255,255,0.06)]">
@@ -603,7 +608,7 @@ function renderManageCategories() {
   });
   html += `<p class="text-[11px] uppercase tracking-wider text-gray-500 font-bold mt-5 mb-2">Доходы</p>`;
   Cache.categories.income.forEach(cat => {
-    const isDefault = ['Зарплата', 'Другое'].includes(cat.name);
+    const isDefault = DEFAULT_SYSTEM_CATEGORIES.includes(cat.name);
     const iconName = cat.icon && cat.icon !== '📦' ? cat.icon : 'tag';
     html += `
       <div class="flex justify-between items-center py-2.5 border-b border-[rgba(255,255,255,0.06)]">
@@ -672,13 +677,10 @@ function updateCategorySelect(containerOrRow, type) {
   if (!menu || !input || !btn || !label) return;
 
   const cats = type === 'Доход' ? Cache.categories.income : Cache.categories.expense;
-  const defaultCats = [
-    'Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Развлечения', 'Другое', 'Зарплата', 'Возврат', 'Кэшбек'
-  ];
 
-  // Генерируем пункты: список категорий с крестиками у добавленных пользователем
+  // Генерируем пункты: список категорий (системные категории защищены от удаления)
   let itemsHtml = cats.map(c => {
-    const isCustom = !defaultCats.includes(c.name);
+    const isCustom = !DEFAULT_SYSTEM_CATEGORIES.includes(c.name);
     const icon = c.icon && c.icon !== '📦' ? c.icon : 'tag';
     return `
       <div class="flex items-center justify-between hover:bg-[#2A2D3C] rounded-xl px-2.5 py-1.5 transition-colors group">
@@ -1098,11 +1100,19 @@ window.submitBrokerPopover = submitBrokerPopover;
 
 async function selectBrokerGoal(goalId) {
   closeAllBrokerPopovers();
-  await submitAction('broker-goal-btn', 'Broker', {
-    type: 'Цель',
-    date: new Date().toISOString().split('T')[0],
-    goalId: goalId
-  });
+  showToast('Сохранение цели...', false, true);
+  try {
+    const col = getUserCol('Broker');
+    await col.add({
+      type: 'Цель',
+      date: new Date().toISOString().split('T')[0],
+      goalId: goalId
+    });
+    await fetchAllData();
+    showToast(goalId ? 'Цель привязана к портфелю' : 'Цель отвязана');
+  } catch (err) {
+    showToast('Ошибка привязки цели: ' + err.message, true);
+  }
 }
 window.selectBrokerGoal = selectBrokerGoal;
 
@@ -2618,16 +2628,34 @@ let currentPickerDate = new Date();
 
 function setupCustomDatePickers() {
   document.querySelectorAll('input[type="date"]').forEach(input => {
-    input.readOnly = true; // Отключаем открытие огромного системного окна Android
+    input.readOnly = true;
+    input.setAttribute('inputmode', 'none');
     input.style.cursor = 'pointer';
-    input.onclick = (e) => {
-      e.stopPropagation();
-      openCustomDatePicker(input);
-    };
   });
 }
 document.addEventListener('DOMContentLoaded', setupCustomDatePickers);
 setTimeout(setupCustomDatePickers, 500);
+
+// Глобальное перехватывание клика: блокирует нативный диалог Android и открывает #custom-datepicker
+document.addEventListener('click', (e) => {
+  const dateInput = e.target.closest('input[type="date"]');
+  if (dateInput) {
+    e.preventDefault();
+    e.stopPropagation();
+    dateInput.readOnly = true;
+    dateInput.setAttribute('inputmode', 'none');
+    dateInput.blur();
+    openCustomDatePicker(dateInput);
+  }
+}, true);
+
+document.addEventListener('pointerdown', (e) => {
+  const dateInput = e.target.closest('input[type="date"]');
+  if (dateInput) {
+    dateInput.readOnly = true;
+    dateInput.setAttribute('inputmode', 'none');
+  }
+}, true);
 
 function openCustomDatePicker(inputEl) {
   activeDateInput = inputEl;
@@ -2639,7 +2667,7 @@ function openCustomDatePicker(inputEl) {
 
   renderCustomDatePicker();
 
-  // Позиционируем прямо под полем даты
+  // Позиционируем календарь прямо под полем (или над ним, если снизу нет места)
   const rect = inputEl.getBoundingClientRect();
   picker.classList.remove('hidden');
 
@@ -2657,6 +2685,9 @@ function closeCustomDatePicker() {
   if (picker) picker.classList.add('hidden');
   activeDateInput = null;
 }
+
+window.openCustomDatePicker = openCustomDatePicker;
+window.closeCustomDatePicker = closeCustomDatePicker;
 
 function changeCustomDatePickerMonth(delta) {
   currentPickerDate.setMonth(currentPickerDate.getMonth() + delta);
