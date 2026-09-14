@@ -1010,7 +1010,7 @@ function openRememberRuleModal(txId) {
     targetCats = window.Cache?.categories?.income?.map(c => c.name) || ['Зарплата', 'Другое'];
   } else {
     targetCats = [
-      'Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Развлечения', 'Другое'
+      'Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Одежда', 'Здоровье', 'Развлечения', 'Другое'
     ];
     if (window.Cache?.categories?.expense) {
       window.Cache.categories.expense.forEach(c => {
@@ -1041,22 +1041,26 @@ async function saveCategoryRuleFromModal() {
   showToast('Сохранение правила...', false, true);
 
   try {
-    // 1. Сохраняем правило в Firebase Firestore
-    const newRule = { pattern: keyword, category: category };
     const col = window.getUserCol ? getUserCol('CategoryRules') : db.collection('CategoryRules');
-const docRef = await col.add(newRule);
-    
-    // 2. Обновляем локальный кэш
-    if (!window.Cache.categoryRules) window.Cache.categoryRules = [];
-    window.Cache.categoryRules.push({ id: docRef.id, ...newRule });
 
-    // 3. Автоматически пересчитываем категории для всех подходящих транзакций в открытом списке!
+    // Если слово ранее было подавлено пользователем — удаляем маркер disabled
+    const snap = await col.where('pattern', '==', keyword).get();
+    const batch = db.batch();
+    snap.docs.forEach(d => batch.delete(d.ref));
+
+    const newDocRef = col.doc();
+    batch.set(newDocRef, { pattern: keyword, category: category });
+    await batch.commit();
+
+    if (!window.Cache.categoryRules) window.Cache.categoryRules = [];
+    window.Cache.categoryRules = window.Cache.categoryRules.filter(r => r.pattern.toLowerCase() !== keyword.toLowerCase());
+    window.Cache.categoryRules.push({ id: newDocRef.id, pattern: keyword, category: category, isSystem: false });
+
     if (window._lastParsedTransactions) {
       window._lastParsedTransactions.forEach(t => {
         const full = `${t.merchant} ${t.rawDetails}`.toLowerCase();
         if (full.includes(keyword.toLowerCase())) {
           t.category = category;
-          // Обновляем селект в DOM без полной перерисовки
           const sel = document.getElementById(`cat-select-${t._id}`);
           if (sel) sel.value = category;
         }
@@ -1089,7 +1093,6 @@ function openRulesEditorModal() {
 function closeRulesEditorModal() {
   document.getElementById('rules-editor-dialog').classList.add('hidden');
   
-  // Возврат в кабинет, если открывали оттуда
   if (window._returnToProfile) {
     window._returnToProfile = false;
     if (typeof openProfileModal === 'function') {
@@ -1107,7 +1110,6 @@ function renderRulesList() {
     return;
   }
 
-  // Группируем правила по категориям
   const grouped = {};
   rules.forEach(r => {
     const cat = r.category || 'Другое';
@@ -1130,9 +1132,9 @@ function renderRulesList() {
 
     grouped[cat].forEach(r => {
       html += `
-        <span class="inline-flex items-center gap-1.5 bg-[#212430] border border-[rgba(255,255,255,0.06)] text-gray-300 text-[12px] px-2.5 py-1.5 rounded-lg">
+        <span class="inline-flex items-center gap-1.5 ${r.isSystem ? 'bg-[#212430] text-gray-300' : 'bg-[#6C5DD3]/15 text-white border border-[#6C5DD3]/30'} text-[12px] px-2.5 py-1.5 rounded-lg">
           <span>${escapeHtml(r.pattern)}</span>
-          <button type="button" onclick="deleteRuleFromEditor('${r.id}')" class="text-gray-500 hover:text-[#FF453A] cursor-pointer"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+          <button type="button" onclick="deleteRuleFromEditor('${r.id}', ${r.isSystem ? 'true' : 'false'}, '${escapeHtml(r.pattern)}')" class="text-gray-500 hover:text-[#FF453A] cursor-pointer" title="Удалить слово"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
         </span>
       `;
     });
@@ -1159,12 +1161,20 @@ async function addRuleFromEditor() {
 
   showToast('Добавление...', false, true);
   try {
-    const newRule = { pattern: keyword, category: category };
     const col = window.getUserCol ? getUserCol('CategoryRules') : db.collection('CategoryRules');
-    const docRef = await col.add(newRule);
+
+    // Если слово ранее было подавлено, удаляем маркер disabled
+    const snap = await col.where('pattern', '==', keyword).get();
+    const batch = db.batch();
+    snap.docs.forEach(d => batch.delete(d.ref));
+
+    const newDocRef = col.doc();
+    batch.set(newDocRef, { pattern: keyword, category: category });
+    await batch.commit();
 
     if (!window.Cache.categoryRules) window.Cache.categoryRules = [];
-    window.Cache.categoryRules.push({ id: docRef.id, ...newRule });
+    window.Cache.categoryRules = window.Cache.categoryRules.filter(r => r.pattern.toLowerCase() !== keyword.toLowerCase());
+    window.Cache.categoryRules.push({ id: newDocRef.id, pattern: keyword, category: category, isSystem: false });
 
     input.value = '';
     renderRulesList();
@@ -1175,17 +1185,46 @@ async function addRuleFromEditor() {
   }
 }
 
-async function deleteRuleFromEditor(ruleId) {
+async function deleteRuleFromEditor(ruleId, isSystem, pattern) {
   try {
     const col = window.getUserCol ? getUserCol('CategoryRules') : db.collection('CategoryRules');
-    await col.doc(ruleId).delete();
-    window.Cache.categoryRules = (window.Cache.categoryRules || []).filter(r => r.id !== ruleId);
+
+    if (isSystem) {
+      // Для системных правил фиксируем подавление
+      await col.add({ pattern: pattern, disabled: true });
+    } else {
+      // Для пользовательских правил удаляем документ
+      await col.doc(ruleId).delete();
+    }
+
+    window.Cache.categoryRules = (window.Cache.categoryRules || []).filter(r => r.id !== ruleId && r.pattern.toLowerCase() !== pattern.toLowerCase());
     renderRulesList();
     showToast('Слово удалено из словаря');
   } catch (e) {
-    showToast('Ошибка удаления', true);
+    showToast('Ошибка удаления: ' + e.message, true);
+  }
+} 
+
+async function restoreDefaultRules() {
+  showToast('Восстановление системных правил...', false, true);
+  try {
+    const col = window.getUserCol ? getUserCol('CategoryRules') : db.collection('CategoryRules');
+    const snap = await col.where('disabled', '==', true).get();
+    if (!snap.empty) {
+      const batch = db.batch();
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+    if (typeof fetchAllData === 'function') {
+      await fetchAllData();
+    }
+    renderRulesList();
+    showToast('Системные правила восстановлены');
+  } catch (e) {
+    showToast('Ошибка восстановления: ' + e.message, true);
   }
 }
+window.restoreDefaultRules = restoreDefaultRules;
 
 // Пересчитывает категории в открытой выписке при добавлении нового правила
 function applyRulesToOpenedStatement(keyword, category) {
