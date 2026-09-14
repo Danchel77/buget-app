@@ -617,6 +617,12 @@ function toggleSelectAllNew() {
 }
 window.toggleSelectAllNew = toggleSelectAllNew;
 
+// Список защищенных системных категорий (у них не показывается иконка удаления)
+const DEFAULT_SYSTEM_CATEGORIES = [
+  'Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье',
+  'Одежда', 'Здоровье', 'Развлечения', 'Другое', 'Зарплата', 'Возврат', 'Кэшбек'
+];
+
 function renderFilteredRows(transactions) {
   const output = document.getElementById('pdf-debug-output');
   if (!output) return;
@@ -624,7 +630,7 @@ function renderFilteredRows(transactions) {
   const expenseCategories = getActiveCategories('Расход');
   const incomeCategories = getActiveCategories('Доход');
 
-  // Фильтрация по статусам: разделяем переводы и дубликаты
+  // Фильтрация по статусам
   let visibleTxs = transactions;
   if (currentImportFilter === 'new') {
     visibleTxs = transactions.filter(t => !t.isDuplicate && !t.isTransfer);
@@ -655,7 +661,7 @@ function renderFilteredRows(transactions) {
            data-is-inactive="${isInactive}"
            style="${isInactive ? 'opacity: 0.55;' : ''}">
         
-        <!-- СТРОКА 1: Чекбокс, Название мерчанта (почти на всю строку!) и Сумма -->
+        <!-- СТРОКА 1: Чекбокс, Название мерчанта и Сумма -->
         <div class="flex items-center justify-between gap-2.5 min-w-0">
           <div class="flex items-center gap-2.5 min-w-0 flex-1">
             <input type="checkbox" 
@@ -699,8 +705,7 @@ function renderFilteredRows(transactions) {
               <div id="cat-menu-${tx._id}" 
                    class="custom-dropdown-menu hidden absolute right-0 bottom-full mb-1.5 w-52 max-h-60 overflow-y-auto bg-[#181B24] border border-[rgba(255,255,255,0.08)] rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.85)] z-50 p-1.5 space-y-0.5">
                 ${cats.map(cat => {
-                  const defaultList = ['Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье', 'Одежда', 'Здоровье', 'Развлечения', 'Другое', 'Зарплата', 'Возврат', 'Кэшбек'];
-                  const isCustom = !defaultList.includes(cat);
+                  const isCustom = !DEFAULT_SYSTEM_CATEGORIES.includes(cat);
                   const loopIcon = getDynamicCategoryIcon(cat);
                   return `
                     <div class="flex items-center justify-between hover:bg-[#2A2D3C] rounded-xl px-2.5 py-1.5 transition-colors group">
@@ -782,7 +787,7 @@ function renderParsedTransactionsView(fileName, transactions, bankConfig) {
     if (expEl) expEl.innerText = formatMoney(totalExp);
     if (incEl) incEl.innerText = formatMoney(totalInc);
 
-    // Обновляем бейджи табов с разделением переводов и дубликатов
+    // Точный раздельный подсчет операций
     const newCount = transactions.filter(t => !t.isDuplicate && !t.isTransfer).length;
     const transfersCount = transactions.filter(t => t.isTransfer).length;
     const dupesCount = transactions.filter(t => t.isDuplicate && !t.isTransfer).length;
@@ -793,8 +798,18 @@ function renderParsedTransactionsView(fileName, transactions, bankConfig) {
     const tabAll = document.getElementById('tab-import-all');
 
     if (tabNew) tabNew.innerText = `Новые (${newCount})`;
-    if (tabTransfers) tabTransfers.innerText = `Переводы (${transfersCount})`;
-    if (tabDupes) tabDupes.innerText = `В базе (${dupesCount})`;
+    
+    // Скрываем вкладки, если в них 0 операций
+    if (tabTransfers) {
+      tabTransfers.innerText = `Переводы (${transfersCount})`;
+      tabTransfers.style.display = transfersCount > 0 ? '' : 'none';
+    }
+
+    if (tabDupes) {
+      tabDupes.innerText = `В базе (${dupesCount})`;
+      tabDupes.style.display = dupesCount > 0 ? '' : 'none';
+    }
+
     if (tabAll) tabAll.innerText = `Все (${transactions.length})`;
 
     const importBtn = document.getElementById('btn-import-transactions');
@@ -811,26 +826,6 @@ function renderParsedTransactionsView(fileName, transactions, bankConfig) {
   dialog.classList.remove('hidden');
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
-
-function renderParsedTransactionsView(fileName, transactions, bankConfig) {
-  window._lastActiveBank = bankConfig;
-
-  // Сортировка по убыванию даты
-  transactions.sort((a, b) => b.date.localeCompare(a.date));
-  
-  const dialog = document.getElementById('pdf-debug-dialog');
-  const info = document.getElementById('pdf-debug-info');
-
-  transactions.forEach((tx, idx) => {
-    tx._id = 'tx_parsed_' + idx;
-    if (!tx.category || tx.category === 'Не определено') {
-      tx.category = StatementCategorizer.categorize(tx.merchant, tx.rawDetails, tx.type);
-    }
-    tx.isDuplicate = isTransactionDuplicate(tx);
-    tx.selected = !tx.isDuplicate && !tx.isTransfer;
-  });
-
-  window._lastParsedTransactions = transactions;
 
   function updateHeaderSummary() {
     const selectedTxs = transactions.filter(t => t.selected);
