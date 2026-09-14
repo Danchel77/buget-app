@@ -512,40 +512,40 @@
       
       <div class="grid grid-cols-2 gap-2 mb-5">
         <!-- Сбербанк -->
-        <div class="flex items-center gap-2.5 p-2 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.04)]">
-          <div data-bank-icon="sber" class="w-7 h-7 flex items-center justify-center flex-shrink-0"></div>
-          <div class="min-w-0">
-            <div class="text-xs font-semibold text-white truncate">Сбербанк</div>
-            <div class="text-[9px] text-[#848D99] truncate">Выписка по счёту</div>
+        <button type="button" onclick="openBankGuide('SBER')" class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-[#12151C] hover:bg-[#212430] border border-[rgba(255,255,255,0.04)] hover:border-[rgba(255,255,255,0.12)] transition-all cursor-pointer text-left group active:scale-95">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div data-bank-icon="sber" class="w-7 h-7 flex items-center justify-center flex-shrink-0"></div>
+            <span class="text-xs font-semibold text-white truncate">Сбербанк</span>
           </div>
-        </div>
+          <i data-lucide="help-circle" class="w-4 h-4 text-[#848D99] group-hover:text-blue-400 flex-shrink-0 transition-colors"></i>
+        </button>
 
         <!-- Яндекс Банк -->
-        <div class="flex items-center gap-2.5 p-2 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.04)]">
-          <div data-bank-icon="yandex" class="w-7 h-7 flex items-center justify-center flex-shrink-0"></div>
-          <div class="min-w-0">
-            <div class="text-xs font-semibold text-white truncate">Яндекс Банк</div>
-            <div class="text-[9px] text-[#848D99] truncate">По договору</div>
+        <button type="button" onclick="openBankGuide('YANDEX')" class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-[#12151C] hover:bg-[#212430] border border-[rgba(255,255,255,0.04)] hover:border-[rgba(255,255,255,0.12)] transition-all cursor-pointer text-left group active:scale-95">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div data-bank-icon="yandex" class="w-7 h-7 flex items-center justify-center flex-shrink-0"></div>
+            <span class="text-xs font-semibold text-white truncate">Яндекс Банк</span>
           </div>
-        </div>
+          <i data-lucide="help-circle" class="w-4 h-4 text-[#848D99] group-hover:text-blue-400 flex-shrink-0 transition-colors"></i>
+        </button>
 
         <!-- Газпромбанк -->
-        <div class="flex items-center gap-2.5 p-2 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.04)]">
-          <div data-bank-icon="gpb" class="w-7 h-7 flex items-center justify-center flex-shrink-0"></div>
-          <div class="min-w-0">
-            <div class="text-xs font-semibold text-white truncate">Газпромбанк</div>
-            <div class="text-[9px] text-[#848D99] truncate">По карте / счёту</div>
+        <button type="button" onclick="openBankGuide('GPB')" class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-[#12151C] hover:bg-[#212430] border border-[rgba(255,255,255,0.04)] hover:border-[rgba(255,255,255,0.12)] transition-all cursor-pointer text-left group active:scale-95">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div data-bank-icon="gpb" class="w-7 h-7 flex items-center justify-center flex-shrink-0"></div>
+            <span class="text-xs font-semibold text-white truncate">Газпромбанк</span>
           </div>
-        </div>
+          <i data-lucide="help-circle" class="w-4 h-4 text-[#848D99] group-hover:text-blue-400 flex-shrink-0 transition-colors"></i>
+        </button>
 
         <!-- Озон Банк -->
-        <div class="flex items-center gap-2.5 p-2 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.04)]">
-          <div data-bank-icon="ozon" class="w-7 h-7 flex items-center justify-center flex-shrink-0"></div>
-          <div class="min-w-0">
-            <div class="text-xs font-semibold text-white truncate">Озон Банк</div>
-            <div class="text-[9px] text-[#848D99] truncate">О движении</div>
+        <button type="button" onclick="openBankGuide('OZON')" class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-[#12151C] hover:bg-[#212430] border border-[rgba(255,255,255,0.04)] hover:border-[rgba(255,255,255,0.12)] transition-all cursor-pointer text-left group active:scale-95">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div data-bank-icon="ozon" class="w-7 h-7 flex items-center justify-center flex-shrink-0"></div>
+            <span class="text-xs font-semibold text-white truncate">Озон Банк</span>
           </div>
-        </div>
+          <i data-lucide="help-circle" class="w-4 h-4 text-[#848D99] group-hover:text-blue-400 flex-shrink-0 transition-colors"></i>
+        </button>
       </div>
 
       <!-- Кнопка выбора файла -->
