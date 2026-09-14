@@ -108,19 +108,29 @@ class StatementCategorizer {
 
     s = s.replace(/[а-я]/g, char => ruToEn[char] !== undefined ? ruToEn[char] : char);
 
-    // 3. Фонетическая гармонизация латиницы
+    // 3. Фонетическая гармонизация латиницы и англо-русских брендов
     s = s
-      .replace(/x/g, 'ks')       // taxi -> taksi, yandex -> yandeks
-      .replace(/w/g, 'v')       // wildberries / vkusvill
-      .replace(/ia/g, 'ya')     // piaterochka -> pyaterochka
-      .replace(/iu/g, 'yu')     // iulius -> yulius
+      .replace(/ck/g, 'k')
+      .replace(/c([eiy])/g, 's$1')     // cinema -> sinema, city -> siti
+      .replace(/c/g, 'k')              // rostics -> rostiks, cafe -> kafe, cofix -> kofiks
+      .replace(/q/g, 'k')
+      .replace(/x/g, 'ks')             // taxi -> taksi, yandex -> yandeks
+      .replace(/w/g, 'v')             // wildberries -> vildberries
+      .replace(/ph/g, 'f')            // pharmacy -> farmacy
+      .replace(/ia/g, 'ya')           // piaterochka -> pyaterochka
+      .replace(/iu/g, 'yu')
       .replace(/shch/g, 'sh')
       .replace(/sch/g, 'sh')
-      .replace(/tc/g, 'ts')     // tc -> ts
+      .replace(/tc/g, 'ts')
       .replace(/tz/g, 'ts')
-      .replace(/ph/g, 'f');     // pharmacy -> farmacy
+      .replace(/ee/g, 'i')            // befree -> befri
+      .replace(/oo/g, 'u')
+      .replace(/y(?![aeiou])/g, 'i'); // dixy -> diksi, city -> siti
 
-    // 4. Очистка спецсимволов и дублирующихся пробелов
+    // 4. Схлопывание двойных согласных (coffee -> kofi, fitness -> fitnes, vkusvill -> vkusvil)
+    s = s.replace(/([b-df-hj-np-tv-z])\1+/g, '$1');
+
+    // 5. Очистка спецсимволов и дублирующихся пробелов
     s = s.replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
 
     return s;
