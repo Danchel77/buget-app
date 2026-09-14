@@ -604,10 +604,11 @@
           <span class="text-[#30D158]">Доход: <b id="pdf-stat-inc" class="font-semibold">0 ₽</b></span>
         </div>
 
-        <!-- Фильтр-табы (Новые / В базе / Все) и кнопка «Выбрать все новые» -->
+        <!-- Фильтр-табы (Новые / Переводы / В базе / Все) и кнопка «Выбрать все новые» -->
         <div class="flex items-center justify-between gap-2 pt-1">
           <div class="flex bg-[#12151C] p-0.5 rounded-xl border border-[rgba(255,255,255,0.04)] text-xs">
             <button type="button" id="tab-import-new" onclick="setImportFilter('new')" class="px-2.5 py-1 rounded-lg font-semibold bg-[#212430] text-white transition-all">Новые</button>
+            <button type="button" id="tab-import-transfers" onclick="setImportFilter('transfers')" class="px-2.5 py-1 rounded-lg font-medium text-[#848D99] hover:text-white transition-all">Переводы</button>
             <button type="button" id="tab-import-dupes" onclick="setImportFilter('dupes')" class="px-2.5 py-1 rounded-lg font-medium text-[#848D99] hover:text-white transition-all">В базе</button>
             <button type="button" id="tab-import-all" onclick="setImportFilter('all')" class="px-2.5 py-1 rounded-lg font-medium text-[#848D99] hover:text-white transition-all">Все</button>
           </div>
