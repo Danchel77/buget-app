@@ -617,12 +617,6 @@ function toggleSelectAllNew() {
 }
 window.toggleSelectAllNew = toggleSelectAllNew;
 
-// Список защищенных системных категорий (у них не показывается иконка удаления)
-const DEFAULT_SYSTEM_CATEGORIES = [
-  'Продукты', 'Кафе и рестораны', 'Маркетплейсы', 'Транспорт', 'Жилье',
-  'Одежда', 'Здоровье', 'Развлечения', 'Другое', 'Зарплата', 'Возврат', 'Кэшбек'
-];
-
 function renderFilteredRows(transactions) {
   const output = document.getElementById('pdf-debug-output');
   if (!output) return;
