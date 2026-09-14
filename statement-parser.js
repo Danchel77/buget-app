@@ -234,7 +234,18 @@ const BANK_REGISTRY = [
     id: 'YANDEX',
     name: 'Яндекс Банк',
     slug: 'yandexbank',
+    iconKey: 'yandex',
     badgeColor: 'bg-amber-900/60 text-amber-300 border-amber-700/60',
+    guide: {
+      doc: 'Выписка по договору Сейва или карты (PDF)',
+      steps: [
+        'Откройте приложение «Яндекс Пэй» или «Яндекс Банк»',
+        'Нажмите на Сейв или карту Яндекс Банка',
+        'Перейдите в раздел «Справки и выписки»',
+        'Выберите «Выписка по счёту» и задайте период дат',
+        'Скачайте сформированный PDF-документ'
+      ]
+    },
     // Лицензия ЦБ РФ № 3027 либо официальное юрлицо в шапке документа
     detect: (header) => header.includes('3027') || header.includes('яндекс банк') || header.includes('yabank.yandex.ru'),
     isTxStart: (l) => /\d{2}\.\d{2}\.\d{4}/.test(l) && /[\d\s\xa0]+[.,]\d{2}\s*₽/.test(l),
@@ -259,7 +270,18 @@ const BANK_REGISTRY = [
     id: 'GPB',
     name: 'Газпромбанк',
     slug: 'gazprombank',
+    iconKey: 'gpb',
     badgeColor: 'bg-blue-900/60 text-blue-300 border-blue-700/60',
+    guide: {
+      doc: 'Выписка по карте / счёту (PDF)',
+      steps: [
+        'Откройте мобильное приложение Газпромбанка',
+        'Выберите счёт карты на главном экране',
+        'Перейдите в раздел «Выписки и справки» или «Действия»',
+        'Выберите «Выписка по счёту», укажите интервал дат',
+        'Сформируйте и сохраните файл в формате PDF'
+      ]
+    },
     // Генеральная лицензия ЦБ РФ № 354 либо Банк ГПБ (АО) в шапке документа
     detect: (header, tableHeader) => header.includes('354') || header.includes('банк гпб') || header.includes('газпромбанк'),
     isTxStart: (l) => /^(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})/.test(l),
@@ -291,7 +313,18 @@ const BANK_REGISTRY = [
     id: 'SBER',
     name: 'Сбербанк',
     slug: 'sberbank',
+    iconKey: 'sber',
     badgeColor: 'bg-emerald-900/60 text-emerald-300 border-emerald-700/60',
+    guide: {
+      doc: 'Выписка по счёту карты (PDF)',
+      steps: [
+        'Откройте приложение «СберБанк Онлайн»',
+        'Выберите нужную карту или платёжный счёт',
+        'Нажмите «Реквизиты и выписки» → «Выписка по счёту»',
+        'Укажите нужный период и выберите формат PDF',
+        'Нажмите «Сохранить» или отправьте файл на e-mail'
+      ]
+    },
     // Генеральная лицензия ЦБ РФ № 1481 либо sberbank.ru в шапке
     detect: (header) => header.includes('1481') || header.includes('sberbank.ru') || header.includes('сбербанк') || header.includes('сбербанк онлайн'),
     isTxStart: (l) => /^(\d{2}\.\d{2}\.\d{4})\s+\d{2}:\d{2}/.test(l) && !/^\d{2}\.\d{2}\.\d{4}\s+\d{6}/.test(l),
@@ -323,7 +356,18 @@ const BANK_REGISTRY = [
     id: 'OZON',
     name: 'Озон Банк',
     slug: 'ozonbank',
+    iconKey: 'ozon',
     badgeColor: 'bg-sky-900/60 text-sky-300 border-sky-700/60',
+    guide: {
+      doc: 'Справка о движении средств (PDF)',
+      steps: [
+        'Откройте приложение Ozon или Ozon Банк',
+        'Перейдите в раздел Ozon Банка («Финансы»)',
+        'Нажмите на счёт или карту → «Выписки и справки»',
+        'Выберите «Справка о движении средств» и период дат',
+        'Нажмите кнопку «Скачать PDF»'
+      ]
+    },
     // Базовая лицензия ЦБ РФ № 3542 либо ООО «Озон Банк» в шапке
     detect: (header) => header.includes('3542') || header.includes('ozon банк') || header.includes('ozon bank') || header.includes('озон банк'),
     isTxStart: (l) => /^\d{2}\.\d{2}\.\d{4}/.test(l),
@@ -359,6 +403,51 @@ const BANK_REGISTRY = [
     }
   }
 ];
+window.BANK_REGISTRY = BANK_REGISTRY;
+
+function openBankGuide(bankIdentifier) {
+  const bank = BANK_REGISTRY.find(b => b.id === bankIdentifier || b.iconKey === bankIdentifier || b.slug === bankIdentifier);
+  if (!bank || !bank.guide) return;
+
+  const dialog = document.getElementById('bank-guide-dialog');
+  const titleEl = document.getElementById('bank-guide-title');
+  const docEl = document.getElementById('bank-guide-doc');
+  const stepsEl = document.getElementById('bank-guide-steps');
+  const iconContainer = document.getElementById('bank-guide-icon');
+
+  if (!dialog || !titleEl || !docEl || !stepsEl) return;
+
+  titleEl.textContent = bank.name;
+  docEl.textContent = bank.guide.doc;
+
+  if (iconContainer) {
+    iconContainer.setAttribute('data-bank-icon', bank.iconKey || bank.slug);
+  }
+
+  stepsEl.innerHTML = bank.guide.steps.map((step, idx) => `
+    <div class="flex items-start gap-2.5 p-2.5 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.03)]">
+      <span class="w-5 h-5 rounded-full bg-[#6C5DD3]/20 text-[#6C5DD3] text-[11px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">${idx + 1}</span>
+      <span class="text-xs text-gray-300 leading-snug">${escapeHtml(step)}</span>
+    </div>
+  `).join('');
+
+  dialog.classList.remove('hidden');
+
+  if (typeof renderBankIcons === 'function') {
+    renderBankIcons();
+  }
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+}
+
+function closeBankGuide() {
+  const dialog = document.getElementById('bank-guide-dialog');
+  if (dialog) dialog.classList.add('hidden');
+}
+
+window.openBankGuide = openBankGuide;
+window.closeBankGuide = closeBankGuide;
 
 // =============================================================
 // 3. ДИСПЕТЧЕР (НАХОДИТ БАНК И ЗАПУСКАЕТ ПАРСИНГ)
