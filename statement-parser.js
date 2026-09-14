@@ -827,49 +827,6 @@ function renderParsedTransactionsView(fileName, transactions, bankConfig) {
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-  function updateHeaderSummary() {
-    const selectedTxs = transactions.filter(t => t.selected);
-    const totalExp = selectedTxs.filter(t => t.type === 'Расход').reduce((s, t) => s + t.amount, 0);
-    const totalInc = selectedTxs.filter(t => t.type === 'Доход').reduce((s, t) => s + t.amount, 0);
-
-    const bankName = bankConfig.name || 'Банк';
-    if (info) {
-      info.innerText = `${bankName} • ${fileName}`;
-    }
-
-    // Обновляем метрики в компактной горизонтальной карточке
-    const cntEl = document.getElementById('pdf-stat-count');
-    const expEl = document.getElementById('pdf-stat-exp');
-    const incEl = document.getElementById('pdf-stat-inc');
-    if (cntEl) cntEl.innerText = `${selectedTxs.length} из ${transactions.length}`;
-    if (expEl) expEl.innerText = formatMoney(totalExp);
-    if (incEl) incEl.innerText = formatMoney(totalInc);
-
-    // Обновляем бейджи табов
-    const newCount = transactions.filter(t => !t.isDuplicate && !t.isTransfer).length;
-    const dupesCount = transactions.filter(t => t.isDuplicate || t.isTransfer).length;
-    const tabNew = document.getElementById('tab-import-new');
-    const tabDupes = document.getElementById('tab-import-dupes');
-    const tabAll = document.getElementById('tab-import-all');
-    if (tabNew) tabNew.innerText = `Новые (${newCount})`;
-    if (tabDupes) tabDupes.innerText = `В базе (${dupesCount})`;
-    if (tabAll) tabAll.innerText = `Все (${transactions.length})`;
-
-    const importBtn = document.getElementById('btn-import-transactions');
-    if (importBtn) {
-      importBtn.innerText = `Импортировать (${selectedTxs.length})`;
-      importBtn.disabled = selectedTxs.length === 0;
-    }
-  }
-
-  window._updateHeaderSummary = updateHeaderSummary;
-  setImportFilter('new'); // По умолчанию открываем только новые транзакции
-  updateHeaderSummary();
-
-  dialog.classList.remove('hidden');
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
-
 function toggleImportCatMenu(txId) {
   const menu = document.getElementById(`cat-menu-${txId}`);
   const btn = document.getElementById(`cat-btn-${txId}`);
