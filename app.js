@@ -896,11 +896,16 @@ function processBroker(ops, goals) {
   const depositList = [];
   const points = [];
 
+  // Находим актуальную цель (самая свежая запись типа 'Цель')
+  const goalOps = ops.filter(o => o.type === 'Цель');
+  if (goalOps.length > 0) {
+    goalOps.sort((a, b) => (b.timestamp || new Date(b.date || 0).getTime()) - (a.timestamp || new Date(a.date || 0).getTime()));
+    goalId = goalOps[0].goalId || '';
+  }
+
   ops.forEach(o => {
-    if (o.type === 'Цель') {
-      goalId = o.goalId || '';
-      return;
-    }
+    if (o.type === 'Цель') return;
+
     const rawDate = o.date || new Date().toISOString().split('T')[0];
     const ds = formatDateStr(rawDate, 'dd.MM');
     const fullDate = formatDateStr(rawDate, 'dd.MM.yyyy');
@@ -1179,13 +1184,26 @@ window.submitBrokerPopover = submitBrokerPopover;
 
 async function selectBrokerGoal(goalId) {
   closeAllBrokerPopovers();
+  showToast('Сохранение цели...', false, true);
   try {
     const col = getUserCol('Broker');
-    await col.add({
-      type: 'Цель',
-      date: new Date().toISOString().split('T')[0],
-      goalId: goalId
-    });
+    // Очищаем все предыдущие записи привязки цели
+    const snap = await col.where('type', '==', 'Цель').get();
+    const batch = db.batch();
+    snap.docs.forEach(doc => batch.delete(doc.ref));
+
+    // Если выбрана конкретная цель — сохраняем её. Если "Без цели" — оставляем очищенным
+    if (goalId) {
+      const newDoc = col.doc();
+      batch.set(newDoc, {
+        type: 'Цель',
+        date: new Date().toISOString().split('T')[0],
+        goalId: goalId,
+        timestamp: Date.now()
+      });
+    }
+
+    await batch.commit();
     await fetchAllData();
   } catch (err) {
     showToast('Ошибка привязки цели: ' + err.message, true);
