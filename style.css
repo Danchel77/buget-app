@@ -182,8 +182,76 @@ nav button.text-blue-400, nav button.text-blue-500 { color:#9da5ff !important; }
 nav button.text-blue-400::before, nav button.text-blue-500::before { content:""; position:absolute; top:6px; left:50%; width:42px; height:4px; transform:translateX(-50%); border-radius:999px; background:#7b83ff; box-shadow:0 0 14px rgba(123,131,255,.4); }
 
 /* ---------- dialogs / toast ---------- */
-.toast { background:var(--surface-3) !important; border:1px solid var(--line-strong) !important; border-radius:16px !important; box-shadow:0 14px 35px rgba(0,0,0,.35) !important; }
-.spinner { border-color:#39414b !important; border-top-color:var(--accent) !important; }
+.toast-container {
+  position: fixed !important;
+  top: calc(14px + env(safe-area-inset-top, 0px)) !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 200 !important;
+  pointer-events: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: max-content !important;
+  max-width: calc(100vw - 32px) !important;
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.toast-container.hidden {
+  display: none !important;
+}
+
+.toast-capsule {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 8px 16px !important;
+  background: rgba(24, 27, 36, 0.94) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.04) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  animation: toast-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.toast-icon-wrap {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 18px !important;
+  height: 18px !important;
+  flex-shrink: 0 !important;
+}
+
+.toast-spinner {
+  width: 14px !important;
+  height: 14px !important;
+  border-radius: 50% !important;
+  border: 2px solid rgba(255, 255, 255, 0.15) !important;
+  border-top-color: var(--accent) !important;
+  animation: toast-spin 0.65s linear infinite !important;
+}
+
+@keyframes toast-spin {
+  to { transform: rotate(360deg); }
+}
+
+.toast-text {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--text) !important;
+  letter-spacing: -0.01em !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
 /* ---------- selection panel (плавающая панель мультивыбора) ---------- */
 /* По умолчанию панель скрыта */
 .selection-panel {
