@@ -804,6 +804,20 @@ function smartPositionDropdown(menu, triggerBtn) {
   }
 }
 
+// Хелпер склонения месяцев для вкладов
+function getDepositDurationStr(startDate, endDate) {
+  const totalDays = Math.max(1, Math.round((endDate - startDate) / 86400000));
+  let months = Math.round(totalDays / 30.4375);
+  if (months < 1) months = 1;
+
+  const mod10 = months % 10;
+  const mod100 = months % 100;
+  if (mod100 >= 11 && mod100 <= 19) return `${months} месяцев`;
+  if (mod10 === 1) return `${months} месяц`;
+  if (mod10 >= 2 && mod10 <= 4) return `${months} месяца`;
+  return `${months} месяцев`;
+}
+
 function processDeposits(deposits, goals) {
   const goalsMap = {};
   goals.forEach(g => goalsMap[g.id] = g.name || '');
@@ -822,6 +836,7 @@ function processDeposits(deposits, goals) {
     const totalDays = Math.max(1, Math.round((endDate - startDate) / 86400000));
     const daysPassed = isClosed ? totalDays : Math.max(0, Math.min(Math.round((new Date() - startDate) / 86400000), totalDays));
     const goalIdStr = isClosed ? '' : (dep.goalId || '');
+    const durationStr = getDepositDurationStr(startDate, endDate);
 
     return {
       id: dep.id,
@@ -834,6 +849,7 @@ function processDeposits(deposits, goals) {
       expectedInterest: totalDays * (amount * (rate / 100) / 365),
       progress: Math.min(100, (daysPassed / totalDays) * 100).toFixed(1),
       endDateStr: formatDateStr(dep.endDate, 'dd.MM.yyyy'),
+      durationStr,
       rawStart: dep.startDate,
       rawEnd: dep.endDate,
       isClosed
@@ -1897,7 +1913,7 @@ function renderDeposits() {
           </div>
           <div class="min-w-0">
             <h3 class="text-[16px] font-semibold text-gray-200 truncate leading-tight">${escapeHtml(dep.name)}</h3>
-            <p class="text-[12px] text-[#848D99] mt-0.5">${isCls ? 'Закрыт' : `До ${dep.endDateStr}`} • ${dep.rate}% годовых</p>
+            <p class="text-[12px] text-[#848D99] mt-0.5">${isCls ? `Закрыт ${dep.endDateStr} • ${dep.durationStr}` : `До ${dep.endDateStr}`} • ${dep.rate}% годовых</p>
           </div>
         </div>
         
@@ -1913,11 +1929,18 @@ function renderDeposits() {
       <div class="mt-4 flex items-end justify-between w-full">
         <div class="flex flex-col">
           <span class="text-[11px] text-[#848D99] font-medium tracking-wide mb-1 uppercase">Вложено: ${formatMoney(dep.amount)}</span>
-          <div class="flex items-center gap-1.5 text-[14px]">
-             <span class="text-[#30D158] font-semibold">+${formatMoney(dep.currentInterest)}</span>
-             <span class="text-gray-700">/</span>
-             <span class="text-gray-400">+${formatMoney(dep.expectedInterest)}</span>
-          </div>
+          ${isCls ? `
+            <div class="flex items-center gap-1.5 text-[14px]">
+               <span class="text-[#30D158] font-semibold">+${formatMoney(dep.expectedInterest)}</span>
+               <span class="text-[11px] text-[#848D99] font-normal">выплачено</span>
+            </div>
+          ` : `
+            <div class="flex items-center gap-1.5 text-[14px]">
+               <span class="text-[#30D158] font-semibold">+${formatMoney(dep.currentInterest)}</span>
+               <span class="text-gray-700">/</span>
+               <span class="text-gray-400">+${formatMoney(dep.expectedInterest)}</span>
+            </div>
+          `}
         </div>
       </div>
 
