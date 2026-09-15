@@ -814,8 +814,9 @@
       <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
     </div>
     <div id="datepicker-days-grid" class="grid grid-cols-7 gap-1 text-center text-xs"></div>
-    <button type="button" onclick="selectCustomDatePickerToday()" class="text-blue-400 hover:underline font-semibold cursor-pointer">Сегодня</button>
-      <button type="button" onclick="closeCustomDatePicker()" class="text-gray-400 hover:text-white cursor-pointer">Закрыть</button>
+    <div class="mt-2.5 pt-2 border-t border-[rgba(255,255,255,0.06)] flex justify-between items-center text-[11px]">
+      <button type="button" onclick="selectCustomDatePickerToday()" class="text-blue-400 hover:underline font-semibold cursor-pointer">Сегодня</button>
+      <button type="button" onclick="closeCustomDatePicker()" class="px-3 py-1.5 bg-[#212430] hover:bg-[#2A2D3C] text-gray-300 hover:text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer ml-auto">Закрыть</button>
     </div>
   </div>
 </body>
