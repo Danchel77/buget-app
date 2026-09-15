@@ -659,8 +659,8 @@ function setImportFilter(filter) {
     const btn = document.getElementById(`tab-import-${f}`);
     if (btn) {
       btn.className = f === filter
-        ? 'px-2.5 py-1 rounded-lg font-semibold bg-[#212430] text-white transition-all cursor-pointer'
-        : 'px-2.5 py-1 rounded-lg font-medium text-[#848D99] hover:text-white transition-all cursor-pointer';
+        ? 'flex-1 text-center whitespace-nowrap px-2.5 py-1.5 rounded-lg font-semibold bg-[#212430] text-white transition-all cursor-pointer'
+        : 'flex-1 text-center whitespace-nowrap px-2.5 py-1.5 rounded-lg font-medium text-[#848D99] hover:text-white transition-all cursor-pointer';
     }
   });
 
@@ -835,8 +835,22 @@ function renderParsedTransactionsView(fileName, transactions, bankConfig) {
     const totalInc = selectedTxs.filter(t => t.type === 'Доход').reduce((s, t) => s + t.amount, 0);
 
     const bankName = bankConfig.name || 'Банк';
+    const iconKey = bankConfig.iconKey || bankConfig.slug || '';
+    const badgeColor = bankConfig.badgeColor || 'bg-blue-900/60 text-blue-300 border-blue-700/60';
+
     if (info) {
-      info.innerText = `${bankName} • ${fileName}`;
+      info.innerHTML = `
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-xl text-[11px] font-semibold border ${badgeColor}">
+          <span data-bank-icon="${iconKey}" class="w-4 h-4 flex items-center justify-center flex-shrink-0"></span>
+          <span>${escapeHtml(bankName)}</span>
+        </span>
+        <span class="text-xs text-[#848D99] truncate font-normal" title="${escapeHtml(fileName)}">
+          ${escapeHtml(fileName)}
+        </span>
+      `;
+      if (typeof renderBankIcons === 'function') {
+        renderBankIcons();
+      }
     }
 
     // Обновляем метрики в компактной горизонтальной карточке
