@@ -65,6 +65,17 @@ button, input, select { font: inherit; }
 button { -webkit-appearance:none; }
 .hidden { display:none !important; }
 
+/* Устранение мобильной задержки тапа 300 мс и ускорение отклика интерфейса */
+button, input, select, textarea, .card, a {
+  touch-action: manipulation;
+}
+
+/* Оптимизация производительности списков и скролла */
+.card {
+  will-change: transform, background-color;
+  transform: translateZ(0);
+}
+
 /* ---------- app shell ---------- */
 header { height: 72px !important; padding: 0 22px !important; background: rgba(11,14,18,.94) !important; border-bottom: 1px solid var(--line) !important; box-shadow: 0 8px 28px rgba(0,0,0,.16) !important; backdrop-filter: blur(18px); }
 header h1 { font-size: 24px !important; letter-spacing: -.04em; display:flex; align-items:center; gap:10px; }
