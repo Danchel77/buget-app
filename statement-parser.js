@@ -659,8 +659,8 @@ function setImportFilter(filter) {
     const btn = document.getElementById(`tab-import-${f}`);
     if (btn) {
       btn.className = f === filter
-        ? 'flex-1 text-center whitespace-nowrap px-2.5 py-1.5 rounded-lg font-semibold bg-[#212430] text-white transition-all cursor-pointer'
-        : 'flex-1 text-center whitespace-nowrap px-2.5 py-1.5 rounded-lg font-medium text-[#848D99] hover:text-white transition-all cursor-pointer';
+        ? 'flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl font-semibold bg-[#212430] text-white transition-all cursor-pointer'
+        : 'flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl font-medium text-[#848D99] hover:text-white transition-all cursor-pointer';
     }
   });
 
@@ -865,26 +865,23 @@ function renderParsedTransactionsView(fileName, transactions, bankConfig) {
     const newCount = transactions.filter(t => !t.isDuplicate && !t.isTransfer).length;
     const transfersCount = transactions.filter(t => t.isTransfer).length;
     const dupesCount = transactions.filter(t => t.isDuplicate && !t.isTransfer).length;
-    
-    const tabNew = document.getElementById('tab-import-new');
+
+    const cntNew = document.getElementById('tab-count-new');
+    const cntTransfers = document.getElementById('tab-count-transfers');
+    const cntDupes = document.getElementById('tab-count-dupes');
+    const cntAll = document.getElementById('tab-count-all');
+
+    if (cntNew) cntNew.innerText = newCount;
+    if (cntTransfers) cntTransfers.innerText = transfersCount;
+    if (cntDupes) cntDupes.innerText = dupesCount;
+    if (cntAll) cntAll.innerText = transactions.length;
+
     const tabTransfers = document.getElementById('tab-import-transfers');
     const tabDupes = document.getElementById('tab-import-dupes');
-    const tabAll = document.getElementById('tab-import-all');
 
-    if (tabNew) tabNew.innerText = `Новые (${newCount})`;
-    
-    // Скрываем вкладки, если в них 0 операций
-    if (tabTransfers) {
-      tabTransfers.innerText = `Переводы (${transfersCount})`;
-      tabTransfers.style.display = transfersCount > 0 ? '' : 'none';
-    }
-
-    if (tabDupes) {
-      tabDupes.innerText = `В базе (${dupesCount})`;
-      tabDupes.style.display = dupesCount > 0 ? '' : 'none';
-    }
-
-    if (tabAll) tabAll.innerText = `Все (${transactions.length})`;
+    // Скрываем вкладки только если в них 0 операций
+    if (tabTransfers) tabTransfers.style.display = transfersCount > 0 ? 'flex' : 'none';
+    if (tabDupes) tabDupes.style.display = dupesCount > 0 ? 'flex' : 'none';
 
     const importBtn = document.getElementById('btn-import-transactions');
     if (importBtn) {
