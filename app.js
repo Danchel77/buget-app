@@ -18,6 +18,15 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
+// Включение оффлайн-кэширования IndexedDB для моментального запуска на любом интернете
+if (typeof db.enablePersistence === 'function') {
+  db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+    if (err.code !== 'failed-precondition' && err.code !== 'unimplemented') {
+      console.warn('Persistence notice:', err);
+    }
+  });
+}
+
 // Хелпер доступа к личной подколлекции авторизованного пользователя
 function getUserCol(table) {
   const user = auth.currentUser;
