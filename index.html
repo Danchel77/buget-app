@@ -610,12 +610,24 @@
           <span class="text-[#30D158]">Доход: <b id="pdf-stat-inc" class="font-semibold">0 ₽</b></span>
         </div>
 
-        <!-- Фильтр-табы на всю ширину строки -->
-        <div class="flex w-full bg-[#12151C] p-0.5 rounded-xl border border-[rgba(255,255,255,0.04)] text-xs overflow-x-auto no-scrollbar">
-          <button type="button" id="tab-import-new" onclick="setImportFilter('new')" class="flex-1 text-center whitespace-nowrap px-2.5 py-1.5 rounded-lg font-semibold bg-[#212430] text-white transition-all cursor-pointer">Новые (0)</button>
-          <button type="button" id="tab-import-transfers" onclick="setImportFilter('transfers')" class="flex-1 text-center whitespace-nowrap px-2.5 py-1.5 rounded-lg font-medium text-[#848D99] hover:text-white transition-all cursor-pointer">Переводы (0)</button>
-          <button type="button" id="tab-import-dupes" onclick="setImportFilter('dupes')" class="flex-1 text-center whitespace-nowrap px-2.5 py-1.5 rounded-lg font-medium text-[#848D99] hover:text-white transition-all cursor-pointer">В базе (0)</button>
-          <button type="button" id="tab-import-all" onclick="setImportFilter('all')" class="flex-1 text-center whitespace-nowrap px-2.5 py-1.5 rounded-lg font-medium text-[#848D99] hover:text-white transition-all cursor-pointer">Все (0)</button>
+        <!-- Фильтр-табы на всю ширину (название сверху, количество снизу — без свайпа) -->
+        <div class="flex w-full bg-[#12151C] p-1 rounded-2xl border border-[rgba(255,255,255,0.04)] gap-1 overflow-hidden">
+          <button type="button" id="tab-import-new" onclick="setImportFilter('new')" class="flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl font-semibold bg-[#212430] text-white transition-all cursor-pointer">
+            <span class="text-[11px] font-medium leading-tight">Новые</span>
+            <span id="tab-count-new" class="text-[10px] opacity-80 font-mono font-semibold leading-tight">0</span>
+          </button>
+          <button type="button" id="tab-import-transfers" onclick="setImportFilter('transfers')" class="flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl font-medium text-[#848D99] hover:text-white transition-all cursor-pointer">
+            <span class="text-[11px] font-medium leading-tight">Переводы</span>
+            <span id="tab-count-transfers" class="text-[10px] opacity-80 font-mono font-semibold leading-tight">0</span>
+          </button>
+          <button type="button" id="tab-import-dupes" onclick="setImportFilter('dupes')" class="flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl font-medium text-[#848D99] hover:text-white transition-all cursor-pointer">
+            <span class="text-[11px] font-medium leading-tight">В базе</span>
+            <span id="tab-count-dupes" class="text-[10px] opacity-80 font-mono font-semibold leading-tight">0</span>
+          </button>
+          <button type="button" id="tab-import-all" onclick="setImportFilter('all')" class="flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl font-medium text-[#848D99] hover:text-white transition-all cursor-pointer">
+            <span class="text-[11px] font-medium leading-tight">Все</span>
+            <span id="tab-count-all" class="text-[10px] opacity-80 font-mono font-semibold leading-tight">0</span>
+          </button>
         </div>
 
         <!-- Кнопка «Выбрать новые», прижатая к левому краю -->
