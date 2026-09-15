@@ -2650,6 +2650,95 @@ document.addEventListener('pointerdown', (e) => {
   }
 }, true);
 
+function formatManualDateInput(el) {
+  let val = el.value.replace(/[^\d]/g, '');
+  if (val.length > 8) val = val.slice(0, 8);
+
+  let formatted = '';
+  if (val.length > 4) {
+    formatted = val.slice(0, 2) + '.' + val.slice(2, 4) + '.' + val.slice(4);
+  } else if (val.length > 2) {
+    formatted = val.slice(0, 2) + '.' + val.slice(2);
+  } else {
+    formatted = val;
+  }
+  el.value = formatted;
+
+  // Если дата введена полностью, сразу синхронизируем сетку календаря
+  if (formatted.length === 10) {
+    const iso = parseManualDate(formatted);
+    if (iso) {
+      currentPickerDate = new Date(iso);
+      renderCustomDatePicker();
+    }
+  }
+}
+
+function handleManualDateKeydown(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    applyManualDateInput();
+  }
+}
+
+function parseManualDate(str) {
+  if (!str) return null;
+  const clean = str.trim().replace(/[^\d.]/g, '');
+  const parts = clean.split('.').filter(Boolean);
+  const now = new Date();
+  let day, month, year;
+
+  if (parts.length === 3) {
+    day = parseInt(parts[0], 10);
+    month = parseInt(parts[1], 10);
+    year = parseInt(parts[2], 10);
+    if (year < 100) year += 2000;
+  } else if (parts.length === 2) {
+    day = parseInt(parts[0], 10);
+    month = parseInt(parts[1], 10);
+    year = currentPickerDate.getFullYear() || now.getFullYear();
+  } else if (parts.length === 1 && clean.length <= 2) {
+    day = parseInt(parts[0], 10);
+    month = (currentPickerDate.getMonth() + 1) || (now.getMonth() + 1);
+    year = currentPickerDate.getFullYear() || now.getFullYear();
+  } else if (clean.length === 8) {
+    day = parseInt(clean.slice(0, 2), 10);
+    month = parseInt(clean.slice(2, 4), 10);
+    year = parseInt(clean.slice(4, 8), 10);
+  } else {
+    return null;
+  }
+
+  if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > 31) return null;
+  if (year < 1900 || year > 2100) return null;
+
+  const daysInMonth = new Date(year, month, 0).getDate();
+  if (day > daysInMonth) return null;
+
+  const yyyy = String(year);
+  const mm = String(month).padStart(2, '0');
+  const dd = String(day).padStart(2, '0');
+
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function applyManualDateInput() {
+  const manualInput = document.getElementById('datepicker-manual-input');
+  if (!manualInput) return;
+
+  const iso = parseManualDate(manualInput.value);
+  if (!iso) {
+    manualInput.classList.add('border-[#FF453A]');
+    showToast('Неверная дата (формат ДД.ММ.ГГГГ)', true);
+    setTimeout(() => manualInput.classList.remove('border-[#FF453A]'), 2000);
+    return;
+  }
+
+  applyCustomDate(iso);
+}
+
 function openCustomDatePicker(inputEl) {
   activeDateInput = inputEl;
   const picker = document.getElementById('custom-datepicker');
@@ -2660,12 +2749,22 @@ function openCustomDatePicker(inputEl) {
 
   renderCustomDatePicker();
 
-  // Позиционируем календарь прямо под полем (или над ним, если снизу нет места)
+  // Предзаполняем поле ручного ввода текущей датой
+  const manualInput = document.getElementById('datepicker-manual-input');
+  if (manualInput) {
+    const yyyy = currentPickerDate.getFullYear();
+    const mm = String(currentPickerDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(currentPickerDate.getDate()).padStart(2, '0');
+    manualInput.value = `${dd}.${mm}.${yyyy}`;
+    manualInput.classList.remove('border-[#FF453A]');
+  }
+
+  // Позиционируем прямо под полем (или над ним, если снизу нет места)
   const rect = inputEl.getBoundingClientRect();
   picker.classList.remove('hidden');
 
   const spaceBelow = window.innerHeight - rect.bottom;
-  let top = (spaceBelow < 280) ? (rect.top - 285) : (rect.bottom + 6);
+  let top = (spaceBelow < 330) ? (rect.top - 335) : (rect.bottom + 6);
   let left = Math.min(window.innerWidth - 295, Math.max(12, rect.left));
 
   picker.style.top = `${top}px`;
@@ -2678,9 +2777,6 @@ function closeCustomDatePicker() {
   if (picker) picker.classList.add('hidden');
   activeDateInput = null;
 }
-
-window.openCustomDatePicker = openCustomDatePicker;
-window.closeCustomDatePicker = closeCustomDatePicker;
 
 function changeCustomDatePickerMonth(delta) {
   currentPickerDate.setMonth(currentPickerDate.getMonth() + delta);
@@ -2709,7 +2805,7 @@ function renderCustomDatePicker() {
   const month = currentPickerDate.getMonth();
   label.innerText = `${monthNames[month]} ${year}`;
 
-  const firstDayIndex = (new Date(year, month, 1).getDay() + 6) % 7; // Понедельник = 0
+  const firstDayIndex = (new Date(year, month, 1).getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   let html = '';
@@ -2741,10 +2837,15 @@ function applyCustomDate(dateStr) {
   }
   closeCustomDatePicker();
 }
+
+window.openCustomDatePicker = openCustomDatePicker;
+window.closeCustomDatePicker = closeCustomDatePicker;
 window.changeCustomDatePickerMonth = changeCustomDatePickerMonth;
 window.selectCustomDatePickerToday = selectCustomDatePickerToday;
-window.closeCustomDatePicker = closeCustomDatePicker;
 window.applyCustomDate = applyCustomDate;
+window.formatManualDateInput = formatManualDateInput;
+window.handleManualDateKeydown = handleManualDateKeydown;
+window.applyManualDateInput = applyManualDateInput;
 
 // Управление информационным окном импорта PDF
 function openPdfInfoModal() {
