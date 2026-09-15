@@ -140,10 +140,15 @@
   </div>
 </div>
   
-  <div id="toast-container" class="hidden">
-    <div id="toast-content" class="toast">
-      <div id="toast-spinner" class="spinner"></div>
-      <span id="toast-text" class="text-white">Синхронизация...</span>
+  <!-- ПЛАВАЮЩИЙ УВЕДОМИТЕЛЬНЫЙ ОСТРОВОК (НЕ СДВИГАЕТ ИНТЕРФЕЙС) -->
+  <div id="toast-container" class="toast-container hidden">
+    <div id="toast-content" class="toast-capsule">
+      <div id="toast-icon-wrap" class="toast-icon-wrap">
+        <div id="toast-spinner" class="toast-spinner"></div>
+        <i id="toast-icon-success" data-lucide="check" class="w-3.5 h-3.5 text-[#30D158] hidden"></i>
+        <i id="toast-icon-error" data-lucide="alert-circle" class="w-3.5 h-3.5 text-[#FF453A] hidden"></i>
+      </div>
+      <span id="toast-text" class="toast-text">Синхронизация...</span>
     </div>
   </div>
 
@@ -802,7 +807,7 @@
 
     <div class="flex items-center justify-between mb-3 pb-2 border-b border-[rgba(255,255,255,0.06)]">
       <button type="button" onclick="changeCustomDatePickerMonth(-1)" class="w-7 h-7 rounded-lg hover:bg-[#212430] flex items-center justify-center text-gray-400 hover:text-white cursor-pointer"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
-      <span id="datepicker-month-year" class="text-xs font-bold text-white tracking-wide">Сентябрь 2026</span>
+      <span id="datepicker-month-year" class="text-xs font-bold text-white tracking-wide">...</span>
       <button type="button" onclick="changeCustomDatePickerMonth(1)" class="w-7 h-7 rounded-lg hover:bg-[#212430] flex items-center justify-center text-gray-400 hover:text-white cursor-pointer"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
     </div>
     <div class="grid grid-cols-7 gap-1 text-center text-[10px] text-gray-500 font-bold mb-1.5">
