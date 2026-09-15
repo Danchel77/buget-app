@@ -2665,7 +2665,7 @@ function openCardContextMenu(e, title, onEdit, onDelete) {
 
   menu.style.top = `${top}px`;
   menu.style.left = `${left}px`;
-  if (typeof lucide !== 'undefined') lucide.createIcons();
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: menu });
 }
 
 function closeCardContextMenu() {
@@ -2674,11 +2674,11 @@ function closeCardContextMenu() {
   activeContextCard = null;
 }
 
-// Скрытие тултипа графика Брокера
+// Скрытие тултипа графика Брокера только если он реально был открыт
 function hideBrokerChartTooltip() {
-  if (brokerChartObj && typeof brokerChartObj.setActiveElements === 'function') {
+  if (brokerChartObj && brokerChartObj.tooltip && brokerChartObj.tooltip.getActiveElements().length > 0) {
     brokerChartObj.setActiveElements([]);
-    brokerChartObj.tooltip?.setActiveElements([], { x: 0, y: 0 });
+    brokerChartObj.tooltip.setActiveElements([], { x: 0, y: 0 });
     brokerChartObj.update('none');
   }
 }
