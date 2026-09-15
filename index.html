@@ -596,7 +596,7 @@
         <div class="flex items-center justify-between w-full min-w-0">
           <div class="min-w-0 flex-1">
             <h3 class="font-bold text-white text-base">Импорт выписки</h3>
-            <div id="pdf-debug-info" class="text-xs text-[#848D99] mt-0.5 min-w-0 truncate">Файл не выбран</div>
+            <div id="pdf-debug-info" class="flex items-center gap-2 mt-1 min-w-0 flex-wrap text-xs text-[#848D99]">Файл не выбран</div>
           </div>
           <button type="button" onclick="openRulesEditorModal()" class="text-gray-400 hover:text-white bg-[#212430] hover:bg-[#2A2D3C] border border-[rgba(255,255,255,0.06)] p-2 rounded-xl text-sm transition-colors flex-shrink-0 ml-2 cursor-pointer flex items-center justify-center" title="Словарь категорий парсера">
             <i data-lucide="settings" class="w-4 h-4"></i>
@@ -610,17 +610,19 @@
           <span class="text-[#30D158]">Доход: <b id="pdf-stat-inc" class="font-semibold">0 ₽</b></span>
         </div>
 
-        <!-- Фильтр-табы (Новые / Переводы / В базе / Все) и кнопка «Выбрать все новые» -->
-        <div class="flex items-center justify-between gap-2 pt-1 overflow-hidden">
-          <div class="flex bg-[#12151C] p-0.5 rounded-xl border border-[rgba(255,255,255,0.04)] text-xs overflow-x-auto no-scrollbar">
-            <button type="button" id="tab-import-new" onclick="setImportFilter('new')" class="whitespace-nowrap px-2.5 py-1 rounded-lg font-semibold bg-[#212430] text-white transition-all cursor-pointer">Новые (0)</button>
-            <button type="button" id="tab-import-transfers" onclick="setImportFilter('transfers')" class="whitespace-nowrap px-2.5 py-1 rounded-lg font-medium text-[#848D99] hover:text-white transition-all cursor-pointer">Переводы (0)</button>
-            <button type="button" id="tab-import-dupes" onclick="setImportFilter('dupes')" class="whitespace-nowrap px-2.5 py-1 rounded-lg font-medium text-[#848D99] hover:text-white transition-all cursor-pointer">В базе (0)</button>
-            <button type="button" id="tab-import-all" onclick="setImportFilter('all')" class="whitespace-nowrap px-2.5 py-1 rounded-lg font-medium text-[#848D99] hover:text-white transition-all cursor-pointer">Все (0)</button>
-          </div>
-          
-          <button type="button" onclick="toggleSelectAllNew()" class="text-xs text-blue-400 hover:text-blue-300 font-medium px-2 py-1 rounded-lg hover:bg-[#212430] transition-colors cursor-pointer whitespace-nowrap flex-shrink-0">
-            Выбрать новые
+        <!-- Фильтр-табы на всю ширину строки -->
+        <div class="flex w-full bg-[#12151C] p-0.5 rounded-xl border border-[rgba(255,255,255,0.04)] text-xs overflow-x-auto no-scrollbar">
+          <button type="button" id="tab-import-new" onclick="setImportFilter('new')" class="flex-1 text-center whitespace-nowrap px-2.5 py-1.5 rounded-lg font-semibold bg-[#212430] text-white transition-all cursor-pointer">Новые (0)</button>
+          <button type="button" id="tab-import-transfers" onclick="setImportFilter('transfers')" class="flex-1 text-center whitespace-nowrap px-2.5 py-1.5 rounded-lg font-medium text-[#848D99] hover:text-white transition-all cursor-pointer">Переводы (0)</button>
+          <button type="button" id="tab-import-dupes" onclick="setImportFilter('dupes')" class="flex-1 text-center whitespace-nowrap px-2.5 py-1.5 rounded-lg font-medium text-[#848D99] hover:text-white transition-all cursor-pointer">В базе (0)</button>
+          <button type="button" id="tab-import-all" onclick="setImportFilter('all')" class="flex-1 text-center whitespace-nowrap px-2.5 py-1.5 rounded-lg font-medium text-[#848D99] hover:text-white transition-all cursor-pointer">Все (0)</button>
+        </div>
+
+        <!-- Кнопка «Выбрать новые», прижатая к левому краю -->
+        <div class="flex items-center justify-start pt-0.5">
+          <button type="button" onclick="toggleSelectAllNew()" class="text-xs text-blue-400 hover:text-blue-300 font-medium px-1.5 py-1 rounded-lg hover:bg-[#212430] transition-colors cursor-pointer inline-flex items-center gap-1.5">
+            <i data-lucide="check-check" class="w-3.5 h-3.5"></i>
+            <span>Выбрать новые</span>
           </button>
         </div>
       </div>
