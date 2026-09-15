@@ -279,16 +279,52 @@ function formatDateStr(dateStr, format) {
     return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
   if (format === 'yyyy-MM')
     return d.toISOString().substring(0, 7);
-  return d.toISOString().substring(0, 10);
+return d.toISOString().substring(0, 10);
 }
 
+let toastTimer = null;
+
 function showToast(text, isError = false, keep = false) {
-  const c = document.getElementById('toast-container');
-  document.getElementById('toast-text').innerText = text;
-  document.getElementById('toast-spinner').style.display = isError || keep === false ? 'none' : 'block';
-  document.getElementById('toast-content').style.borderColor = isError ? '#ef4444' : (keep ? '#3b82f6' : '#10b981');
-  c.classList.remove('hidden');
-  if (!keep) setTimeout(() => c.classList.add('hidden'), 2500);
+  const container = document.getElementById('toast-container');
+  const content = document.getElementById('toast-content');
+  const textEl = document.getElementById('toast-text');
+  const spinner = document.getElementById('toast-spinner');
+  const successIcon = document.getElementById('toast-icon-success');
+  const errorIcon = document.getElementById('toast-icon-error');
+
+  if (!container || !textEl) return;
+
+  clearTimeout(toastTimer);
+  textEl.innerText = text;
+
+  if (isError) {
+    if (spinner) spinner.style.display = 'none';
+    if (successIcon) successIcon.classList.add('hidden');
+    if (errorIcon) errorIcon.classList.remove('hidden');
+    if (content) content.style.borderColor = 'rgba(255, 69, 58, 0.4)';
+  } else if (keep) {
+    if (spinner) spinner.style.display = 'block';
+    if (successIcon) successIcon.classList.add('hidden');
+    if (errorIcon) errorIcon.classList.add('hidden');
+    if (content) content.style.borderColor = 'rgba(108, 93, 211, 0.4)';
+  } else {
+    if (spinner) spinner.style.display = 'none';
+    if (successIcon) successIcon.classList.remove('hidden');
+    if (errorIcon) errorIcon.classList.add('hidden');
+    if (content) content.style.borderColor = 'rgba(48, 209, 88, 0.4)';
+  }
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+
+  container.classList.remove('hidden');
+
+  if (!keep) {
+    toastTimer = setTimeout(() => {
+      container.classList.add('hidden');
+    }, 2400);
+  }
 }
 
 /* Кастомное диалоговое окно */
