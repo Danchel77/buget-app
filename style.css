@@ -34,11 +34,13 @@ body::before { display: none; /* Убираем дешевое фоновое с
 
 .card {
   position: relative !important;
-  transition: background-color 0.2s ease, transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  contain: layout style;
+  will-change: background-color;
+  transform: translateZ(0);
+  transition: background-color 0.06s ease;
 }
 .card:active {
   background: var(--surface-2) !important;
-  transform: scale(0.98);
 }
 
 /* Плавающее контекстное меню у карточки */
@@ -65,15 +67,9 @@ button, input, select { font: inherit; }
 button { -webkit-appearance:none; }
 .hidden { display:none !important; }
 
-/* Устранение мобильной задержки тапа 300 мс и ускорение отклика интерфейса */
-button, input, select, textarea, .card, a {
+/* Полное снятие мобильной задержки тапа 300 мс для всех элементов и их потомков */
+html, body, * {
   touch-action: manipulation;
-}
-
-/* Оптимизация производительности списков и скролла */
-.card {
-  will-change: transform, background-color;
-  transform: translateZ(0);
 }
 
 /* ---------- app shell ---------- */
