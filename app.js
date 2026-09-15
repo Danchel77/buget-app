@@ -390,55 +390,77 @@ async function fetchCollection(table) {
   }
 }
 
+async function applySnapshotsToUI([txS, depS, brS, goalS, catS, rulesS]) {
+  const txData = txS.docs.map(d => ({ id: d.id, ...d.data() }));
+  const depData = depS.docs.map(d => ({ id: d.id, ...d.data() }));
+  const brData = brS.docs.map(d => ({ id: d.id, ...d.data() }));
+  const goalData = goalS.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  const processedDeposits = processDeposits(depData, goalData);
+  const processedBroker = processBroker(brData, goalData);
+  const catData = catS.docs.map(d => ({ id: d.id, ...d.data() }));
+  const categories = processCategories(catData);
+
+  const existingSettings = (Cache && Cache.settings) ? Cache.settings : {};
+
+  Cache = {
+    settings: existingSettings,
+    transactions: processTransactions(txData),
+    deposits: processedDeposits,
+    broker: processedBroker,
+    goals: processGoals(goalData, processedDeposits, processedBroker),
+    categories: categories,
+    categoryRules: await processOrSeedRules(rulesS)
+  };
+  window.Cache = Cache;
+
+  updateGoalDropdowns();
+  renderTransactions();
+  renderDeposits();
+  renderBroker();
+  renderGoals();
+}
+
 async function fetchAllData() {
-  showToast("Синхронизация...", false, true);
+  const tables = ['Transactions', 'Deposits', 'Broker', 'Goals', 'Categories', 'CategoryRules'];
+
+  // ЭТАП 1: Мгновенное чтение из локального кэша IndexedDB (15-40 мс)
   try {
-    const [txS, depS, brS, goalS, catS, rulesS] = await Promise.all([
-      getUserCol('Transactions').get(),
-      getUserCol('Deposits').get(),
-      getUserCol('Broker').get(),
-      getUserCol('Goals').get(),
-      getUserCol('Categories').get(),
-      getUserCol('CategoryRules').get()
-    ]);
-    const txData = txS.docs.map(d => ({ id: d.id, ...d.data() }));
-    const depData = depS.docs.map(d => ({ id: d.id, ...d.data() }));
-    const brData = brS.docs.map(d => ({ id: d.id, ...d.data() }));
-    const goalData = goalS.docs.map(d => ({ id: d.id, ...d.data() }));
+    const cachedSnaps = await Promise.all(
+      tables.map(tbl => getUserCol(tbl).get({ source: 'cache' }))
+    );
+    // Если в локальном кэше есть данные — сразу показываем интерфейс
+    if (cachedSnaps.some(s => !s.empty)) {
+      await applySnapshotsToUI(cachedSnaps);
+      document.getElementById('loading-screen')?.classList.add('hidden');
+    }
+  } catch (e) {
+    // Первый запуск на устройстве — локальный кэш еще пуст, переходим к сети
+  }
 
-    const processedDeposits = processDeposits(depData, goalData);
-    const processedBroker = processBroker(brData, goalData);
-    const catData = catS.docs.map(d => ({ id: d.id, ...d.data() }));
-    const categories = processCategories(catData);
-    
-    // БЕРЕЖНО СОХРАНЯЕМ СУЩЕСТВУЮЩИЕ НАСТРОЙКИ (showBroker и т.д.) ИЗ loadUserSettings
-    const existingSettings = (Cache && Cache.settings) ? Cache.settings : {};
-    
-    Cache = {
-      settings: existingSettings,
-      transactions: processTransactions(txData),
-      deposits: processedDeposits,
-      broker: processedBroker,
-      goals: processGoals(goalData, processedDeposits, processedBroker),
-      categories: categories,
-      categoryRules: await processOrSeedRules(rulesS)
-    };
-    window.Cache = Cache;
-
-    updateGoalDropdowns();
-    renderTransactions();
-    renderDeposits();
-    renderBroker();
-    renderGoals();
+  // ЭТАП 2: Фоновая синхронизация со свежими данными сервера
+  try {
+    showToast("Синхронизация...", false, true);
+    const serverSnaps = await Promise.all(
+      tables.map(tbl => getUserCol(tbl).get())
+    );
+    await applySnapshotsToUI(serverSnaps);
     document.getElementById('last-sync').innerText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    document.getElementById('toast-container').classList.add('hidden');
+    document.getElementById('toast-container')?.classList.add('hidden');
+    document.getElementById('loading-screen')?.classList.add('hidden');
   } catch (err) {
-    showToast("Ошибка", true);
+    document.getElementById('toast-container')?.classList.add('hidden');
+    document.getElementById('loading-screen')?.classList.add('hidden');
+    // Если оффлайн, но локальные данные уже отрисованы — не беспокоим ошибкой
+    if (!Cache) {
+      showToast("Нет подключения к сети", true);
+    }
   }
 }
 
 /* Универсальная функция добавления/обновления */
 async function submitAction(btnId, table, data) {
+
   const btn = document.getElementById(btnId);
   btn.disabled = true;
   showToast("Сохранение...", false, true);
