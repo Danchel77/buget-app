@@ -1561,9 +1561,12 @@ function buildCharts() {
         {
           label: 'Доходы',
           data: incomes,
-          backgroundColor: 'rgba(48, 209, 88, 0.88)',
+          backgroundColor: 'rgba(48, 209, 88, 0.78)',
+          hoverBackgroundColor: '#30D158',
           borderColor: '#30D158',
+          hoverBorderColor: '#ffffff',
           borderWidth: 0,
+          hoverBorderWidth: 1.5,
           borderRadius: 7,
           borderSkipped: false,
           barPercentage: .72,
@@ -1572,9 +1575,12 @@ function buildCharts() {
         {
           label: 'Расходы',
           data: expenses,
-          backgroundColor: 'rgba(255, 69, 58, 0.88)',
+          backgroundColor: 'rgba(255, 69, 58, 0.78)',
+          hoverBackgroundColor: '#FF453A',
           borderColor: '#FF453A',
+          hoverBorderColor: '#ffffff',
           borderWidth: 0,
+          hoverBorderWidth: 1.5,
           borderRadius: 7,
           borderSkipped: false,
           barPercentage: .72,
@@ -1585,8 +1591,42 @@ function buildCharts() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      animation: { duration: 450, easing: 'easeOutQuart' },
-      interaction: { mode: 'index', intersect: true },
+      animation: { duration: 350, easing: 'easeOutQuart' },
+      interaction: {
+        mode: 'index',
+        intersect: true
+      },
+      onClick: (e, elements, chart) => {
+        if (!elements || elements.length === 0) {
+          // Клик в пустую область графика — сбрасываем подсветку и скрываем тултип
+          chart.setActiveElements([]);
+          chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+          chart.update();
+          return;
+        }
+
+        const clickedIdx = elements[0].index;
+        const currentActive = chart.getActiveElements();
+
+        // Повторный клик по тому же месяцу — снимаем выделение (toggle)
+        if (currentActive.length > 0 && currentActive[0].index === clickedIdx) {
+          chart.setActiveElements([]);
+          chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+          chart.update();
+        } else {
+          // Выделяем столбцы выбранного месяца и вызываем тултип
+          const activeItems = [
+            { datasetIndex: 0, index: clickedIdx },
+            { datasetIndex: 1, index: clickedIdx }
+          ];
+          chart.setActiveElements(activeItems);
+          chart.tooltip.setActiveElements(activeItems, {
+            x: elements[0].element.x,
+            y: elements[0].element.y
+          });
+          chart.update();
+        }
+      },
       scales: {
         x: {
           stacked: false,
@@ -1615,7 +1655,6 @@ function buildCharts() {
       }
     }
   });
-
   // Запуск отображения текущего выбранного месяца
   updateAnalyticsMonthView();
 }
@@ -1741,14 +1780,41 @@ function updateAnalyticsForMonth(monthId) {
         backgroundColor: data.length ? colors.slice(0, data.length) : ['#303740'],
         borderColor: '#171d24',
         borderWidth: 3,
-        hoverOffset: 5
+        hoverOffset: 8,
+        hoverBorderColor: '#ffffff',
+        hoverBorderWidth: 2
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       cutout: '72%',
-      animation: { duration: 450 },
+      animation: { duration: 350 },
+      onClick: (e, elements, chart) => {
+        if (!elements || elements.length === 0) {
+          chart.setActiveElements([]);
+          chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+          chart.update();
+          return;
+        }
+
+        const clickedIdx = elements[0].index;
+        const currentActive = chart.getActiveElements();
+
+        // Повторный тап по тому же сегменту закрывает тултип (toggle)
+        if (currentActive.length > 0 && currentActive[0].index === clickedIdx) {
+          chart.setActiveElements([]);
+          chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+          chart.update();
+        } else {
+          chart.setActiveElements([{ datasetIndex: 0, index: clickedIdx }]);
+          chart.tooltip.setActiveElements([{ datasetIndex: 0, index: clickedIdx }], {
+            x: elements[0].element.x,
+            y: elements[0].element.y
+          });
+          chart.update();
+        }
+      },
       plugins: {
         legend: { display: false },
         datalabels: { display: false },
@@ -2725,23 +2791,42 @@ function closeCardContextMenu() {
   activeContextCard = null;
 }
 
-// Скрытие тултипа графика Брокера только если он реально был открыт
-function hideBrokerChartTooltip() {
-  if (brokerChartObj && brokerChartObj.tooltip && brokerChartObj.tooltip.getActiveElements().length > 0) {
+// Скрытие тултипов графиков при клике в пустое место страницы или скролле
+function hideAllChartTooltips(e) {
+  const isTargetInside = (selector) => e && e.target && e.target.closest(selector);
+
+  // 1. График брокера
+  if (brokerChartObj && !isTargetInside('#brokerChart') && brokerChartObj.tooltip && brokerChartObj.tooltip.getActiveElements().length > 0) {
     brokerChartObj.setActiveElements([]);
     brokerChartObj.tooltip.setActiveElements([], { x: 0, y: 0 });
     brokerChartObj.update('none');
+    const balEl = document.getElementById('broker-balance');
+    if (balEl && Cache?.broker) balEl.innerText = formatMoney(Cache.broker.balance);
+  }
+
+  // 2. Столбчатый график динамики трат
+  if (monthlyChartObj && !isTargetInside('#monthlyExpensesChart') && monthlyChartObj.getActiveElements().length > 0) {
+    monthlyChartObj.setActiveElements([]);
+    monthlyChartObj.tooltip.setActiveElements([], { x: 0, y: 0 });
+    monthlyChartObj.update();
+  }
+
+  // 3. Круговая диаграмма структуры категорий
+  if (categoryChartObj && !isTargetInside('#categoryExpensesChart') && categoryChartObj.getActiveElements().length > 0) {
+    categoryChartObj.setActiveElements([]);
+    categoryChartObj.tooltip.setActiveElements([], { x: 0, y: 0 });
+    categoryChartObj.update();
   }
 }
 
-// При скролле страницы скрываются меню, календарь и всплывающая точка графика
+// При скролле страницы скрываются меню, календарь и всплывающие тултипы
 window.addEventListener('scroll', () => {
   closeCardContextMenu();
   closeCustomDatePicker();
-  hideBrokerChartTooltip();
+  hideAllChartTooltips();
 }, { passive: true, capture: true });
 
-// Закрытие при клике мимо
+// Закрытие при клике в любое свободное место мимо элементов
 document.addEventListener('click', (e) => {
   if (!e.target.closest('#card-context-menu')) {
     closeCardContextMenu();
@@ -2749,9 +2834,7 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('#custom-datepicker') && !e.target.closest('input[type="date"]')) {
     closeCustomDatePicker();
   }
-  if (!e.target.closest('#brokerChart')) {
-    hideBrokerChartTooltip();
-  }
+  hideAllChartTooltips(e);
 });
 
 // -------------------------------------------------------------
