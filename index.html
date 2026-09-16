@@ -675,6 +675,111 @@
     </div>
   </div>
 
+  <!-- МОДАЛЬНОЕ ОКНО: НАСТРОЙКА ПЛАНА БЮДЖЕТА -->
+  <div id="budget-plan-dialog" class="fixed inset-0 bg-black/80 z-[150] hidden flex flex-col justify-center items-center p-4 backdrop-blur-sm animate-fade-in">
+    <div class="bg-[#181B24] border border-[rgba(255,255,255,0.08)] w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 mb-4 border-b border-[rgba(255,255,255,0.06)]">
+        <div class="flex items-center gap-2">
+          <i data-lucide="sliders" class="w-4 h-4 text-[#6C5DD3]"></i>
+          <h3 class="font-bold text-white text-base">План бюджета</h3>
+        </div>
+        <button type="button" onclick="closeBudgetPlanModal()" class="w-7 h-7 rounded-full bg-[#212430] text-gray-400 hover:text-white flex items-center justify-center cursor-pointer text-sm">✕</button>
+      </div>
+
+      <!-- Справка: Исторический расчет среднего дохода -->
+      <div class="bg-[#12151C] border border-[rgba(255,255,255,0.04)] rounded-2xl p-3.5 mb-4">
+        <div class="flex items-center justify-between text-xs mb-1">
+          <span class="text-[#848D99]">Средний доход за 3 мес.</span>
+          <span id="plan-avg-income" class="font-bold text-[#30D158]">0 ₽</span>
+        </div>
+        <p class="text-[10px] text-gray-500 leading-tight">На основе регулярных доходов из загруженных выписок</p>
+      </div>
+
+      <form id="budget-plan-form" onsubmit="submitBudgetPlan(event)" class="space-y-3.5">
+        <div>
+          <label class="block text-[11px] text-[#848D99] uppercase font-bold mb-1">Плановый доход в месяц (₽)</label>
+          <input type="text" inputmode="decimal" oninput="formatSumInput(this); updatePlanForecast();" id="plan-income-input" placeholder="0 ₽" required class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white font-bold rounded-xl p-3 outline-none text-sm">
+        </div>
+
+        <div>
+          <label class="block text-[11px] text-[#848D99] uppercase font-bold mb-1">Лимит на повседневную жизнь (₽)</label>
+          <input type="text" inputmode="decimal" oninput="formatSumInput(this); updatePlanForecast();" id="plan-expense-input" placeholder="0 ₽" required class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white font-bold rounded-xl p-3 outline-none text-sm">
+          <p id="plan-week-hint" class="text-[10px] text-[#848D99] mt-1 px-1">Базовый лимит недели: ~0 ₽</p>
+        </div>
+
+        <!-- Авторасчет свободного остатка на цели -->
+        <div class="bg-[#12151C] border border-[rgba(255,255,255,0.04)] rounded-2xl p-3.5">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-[#848D99]">Накопления в цели:</span>
+            <b id="plan-forecast-surplus" class="text-white font-bold text-sm">+0 ₽/мес</b>
+          </div>
+          <p class="text-[10px] text-gray-500 mt-1">Доходы минус счета календаря и лимиты на жизнь</p>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button type="button" onclick="closeBudgetPlanModal()" class="flex-1 bg-[#212430] hover:bg-[#2A2D3C] text-gray-300 py-3 rounded-xl text-xs font-semibold cursor-pointer">Отмена</button>
+          <button type="submit" class="flex-1 bg-[#6C5DD3] hover:bg-[#5b4ec2] text-white py-3 rounded-xl text-xs font-semibold shadow-md active:scale-95 cursor-pointer">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: ДОБАВЛЕНИЕ ПЛАТЕЖА В КАЛЕНДАРЬ -->
+  <div id="calendar-bill-dialog" class="fixed inset-0 bg-black/80 z-[150] hidden flex flex-col justify-center items-center p-4 backdrop-blur-sm animate-fade-in">
+    <div class="bg-[#181B24] border border-[rgba(255,255,255,0.08)] w-full max-w-sm rounded-3xl p-5 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 mb-4 border-b border-[rgba(255,255,255,0.06)]">
+        <h3 class="font-bold text-white text-base">Платеж в календарь</h3>
+        <button type="button" onclick="closeAddBillModal()" class="w-7 h-7 rounded-full bg-[#212430] text-gray-400 hover:text-white flex items-center justify-center cursor-pointer text-sm">✕</button>
+      </div>
+
+      <form id="calendar-bill-form" onsubmit="submitCalendarBill(event)" class="space-y-3">
+        <input type="text" id="bill-name" placeholder="Название (ЖКХ, Аренда, Подписка)" required class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white rounded-xl p-3 outline-none text-xs">
+        <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="bill-amount" placeholder="Сумма (₽)" required class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white font-bold rounded-xl p-3 outline-none text-sm">
+        
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] text-[#848D99] uppercase font-bold mb-1">День месяца</label>
+            <input type="number" id="bill-day" min="1" max="31" placeholder="Число (1-31)" required class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white rounded-xl p-2.5 outline-none text-xs">
+          </div>
+          <div>
+            <label class="block text-[10px] text-[#848D99] uppercase font-bold mb-1">Тип платежа</label>
+            <select id="bill-type" class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white rounded-xl p-2.5 outline-none text-xs">
+              <option value="recurring">Ежемесячно</option>
+              <option value="onetime">Разовый</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button type="button" onclick="closeAddBillModal()" class="flex-1 bg-[#212430] hover:bg-[#2A2D3C] text-gray-300 py-3 rounded-xl text-xs font-semibold cursor-pointer">Отмена</button>
+          <button type="submit" class="flex-1 bg-[#6C5DD3] hover:bg-[#5b4ec2] text-white py-3 rounded-xl text-xs font-semibold shadow-md active:scale-95 cursor-pointer">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: ПОПОЛНЕНИЕ / СПИСАНИЕ ИЗ КОПИЛКИ ЦЕЛИ -->
+  <div id="goal-topup-dialog" class="fixed inset-0 bg-black/80 z-[150] hidden flex flex-col justify-center items-center p-4 backdrop-blur-sm animate-fade-in">
+    <div class="bg-[#181B24] border border-[rgba(255,255,255,0.08)] w-full max-w-xs rounded-3xl p-5 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 mb-3 border-b border-[rgba(255,255,255,0.06)]">
+        <h4 id="goal-topup-title" class="text-sm font-bold text-white">Копилка цели</h4>
+        <button type="button" onclick="closeGoalTopupModal()" class="w-7 h-7 rounded-full bg-[#212430] text-gray-400 hover:text-white flex items-center justify-center cursor-pointer text-sm">✕</button>
+      </div>
+
+      <div class="flex bg-[#12151C] p-1 rounded-xl mb-3 border border-[rgba(255,255,255,0.04)] text-xs">
+        <button type="button" id="tab-topup-add" onclick="setTopupMode('add')" class="flex-1 py-1.5 rounded-lg font-semibold bg-[#212430] text-white transition-all">Пополнить (+)</button>
+        <button type="button" id="tab-topup-sub" onclick="setTopupMode('sub')" class="flex-1 py-1.5 rounded-lg font-medium text-[#848D99] hover:text-white transition-all">Снять (−)</button>
+      </div>
+
+      <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="goal-topup-amount" placeholder="0 ₽" required class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white font-bold rounded-xl p-3 outline-none text-base mb-4">
+
+      <div class="flex gap-2">
+        <button type="button" onclick="closeGoalTopupModal()" class="flex-1 bg-[#212430] hover:bg-[#2A2D3C] text-gray-300 py-2.5 rounded-xl text-xs font-semibold cursor-pointer">Отмена</button>
+        <button type="button" onclick="submitGoalTopup()" class="flex-1 bg-[#6C5DD3] hover:bg-[#5b4ec2] text-white py-2.5 rounded-xl text-xs font-semibold shadow-md active:scale-95 cursor-pointer">Применить</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Модальное окно предпросмотра сырых данных PDF -->
   <div id="pdf-debug-dialog" class="fixed inset-0 bg-black/85 z-[130] hidden flex flex-col justify-center items-center p-3 sm:p-4 backdrop-blur-sm animate-fade-in">
     <div class="bg-[#181B24] border border-[rgba(255,255,255,0.06)] w-full max-w-2xl rounded-3xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
