@@ -180,6 +180,86 @@
 
   <main id="app-content" class="p-4">
     
+    <!-- ЭКРАН БЮДЖЕТА (ГЛАВНЫЙ ЭКРАН УПРАВЛЕНИЯ ФИНАНСАМИ) -->
+    <div id="budget-tab" class="space-y-4 animate-fade-in">
+      <!-- Шапка экрана с датой и кнопкой настройки плана -->
+      <div class="flex items-center justify-between px-1">
+        <div>
+          <p class="text-[10px] text-[#848D99] uppercase font-bold tracking-wider">Планирование</p>
+          <h2 id="budget-month-label" class="text-xl font-bold text-white tracking-tight">Сентябрь 2026</h2>
+        </div>
+        <button type="button" onclick="openBudgetPlanModal()" class="bg-[#181B24] hover:bg-[#212430] active:scale-95 border border-[rgba(255,255,255,0.06)] text-gray-200 px-3.5 py-2 rounded-xl flex items-center gap-2 text-xs font-semibold transition-all cursor-pointer shadow-sm">
+          <i data-lucide="sliders" class="w-4 h-4 text-[#6C5DD3]"></i>
+          <span>План месяца</span>
+        </button>
+      </div>
+
+      <!-- 1. Главная карточка: Недельный пульс и общий темп месяца -->
+      <div class="bg-[#181B24] border border-[rgba(255,255,255,0.06)] rounded-3xl p-5 shadow-sm relative overflow-hidden">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[11px] text-[#848D99] uppercase tracking-wider font-bold">Свободно на эту неделю</span>
+          <span id="budget-week-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-[#30D158]/15 text-[#30D158]">В графике</span>
+        </div>
+
+        <p id="budget-week-available" class="text-3xl font-bold text-white tracking-tight">0 ₽</p>
+        <p id="budget-week-sub" class="text-xs text-[#848D99] mt-1">Лимит недели: 0 ₽ • До конца недели 7 дн.</p>
+
+        <!-- Месячная шкала свободных трат на жизнь -->
+        <div class="mt-5 pt-4 border-t border-[rgba(255,255,255,0.04)]">
+          <div class="flex justify-between items-center text-xs mb-2">
+            <span class="text-gray-400">На жизнь в этом месяце</span>
+            <span id="budget-month-stat" class="font-medium text-gray-200">0 из 0 ₽</span>
+          </div>
+          <div class="w-full bg-[rgba(255,255,255,0.06)] h-2 rounded-full overflow-hidden">
+            <div id="budget-month-progress" class="bg-[#30D158] h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Календарь запланированных платежей (перенос на новую строку БЕЗ скролла) -->
+      <div class="space-y-2.5">
+        <div class="flex items-center justify-between px-1">
+          <div>
+            <p class="text-[11px] text-[#848D99] uppercase tracking-wider font-bold">Календарь платежей</p>
+            <p id="budget-bills-total" class="text-xs text-gray-400 mt-0.5">Обязательные счета: 0 ₽</p>
+          </div>
+          <button type="button" onclick="openAddBillModal()" class="text-xs text-[#6C5DD3] hover:text-[#8274ea] bg-[#6C5DD3]/10 hover:bg-[#6C5DD3]/20 border border-[#6C5DD3]/20 px-3 py-1.5 rounded-xl font-semibold transition-all flex items-center gap-1 cursor-pointer">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            <span>Платеж</span>
+          </button>
+        </div>
+
+        <!-- Адаптивная 2-колоночная сетка с переносом карточек вниз -->
+        <div id="budget-calendar-list" class="grid grid-cols-2 gap-2"></div>
+      </div>
+
+      <!-- 3. Блок финансовых целей (виртуальные копилки) -->
+      <div class="space-y-2.5">
+        <div class="flex items-center justify-between px-1">
+          <div>
+            <p class="text-[11px] text-[#848D99] uppercase tracking-wider font-bold">Цели накопления</p>
+            <p id="budget-goals-surplus" class="text-xs text-gray-400 mt-0.5">Накопления по плану: +0 ₽/мес</p>
+          </div>
+          <button type="button" onclick="openGoalModal()" class="text-xs text-[#6C5DD3] hover:text-[#8274ea] bg-[#6C5DD3]/10 hover:bg-[#6C5DD3]/20 border border-[#6C5DD3]/20 px-3 py-1.5 rounded-xl font-semibold transition-all flex items-center gap-1 cursor-pointer">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            <span>Новая цель</span>
+          </button>
+        </div>
+
+        <div id="budget-goals-list" class="space-y-3"></div>
+      </div>
+
+      <!-- 4. Лимиты по категориям на месяц -->
+      <div class="space-y-2.5 pb-6">
+        <div class="flex items-center justify-between px-1">
+          <p class="text-[11px] text-[#848D99] uppercase tracking-wider font-bold">Лимиты по категориям</p>
+          <span class="text-xs text-[#848D99]">План на месяц</span>
+        </div>
+
+        <div id="budget-category-limits-list" class="space-y-2"></div>
+      </div>
+    </div>
+
     <!-- ЭКРАН ТРАНЗАКЦИЙ -->
     <div id="transactions-tab" class="space-y-4 hidden animate-fade-in">
       <div class="grid grid-cols-2 gap-3 mb-2">
@@ -450,12 +530,12 @@
     </div>
   </main>
 
-  <nav class="fixed bottom-0 w-full bg-gray-900 border-t border-gray-800 flex justify-around pb-safe">
-  <button onclick="switchTab('transactions')" id="nav-transactions" class="flex-1 py-4 text-blue-400 font-medium text-sm flex items-center justify-center">Траты</button>
-  <button onclick="switchTab('deposits')" id="nav-deposits" class="flex-1 py-4 text-gray-500 font-medium text-sm flex items-center justify-center">Вклады</button>
-  <button onclick="switchTab('broker')" id="nav-broker" class="flex-1 py-4 text-gray-500 font-medium text-sm flex items-center justify-center">Брокер</button>
-  <button onclick="switchTab('goals')" id="nav-goals" class="flex-1 py-4 text-gray-500 font-medium text-sm flex items-center justify-center">Цели</button>
-</nav>
+  <nav class="fixed bottom-0 w-full bg-gray-900 border-t border-gray-800 flex justify-around pb-safe z-40">
+    <button onclick="switchTab('budget')" id="nav-budget" class="flex-1 py-4 text-blue-400 font-medium text-sm flex items-center justify-center">Бюджет</button>
+    <button onclick="switchTab('transactions')" id="nav-transactions" class="flex-1 py-4 text-gray-500 font-medium text-sm flex items-center justify-center">Траты</button>
+    <button onclick="switchTab('deposits')" id="nav-deposits" class="flex-1 py-4 text-gray-500 font-medium text-sm flex items-center justify-center">Вклады</button>
+    <button onclick="switchTab('broker')" id="nav-broker" class="flex-1 py-4 text-gray-500 font-medium text-sm flex items-center justify-center">Брокер</button>
+  </nav>
 
   <!-- ШАБЛОН СТРОКИ ТРАНЗАКЦИИ -->
   <template id="tx-row-template">
