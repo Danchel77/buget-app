@@ -1003,6 +1003,8 @@ function processGoals(goals) {
 // =============================================================
 // ДВИЖОК ЭКРАНА БЮДЖЕТА: ОНБОРДИНГ, ПУЛЬС, АВТОСВЯЗКА ЧЕКОВ И ЦЕЛИ
 // =============================================================
+let currentWizardStep = 1;
+let wizardSelectedIncomeSources = new Set(['Зарплата', 'Кэшбек']);
 
 function renderBudgetTab() {
   if (!Cache) return;
@@ -1015,7 +1017,7 @@ function renderBudgetTab() {
   if (!plan.isConfigured) {
     if (wizardEl) wizardEl.classList.remove('hidden');
     if (dashboardEl) dashboardEl.classList.add('hidden');
-    initBudgetWizard();
+    initBudgetWizard(false);
     return;
   }
 
@@ -1087,29 +1089,22 @@ function renderBudgetTab() {
     monthProgressEl.className = pct >= 95 ? 'bg-[#FF453A] h-full rounded-full transition-all' : (pct >= 75 ? 'bg-[#FF9F0A] h-full rounded-full transition-all' : 'bg-[#30D158] h-full rounded-full transition-all');
   }
 
-  // 2. Рендер календаря счетов (с умной проверкой чеков текущего месяца)
   renderBudgetCalendar(bills, today, monthItems);
-
-  // 3. Рендер целей накопления
   renderBudgetGoals(goals, plan, bills);
-
-  // 4. Рендер лимитов по категориям с полноценными прогресс-барами
   renderBudgetCategoryLimits(monthItems, plan.categoryLimits || {});
 
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-// Автоматическая проверка: был ли счет уже оплачен в реальных транзакциях месяца
 function isBillPaidInCurrentMonth(bill, monthItems) {
-  if (bill.isPaid) return true; // Отмечено пользователем вручную
+  if (bill.isPaid) return true;
 
   const billAmount = parseFloat(bill.amount) || 0;
   const billName = (bill.name || '').toLowerCase();
 
-  // Ищем совпадение в чеках за текущий месяц (по категории, сумме или названию)
   return monthItems.some(tx => {
     if (tx.type !== 'Расход') return false;
-    const isAmountMatch = Math.abs(tx.amount - billAmount) <= (billAmount * 0.15); // погрешность до 15% (для ЖКХ)
+    const isAmountMatch = Math.abs(tx.amount - billAmount) <= (billAmount * 0.15);
     const isCommentMatch = tx.comment && (tx.comment.toLowerCase().includes(billName) || billName.includes(tx.comment.toLowerCase()));
     const isCategoryMatch = (bill.category && tx.category === bill.category) && isAmountMatch;
 
@@ -1232,7 +1227,6 @@ function renderBudgetGoals(goals, plan, bills) {
   }).join('');
 }
 
-// Рендер лимитов категорий с прогресс-барами
 function renderBudgetCategoryLimits(monthItems, categoryLimits) {
   const container = document.getElementById('budget-category-limits-list');
   if (!container || !Cache?.categories) return;
@@ -1255,48 +1249,41 @@ function renderBudgetCategoryLimits(monthItems, categoryLimits) {
     else if (pct >= 75) barColor = 'bg-[#FF9F0A]';
 
     return `
-      <div class="card bg-[#181B24] border border-[rgba(255,255,255,0.04)] rounded-2xl p-3.5 cursor-pointer hover:border-[rgba(255,255,255,0.12)] transition-all"
+      <div class="card bg-[#181B24] border border-[rgba(255,255,255,0.04)] rounded-xl p-2.5 cursor-pointer hover:border-[rgba(255,255,255,0.12)] transition-all"
            onclick="openCategoryLimitModal('${escapeHtml(cat.name)}', ${limit})">
-        <div class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <div class="w-8 h-8 rounded-xl bg-[#212430] text-gray-300 flex items-center justify-center flex-shrink-0">
-              <i data-lucide="${icon}" class="w-4 h-4"></i>
-            </div>
-            <div>
-              <h4 class="text-xs font-semibold text-gray-200 truncate">${escapeHtml(cat.name)}</h4>
-              <p class="text-[10px] text-[#848D99]">${limit > 0 ? `Лимит: ${formatMoney(limit)}` : 'Лимит не задан (тап для настройки)'}</p>
-            </div>
+        <div class="flex items-center justify-between mb-1.5 min-w-0">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <i data-lucide="${icon}" class="w-3.5 h-3.5 text-[#848D99] flex-shrink-0"></i>
+            <span class="text-[11px] font-semibold text-gray-200 truncate">${escapeHtml(cat.name)}</span>
           </div>
-          <span class="text-xs font-bold font-mono ${isOver ? 'text-[#FF453A]' : 'text-white'}">${formatMoney(spent)}</span>
+          <span class="text-[11px] font-bold font-mono ${isOver ? 'text-[#FF453A]' : 'text-gray-300'} flex-shrink-0">${formatMoney(spent)}</span>
         </div>
 
-        ${limit > 0 ? `
-          <div class="w-full bg-[rgba(255,255,255,0.06)] h-1.5 rounded-full overflow-hidden">
-            <div class="${barColor} h-full rounded-full transition-all duration-300" style="width: ${pct}%"></div>
-          </div>
-        ` : ''}
+        <div class="w-full bg-[rgba(255,255,255,0.06)] h-1 rounded-full overflow-hidden">
+          <div class="${barColor} h-full rounded-full transition-all duration-300" style="width: ${limit > 0 ? pct : 0}%"></div>
+        </div>
+        <div class="text-[9px] text-[#848D99] mt-1 truncate">${limit > 0 ? `Лимит: ${formatMoney(limit)}` : 'Лимит не задан'}</div>
       </div>
     `;
   }).join('');
 }
 
 // -------------------------------------------------------------
-// МАСТЕР ПЕРВОГО ЗАПУСКА БЮДЖЕТА (ХОЛОДНЫЙ СТАРТ)
+// МАСТЕР ПЕРВОГО ЗАПУСКА БЮДЖЕТА (БЕЗ СБРОСА ШАГОВ И СКРОЛЛА)
 // -------------------------------------------------------------
 let wizardData = {
-  goalName: '',
-  goalTarget: 0,
   income: 0,
-  bills: [],
   categoryLimits: {}
 };
 
-function initBudgetWizard() {
-  goToWizardStep(1);
+function initBudgetWizard(forceReset = false) {
+  if (forceReset) currentWizardStep = 1;
+  goToWizardStep(currentWizardStep);
   calculateHistoricalIncomeForWizard();
 }
 
 function goToWizardStep(step) {
+  currentWizardStep = step;
   [1, 2, 3, 4, 5].forEach(i => {
     const el = document.getElementById(`wizard-step-${i}`);
     if (el) el.classList.toggle('hidden', i !== step);
@@ -1309,22 +1296,16 @@ function goToWizardStep(step) {
     'Лимиты на повседневную жизнь',
     'Итоговый план бюджета'
   ];
-  const descs = [
-    'Бюджет строится вокруг ваших целей. Свободные средства будут автоматически приближать эту цель.',
-    'Укажите ориентировочный чистый доход в месяц (по выпискам или вручную).',
-    'Кликните по числу в календаре, чтобы привязать аренду, ЖКХ или разовый платеж.',
-    'Ограничьте траты на супермаркеты, кафе и шопинг с учетом вашей статистики.',
-    'Проверьте рассчитанный недельный баланс и срок достижения цели.'
-  ];
 
   const badge = document.getElementById('wizard-step-badge');
   const titleEl = document.getElementById('wizard-step-title');
-  const descEl = document.getElementById('wizard-step-desc');
+  const counterEl = document.getElementById('wizard-step-counter');
 
   if (badge) badge.innerText = `Шаг ${step} из 5`;
   if (titleEl) titleEl.innerText = titles[step - 1];
-  if (descEl) descEl.innerText = descs[step - 1];
+  if (counterEl) counterEl.innerText = `${step}/5`;
 
+  if (step === 2) calculateHistoricalIncomeForWizard();
   if (step === 3) renderWizardCalendar();
   if (step === 4) renderWizardCategoryLimits();
   if (step === 5) renderWizardSummary();
@@ -1334,62 +1315,208 @@ function goToWizardStep(step) {
 
 function calculateHistoricalIncomeForWizard() {
   const months = Cache?.transactions || [];
+  const sourcesContainer = document.getElementById('wiz-income-sources-list');
+  const calcEl = document.getElementById('wiz-calculated-income');
+  const inputEl = document.getElementById('wiz-income-input');
+
   if (months.length === 0) {
-    document.getElementById('wiz-calculated-income').innerText = 'Нет выписок';
+    if (calcEl) calcEl.innerText = 'Нет выписок';
+    if (sourcesContainer) sourcesContainer.innerHTML = '<span class="text-[10px] text-[#848D99]">Нет загруженных выписок — укажите сумму вручную ниже</span>';
     return;
   }
 
-  const lastMonths = months.slice(0, 3);
-  const totalInc = lastMonths.reduce((s, m) => s + (Number(m.income) || 0), 0);
-  const avg = Math.round(totalInc / lastMonths.length);
+  // Собираем все уникальные категории доходов из базы
+  const availableSources = ['Зарплата', 'Кэшбек', 'Возврат', 'Другое'];
+  if (sourcesContainer) {
+    sourcesContainer.innerHTML = availableSources.map(src => {
+      const active = wizardSelectedIncomeSources.has(src);
+      return `
+        <button type="button" onclick="toggleWizardIncomeSource('${escapeHtml(src)}')" class="px-2 py-0.5 rounded-lg text-[10px] font-semibold border transition-all cursor-pointer ${active ? 'bg-[#30D158]/15 text-[#30D158] border-[#30D158]/30' : 'bg-[#181B24] text-gray-400 border-[rgba(255,255,255,0.06)]'}">
+          ${active ? '✓ ' : ''}${escapeHtml(src)}
+        </button>
+      `;
+    }).join('');
+  }
 
-  const calcEl = document.getElementById('wiz-calculated-income');
-  const inputEl = document.getElementById('wiz-income-input');
+  // Расчет среднего дохода по выбранным источникам за последние месяцы
+  const lastMonths = months.slice(0, 3);
+  let totalIncome = 0;
+
+  lastMonths.forEach(m => {
+    (m.items || []).forEach(tx => {
+      if (tx.type === 'Доход' && wizardSelectedIncomeSources.has(tx.category)) {
+        totalIncome += tx.amount;
+      }
+    });
+  });
+
+  const avg = Math.round(totalIncome / Math.max(1, lastMonths.length));
   if (calcEl) calcEl.innerText = `${formatMoney(avg)}/мес`;
   if (inputEl && !inputEl.value) setFormattedVal('wiz-income-input', avg);
 }
 
+function toggleWizardIncomeSource(src) {
+  if (wizardSelectedIncomeSources.has(src)) {
+    wizardSelectedIncomeSources.delete(src);
+  } else {
+    wizardSelectedIncomeSources.add(src);
+  }
+  calculateHistoricalIncomeForWizard();
+}
+
+// Календарь Шага 3: подсветка дней, тултип по клику, меню по удержанию
+let activeCalendarDay = null;
+let dayLongPressTimer = null;
+
 function renderWizardCalendar() {
   const grid = document.getElementById('wiz-calendar-grid');
+  const countEl = document.getElementById('wiz-bills-count');
   if (!grid) return;
 
-  const daysInMonth = 30; // стандартный месяц календаря
-  let html = '';
+  const bills = Cache?.calendarBills || [];
+  if (countEl) countEl.innerText = `Счетов: ${bills.length}`;
 
-  for (let d = 1; d <= daysInMonth; d++) {
-    const hasBills = wizardData.bills.some(b => b.day === d);
+  let html = '';
+  for (let d = 1; d <= 31; d++) {
+    const dayBills = bills.filter(b => parseInt(b.day, 10) === d);
+    const count = dayBills.length;
+
     html += `
-      <button type="button" onclick="promptAddBillInWizard(${d})" class="h-9 rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer ${hasBills ? 'bg-[#6C5DD3] text-white font-bold' : 'hover:bg-[#212430] text-gray-300'}">
+      <button type="button" 
+              onclick="handleWizardDayClick(${d})"
+              onpointerdown="startDayLongPress(${d})"
+              onpointerup="cancelDayLongPress()"
+              onpointerleave="cancelDayLongPress()"
+              class="h-8 rounded-lg flex flex-col items-center justify-center transition-all cursor-pointer relative ${count > 0 ? 'bg-[#6C5DD3] text-white font-bold shadow-sm' : 'hover:bg-[#212430] text-gray-300'}">
         <span>${d}</span>
-        ${hasBills ? '<span class="w-1 h-1 rounded-full bg-white mt-0.5"></span>' : ''}
+        ${count > 1 ? `<span class="text-[8px] leading-none opacity-90">${count}</span>` : (count === 1 ? `<span class="w-1 h-1 rounded-full bg-white"></span>` : '')}
       </button>
     `;
   }
   grid.innerHTML = html;
-  renderWizardAddedBills();
 }
 
-function promptAddBillInWizard(day) {
+function handleWizardDayClick(day) {
+  const bills = (Cache?.calendarBills || []).filter(b => parseInt(b.day, 10) === day);
+  const tooltip = document.getElementById('wiz-day-tooltip');
+  if (!tooltip) return;
+
+  if (bills.length === 0) {
+    tooltip.classList.add('hidden');
+    openAddBillOnDay(day);
+    return;
+  }
+
+  // Если тултип этого дня уже открыт — закрываем его
+  if (activeCalendarDay === day && !tooltip.classList.contains('hidden')) {
+    tooltip.classList.add('hidden');
+    activeCalendarDay = null;
+    return;
+  }
+
+  activeCalendarDay = day;
+  tooltip.innerHTML = `
+    <div class="flex items-center justify-between pb-1 border-b border-[rgba(255,255,255,0.06)] font-bold text-white text-[11px]">
+      <span>${day} число (${bills.length})</span>
+      <button type="button" onclick="openDayBillsModal(${day})" class="text-[#6C5DD3] hover:underline text-[10px] cursor-pointer">Настроить</button>
+    </div>
+    <div class="space-y-1">
+      ${bills.map(b => `
+        <div class="flex items-center justify-between gap-2 text-[11px]">
+          <span class="text-gray-300 truncate">${escapeHtml(b.name)}</span>
+          <b class="text-white font-mono">${formatMoney(b.amount)}</b>
+        </div>
+      `).join('')}
+    </div>
+    <button type="button" onclick="openAddBillOnDay(${day})" class="w-full mt-1.5 py-1 text-center text-[10px] text-blue-400 bg-[#181B24] hover:bg-[#2A2D3C] rounded-lg font-medium cursor-pointer">
+      + Еще платеж на этот день
+    </button>
+  `;
+  tooltip.classList.remove('hidden');
+}
+
+function startDayLongPress(day) {
+  clearTimeout(dayLongPressTimer);
+  dayLongPressTimer = setTimeout(() => {
+    openDayBillsModal(day);
+  }, 450);
+}
+
+function cancelDayLongPress() {
+  clearTimeout(dayLongPressTimer);
+}
+
+function openAddBillOnDay(day) {
   document.getElementById('bill-day').value = day;
   openAddBillModal();
 }
 
-function renderWizardAddedBills() {
-  const container = document.getElementById('wiz-bills-added-list');
-  if (!container) return;
+function openDayBillsModal(day) {
+  cancelDayLongPress();
+  const dlg = document.getElementById('day-bills-dialog');
+  const title = document.getElementById('day-bills-title');
+  const list = document.getElementById('day-bills-items-list');
+  const addBtn = document.getElementById('btn-add-second-bill');
+  if (!dlg || !list) return;
 
-  const bills = Cache?.calendarBills || wizardData.bills || [];
-  if (bills.length === 0) {
-    container.innerHTML = '<p class="text-xs text-[#848D99] text-center py-2">Счетов пока не добавлено</p>';
-    return;
+  const bills = (Cache?.calendarBills || []).filter(b => parseInt(b.day, 10) === day);
+  if (title) title.innerText = `Платежи на ${day} число`;
+
+  list.innerHTML = bills.length ? bills.map(b => `
+    <div class="flex items-center justify-between p-2 rounded-xl bg-[#12151C] text-xs">
+      <div class="min-w-0 pr-2">
+        <div class="font-semibold text-white truncate">${escapeHtml(b.name)}</div>
+        <div class="text-[#30D158] font-mono font-bold">${formatMoney(b.amount)} • ${b.type === 'recurring' ? 'Ежемесячно' : 'Разовый'}</div>
+      </div>
+      <button type="button" onclick="deleteCalendarBill('${b.id}', ${day})" class="text-gray-500 hover:text-[#FF453A] p-1 cursor-pointer">
+        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+      </button>
+    </div>
+  `).join('') : '<p class="text-xs text-[#848D99] text-center py-2">Нет платежей</p>';
+
+  if (addBtn) {
+    addBtn.onclick = () => {
+      closeDayBillsModal();
+      openAddBillOnDay(day);
+    };
   }
 
-  container.innerHTML = bills.map(b => `
-    <div class="flex items-center justify-between p-2.5 rounded-xl bg-[#12151C] text-xs">
-      <span class="font-medium text-white">${b.day} число: ${escapeHtml(b.name)}</span>
-      <b class="text-[#30D158] font-mono">${formatMoney(b.amount)}</b>
-    </div>
-  `).join('');
+  dlg.classList.remove('hidden');
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function closeDayBillsModal() {
+  const dlg = document.getElementById('day-bills-dialog');
+  if (dlg) dlg.classList.add('hidden');
+}
+
+async function deleteCalendarBill(billId, day) {
+  try {
+    await getUserCol('CalendarBills').doc(billId).delete();
+    await fetchAllData();
+    openDayBillsModal(day);
+    renderWizardCalendar();
+    showToast('Платеж удален');
+  } catch (e) {
+    showToast('Ошибка удаления', true);
+  }
+}
+
+// Шаг 4: Расчет реального среднего расхода по категориям за месяц
+function calculateCategoryMonthlyAverage(catName) {
+  const months = Cache?.transactions || [];
+  if (months.length === 0) return 0;
+
+  let totalSpent = 0;
+  months.forEach(m => {
+    (m.items || []).forEach(tx => {
+      if (tx.type === 'Расход' && tx.category === catName) {
+        totalSpent += tx.amount;
+      }
+    });
+  });
+
+  return Math.round(totalSpent / Math.max(1, months.length));
 }
 
 function renderWizardCategoryLimits() {
@@ -1397,17 +1524,36 @@ function renderWizardCategoryLimits() {
   if (!container || !Cache?.categories) return;
 
   const cats = Cache.categories.expense || [];
-  container.innerHTML = cats.map(cat => `
-    <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-[#12151C]">
-      <span class="text-xs font-medium text-gray-200 truncate flex-1">${escapeHtml(cat.name)}</span>
-      <input type="text" inputmode="decimal" oninput="formatSumInput(this)" data-wiz-cat="${escapeHtml(cat.name)}" placeholder="Без лимита" class="w-28 bg-[#181B24] border border-[rgba(255,255,255,0.06)] text-white text-xs font-bold rounded-lg p-2 text-right outline-none">
-    </div>
-  `).join('');
+  container.innerHTML = cats.map(cat => {
+    const avg = calculateCategoryMonthlyAverage(cat.name);
+    return `
+      <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-[#12151C]">
+        <div class="min-w-0 flex-1">
+          <span class="text-xs font-medium text-gray-200 truncate block">${escapeHtml(cat.name)}</span>
+          <span class="text-[9px] text-[#848D99]">${avg > 0 ? `В среднем: ~${formatMoney(avg)}` : 'В среднем: нет данных'}</span>
+        </div>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          ${avg > 0 ? `
+            <button type="button" onclick="applyCatAvgToInput('${escapeHtml(cat.name)}', ${avg})" class="text-[9px] text-blue-400 bg-[#212430] hover:bg-[#2A2D3C] px-1.5 py-1 rounded-md cursor-pointer">
+              Подставить
+            </button>
+          ` : ''}
+          <input type="text" inputmode="decimal" oninput="formatSumInput(this)" data-wiz-cat="${escapeHtml(cat.name)}" placeholder="Лимит" class="w-24 bg-[#181B24] border border-[rgba(255,255,255,0.06)] text-white text-xs font-bold rounded-lg p-1.5 text-right outline-none">
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
+function applyCatAvgToInput(catName, avg) {
+  const inp = document.querySelector(`[data-wiz-cat="${catName}"]`);
+  if (inp) setFormattedVal(inp.id || inp, avg);
+}
+
+// Шаг 5: Итог без нуля в недельном бюджете
 function renderWizardSummary() {
   const income = getUnformattedVal(document.getElementById('wiz-income-input')) || 0;
-  const bills = Cache?.calendarBills || wizardData.bills || [];
+  const bills = Cache?.calendarBills || [];
   const billsTotal = bills.reduce((s, b) => s + (parseFloat(b.amount) || 0), 0);
 
   let limitsTotal = 0;
@@ -1420,8 +1566,10 @@ function renderWizardSummary() {
     }
   });
 
+  // Если категории не лимитированы по отдельности, недельный бюджет считается от остатка на жизнь
+  const livingBudget = limitsTotal > 0 ? limitsTotal : Math.max(0, income - billsTotal);
+  const weekBudget = Math.round(livingBudget / 4.33);
   const surplus = Math.max(0, income - billsTotal - limitsTotal);
-  const weekBudget = Math.round(limitsTotal / 4.33);
 
   document.getElementById('wiz-sum-income').innerText = formatMoney(income);
   document.getElementById('wiz-sum-bills').innerText = formatMoney(billsTotal);
@@ -1454,7 +1602,6 @@ async function finishBudgetOnboarding() {
   try {
     const batch = db.batch();
 
-    // 1. Сохраняем первую цель
     const goalRef = getUserCol('Goals').doc();
     batch.set(goalRef, {
       name: goalName,
@@ -1465,7 +1612,6 @@ async function finishBudgetOnboarding() {
       createdAt: Date.now()
     });
 
-    // 2. Сохраняем активированный план
     const planRef = getUserCol('BudgetPlan').doc('plan');
     batch.set(planRef, {
       isConfigured: true,
@@ -1483,9 +1629,6 @@ async function finishBudgetOnboarding() {
   }
 }
 
-// -------------------------------------------------------------
-// РЕДАКТИРОВАНИЕ ЛИМИТА КАТЕГОРИИ И УДАЛЕНИЕ ЦЕЛИ
-// -------------------------------------------------------------
 let activeEditCategory = null;
 
 function openCategoryLimitModal(catName, currentLimit) {
@@ -1547,7 +1690,15 @@ function deleteBudgetGoal(goalId, goalName) {
 }
 
 window.goToWizardStep = goToWizardStep;
-window.promptAddBillInWizard = promptAddBillInWizard;
+window.toggleWizardIncomeSource = toggleWizardIncomeSource;
+window.handleWizardDayClick = handleWizardDayClick;
+window.startDayLongPress = startDayLongPress;
+window.cancelDayLongPress = cancelDayLongPress;
+window.openAddBillOnDay = openAddBillOnDay;
+window.openDayBillsModal = openDayBillsModal;
+window.closeDayBillsModal = closeDayBillsModal;
+window.deleteCalendarBill = deleteCalendarBill;
+window.applyCatAvgToInput = applyCatAvgToInput;
 window.finishBudgetOnboarding = finishBudgetOnboarding;
 window.openCategoryLimitModal = openCategoryLimitModal;
 window.closeCategoryLimitModal = closeCategoryLimitModal;
