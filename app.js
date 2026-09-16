@@ -368,7 +368,6 @@ async function fetchCollection(table) {
     const querySnapshot = await getUserCol(table).get();
     const data = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
     switch (table) {
-      switch (table) {
       case 'Transactions':
         Cache.transactions = processTransactions(data);
         renderTransactions();
