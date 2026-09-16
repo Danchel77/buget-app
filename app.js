@@ -2660,6 +2660,8 @@ function submitGoal(e) {
   submitAction('goal-submit-btn', 'Goals', {
     name: document.getElementById('goal-name').value,
     target: getUnformattedVal(document.getElementById('goal-target')),
+    saved: 0,
+    share: 100,
     deadline: document.getElementById('goal-deadline').value,
     status: 'В процессе'
   });
