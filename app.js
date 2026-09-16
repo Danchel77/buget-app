@@ -239,7 +239,7 @@ auth.onAuthStateChanged(async user => {
   
   if (user) {
     document.getElementById('login-screen').classList.add('hidden');
-    switchTab('transactions');
+    switchTab('budget');
 
     // Обновляем никнейм в шапке
     const nameEl = document.getElementById('header-user-name');
@@ -368,9 +368,11 @@ async function fetchCollection(table) {
     const querySnapshot = await getUserCol(table).get();
     const data = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
     switch (table) {
+      switch (table) {
       case 'Transactions':
         Cache.transactions = processTransactions(data);
         renderTransactions();
+        renderBudgetTab();
         break;
       case 'Deposits':
         Cache.deposits = processDeposits(data, Cache.goals);
@@ -381,7 +383,6 @@ async function fetchCollection(table) {
         renderBroker();
         break;
       case 'Goals':
-        // Цели влияют на вклады и брокера, поэтому обновляем всё
         await fetchAllData();
         break;
     }
@@ -390,11 +391,13 @@ async function fetchCollection(table) {
   }
 }
 
-async function applySnapshotsToUI([txS, depS, brS, goalS, catS, rulesS]) {
+async function applySnapshotsToUI([txS, depS, brS, goalS, catS, rulesS, planS, billsS]) {
   const txData = txS.docs.map(d => ({ id: d.id, ...d.data() }));
   const depData = depS.docs.map(d => ({ id: d.id, ...d.data() }));
   const brData = brS.docs.map(d => ({ id: d.id, ...d.data() }));
-  const goalData = goalS.docs.map(d => ({ id: d.id, ...d.data() }));
+  const goalData = goalS ? goalS.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+  const planData = planS && !planS.empty ? planS.docs[0].data() : {};
+  const billsData = billsS ? billsS.docs.map(d => ({ id: d.id, ...d.data() })) : [];
 
   const processedDeposits = processDeposits(depData, goalData);
   const processedBroker = processBroker(brData, goalData);
@@ -408,35 +411,34 @@ async function applySnapshotsToUI([txS, depS, brS, goalS, catS, rulesS]) {
     transactions: processTransactions(txData),
     deposits: processedDeposits,
     broker: processedBroker,
-    goals: processGoals(goalData, processedDeposits, processedBroker),
+    goals: processGoals(goalData),
     categories: categories,
-    categoryRules: await processOrSeedRules(rulesS)
+    categoryRules: await processOrSeedRules(rulesS),
+    budgetPlan: planData,
+    calendarBills: billsData
   };
   window.Cache = Cache;
 
   updateGoalDropdowns();
+  renderBudgetTab();
   renderTransactions();
   renderDeposits();
   renderBroker();
-  renderGoals();
 }
 
 async function fetchAllData() {
-  const tables = ['Transactions', 'Deposits', 'Broker', 'Goals', 'Categories', 'CategoryRules'];
+  const tables = ['Transactions', 'Deposits', 'Broker', 'Goals', 'Categories', 'CategoryRules', 'BudgetPlan', 'CalendarBills'];
 
   // ЭТАП 1: Мгновенное чтение из локального кэша IndexedDB (15-40 мс)
   try {
     const cachedSnaps = await Promise.all(
       tables.map(tbl => getUserCol(tbl).get({ source: 'cache' }))
     );
-    // Если в локальном кэше есть данные — сразу показываем интерфейс
     if (cachedSnaps.some(s => !s.empty)) {
       await applySnapshotsToUI(cachedSnaps);
       document.getElementById('loading-screen')?.classList.add('hidden');
     }
-  } catch (e) {
-    // Первый запуск на устройстве — локальный кэш еще пуст, переходим к сети
-  }
+  } catch (e) {}
 
   // ЭТАП 2: Фоновая синхронизация со свежими данными сервера
   try {
@@ -451,7 +453,6 @@ async function fetchAllData() {
   } catch (err) {
     document.getElementById('toast-container')?.classList.add('hidden');
     document.getElementById('loading-screen')?.classList.add('hidden');
-    // Если оффлайн, но локальные данные уже отрисованы — не беспокоим ошибкой
     if (!Cache) {
       showToast("Нет подключения к сети", true);
     }
@@ -1003,12 +1004,18 @@ function processGoals(goals, deps, br) {
 // --- НАВИГАЦИЯ, ФОРМЫ, РЕНДЕР ---
 function switchTab(tab) {
   if (selectionMode) disableSelectionMode();
-  ['transactions', 'deposits', 'broker', 'goals'].forEach(t => {
-    document.getElementById(t + '-tab').classList.add('hidden');
-    document.getElementById('nav-' + t).classList.replace('text-blue-400', 'text-gray-500');
+  ['budget', 'transactions', 'deposits', 'broker'].forEach(t => {
+    const el = document.getElementById(t + '-tab');
+    const navBtn = document.getElementById('nav-' + t);
+    if (el) el.classList.add('hidden');
+    if (navBtn) navBtn.classList.replace('text-blue-400', 'text-gray-500');
   });
-  document.getElementById(tab + '-tab').classList.remove('hidden');
-  document.getElementById('nav-' + tab).classList.replace('text-gray-500', 'text-blue-400');
+  const activeTabEl = document.getElementById(tab + '-tab');
+  const activeNavBtn = document.getElementById('nav-' + tab);
+  if (activeTabEl) activeTabEl.classList.remove('hidden');
+  if (activeNavBtn) activeNavBtn.classList.replace('text-gray-500', 'text-blue-400');
+  
+  if (tab === 'budget') renderBudgetTab();
   if (tab === 'broker' && Cache) setTimeout(drawBrokerChart, 100);
 }
 
@@ -3109,3 +3116,426 @@ function triggerPdfFileInput() {
   if (fileInput) fileInput.click();
 }
 window.triggerPdfFileInput = triggerPdfFileInput;
+
+// --- ЛОГИКА ЦЕЛЕЙ (АВТОНОМНЫЕ ВИРТУАЛЬНЫЕ КОПИЛКИ) ---
+function processGoals(goals) {
+  return goals.map(g => {
+    const tar = parseFloat(g.target) || 0;
+    const sav = parseFloat(g.saved) || 0;
+    const share = parseFloat(g.share) || (goals.length > 0 ? Math.round(100 / goals.length) : 100);
+    return {
+      id: g.id,
+      name: g.name,
+      target: tar,
+      saved: sav,
+      share: share,
+      progress: Math.min(100, tar > 0 ? (sav / tar) * 100 : 0).toFixed(1),
+      isAchieved: sav >= tar
+    };
+  });
+}
+
+// -------------------------------------------------------------
+// РАСЧЕТ И РЕНДЕР ЭКРАНА БЮДЖЕТА
+// -------------------------------------------------------------
+function renderBudgetTab() {
+  if (!Cache) return;
+
+  const plan = Cache.budgetPlan || {};
+  const bills = Cache.calendarBills || [];
+  const goals = Cache.goals || [];
+  const today = new Date();
+
+  // 1. Расчет полной недели (Пн–Вс)
+  const dayOfWeek = today.getDay();
+  const diffToMonday = (dayOfWeek + 6) % 7;
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - diffToMonday);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  endOfWeek.setHours(23, 59, 59, 999);
+
+  // Считаем траты текущей недели (исключая обязательные платежи календаря)
+  const currentMonthId = formatDateStr(today, 'yyyy-MM');
+  const monthData = Cache.transactions?.find(m => m.id === currentMonthId);
+  const monthItems = monthData ? monthData.items : [];
+
+  let weeklySpent = 0;
+  let monthlySpent = 0;
+
+  monthItems.forEach(tx => {
+    if (tx.type !== 'Расход') return;
+    monthlySpent += tx.amount;
+
+    const txDate = new Date(tx.rawDate);
+    if (txDate >= startOfWeek && txDate <= endOfWeek) {
+      weeklySpent += tx.amount;
+    }
+  });
+
+  const monthlyLimit = plan.monthlyVariableLimit || 60000;
+  const weeklyBaseLimit = Math.round(monthlyLimit / 4.33);
+  const weeklyAvailable = Math.max(0, weeklyBaseLimit - weeklySpent);
+  const daysToEndOfWeek = 7 - diffToMonday;
+
+  // Обновляем виджет недели
+  const weekAvailEl = document.getElementById('budget-week-available');
+  const weekSubEl = document.getElementById('budget-week-sub');
+  const weekBadge = document.getElementById('budget-week-badge');
+
+  if (weekAvailEl) weekAvailEl.innerText = formatMoney(weeklyAvailable);
+  if (weekSubEl) weekSubEl.innerText = `Лимит недели: ${formatMoney(weeklyBaseLimit)} • До конца недели ${daysToEndOfWeek} дн.`;
+
+  if (weekBadge) {
+    if (weeklySpent > weeklyBaseLimit) {
+      weekBadge.innerText = 'Перерасход';
+      weekBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-[#FF453A]/15 text-[#FF453A]';
+    } else {
+      weekBadge.innerText = 'В графике';
+      weekBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-[#30D158]/15 text-[#30D158]';
+    }
+  }
+
+  // Обновляем шкалу месяца
+  const monthStatEl = document.getElementById('budget-month-stat');
+  const monthProgressEl = document.getElementById('budget-month-progress');
+  if (monthStatEl) monthStatEl.innerText = `${formatMoney(monthlySpent)} из ${formatMoney(monthlyLimit)}`;
+  if (monthProgressEl) {
+    const pct = Math.min(100, (monthlySpent / (monthlyLimit || 1)) * 100);
+    monthProgressEl.style.width = `${pct}%`;
+    monthProgressEl.className = pct >= 95 ? 'bg-[#FF453A] h-full rounded-full transition-all' : (pct >= 75 ? 'bg-[#FF9F0A] h-full rounded-full transition-all' : 'bg-[#30D158] h-full rounded-full transition-all');
+  }
+
+  // 2. Рендер календаря обязательных счетов (сетка без горизонтального скролла)
+  renderBudgetCalendar(bills, today);
+
+  // 3. Рендер целей накопления
+  renderBudgetGoals(goals, plan, bills);
+
+  // 4. Рендер лимитов по категориям
+  renderBudgetCategoryLimits(monthItems);
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function renderBudgetCalendar(bills, today) {
+  const container = document.getElementById('budget-calendar-list');
+  const totalEl = document.getElementById('budget-bills-total');
+  if (!container) return;
+
+  const totalBillsSum = bills.reduce((s, b) => s + (parseFloat(b.amount) || 0), 0);
+  if (totalEl) totalEl.innerText = `Обязательные счета: ${formatMoney(totalBillsSum)}`;
+
+  if (bills.length === 0) {
+    container.innerHTML = `
+      <div class="col-span-2 bg-[#12151C] border border-[rgba(255,255,255,0.04)] rounded-2xl p-4 text-center text-xs text-[#848D99]">
+        Нет запланированных платежей на этот месяц
+      </div>
+    `;
+    return;
+  }
+
+  const currentDay = today.getDate();
+
+  container.innerHTML = bills.map(b => {
+    const billDay = parseInt(b.day, 10) || 1;
+    const isPast = billDay < currentDay;
+    const isPaid = !!b.isPaid;
+
+    let statusBorder = 'border-[rgba(255,255,255,0.06)] bg-[#181B24]';
+    let statusBadge = '<span class="text-[10px] text-[#848D99]">Ожидает</span>';
+
+    if (isPaid) {
+      statusBorder = 'border-[#30D158]/30 bg-[#30D158]/5';
+      statusBadge = '<span class="text-[10px] font-bold text-[#30D158]">Оплачено</span>';
+    } else if (isPast) {
+      statusBorder = 'border-[#FF453A]/30 bg-[#FF453A]/5';
+      statusBadge = '<span class="text-[10px] font-bold text-[#FF453A]">Просрочено</span>';
+    }
+
+    return `
+      <div class="card p-3 rounded-2xl border ${statusBorder} flex flex-col justify-between cursor-pointer transition-all"
+           onclick="toggleBillPaidStatus('${b.id}', ${!isPaid})">
+        <div class="flex items-start justify-between gap-1 mb-2">
+          <span class="text-[11px] font-bold text-white">${billDay} сен</span>
+          ${statusBadge}
+        </div>
+        <div>
+          <h4 class="text-xs font-semibold text-gray-200 truncate leading-tight">${escapeHtml(b.name)}</h4>
+          <p class="text-sm font-bold text-white mt-1 font-mono">${formatMoney(b.amount)}</p>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderBudgetGoals(goals, plan, bills) {
+  const container = document.getElementById('budget-goals-list');
+  const surplusEl = document.getElementById('budget-goals-surplus');
+  if (!container) return;
+
+  const monthlyIncome = plan.monthlyIncome || 0;
+  const monthlyLimit = plan.monthlyVariableLimit || 0;
+  const totalBills = bills.reduce((s, b) => s + (parseFloat(b.amount) || 0), 0);
+  const netSurplus = Math.max(0, monthlyIncome - monthlyLimit - totalBills);
+
+  if (surplusEl) surplusEl.innerText = `Накопления по плану: +${formatMoney(netSurplus)}/мес`;
+
+  if (goals.length === 0) {
+    container.innerHTML = `
+      <div class="bg-[#181B24] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4 text-center text-xs text-[#848D99]">
+        Целей пока нет. Добавьте цель, чтобы план бюджета автоматически откладывал на неё деньги.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = goals.map(g => {
+    const goalMonthlyAlloc = Math.round(netSurplus * (g.share / 100));
+    const remaining = Math.max(0, g.target - g.saved);
+    const monthsNeeded = goalMonthlyAlloc > 0 ? Math.ceil(remaining / goalMonthlyAlloc) : 0;
+    const timeHint = g.isAchieved ? 'Цель выполнена' : (monthsNeeded > 0 ? `~${monthsNeeded} мес. при текущем плане` : 'Увеличьте профицит');
+
+    return `
+      <div class="card bg-[#181B24] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4 shadow-sm">
+        <div class="flex items-start justify-between mb-2">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-8 h-8 rounded-xl bg-[#6C5DD3]/15 text-[#6C5DD3] flex items-center justify-center flex-shrink-0">
+              <i data-lucide="target" class="w-4 h-4"></i>
+            </div>
+            <div class="min-w-0">
+              <h4 class="text-sm font-bold text-white truncate">${escapeHtml(g.name)}</h4>
+              <p class="text-[11px] text-[#848D99]">${timeHint}</p>
+            </div>
+          </div>
+          <button type="button" onclick="openGoalTopupModal('${g.id}', '${escapeHtml(g.name)}')" class="bg-[#212430] hover:bg-[#2A2D3C] text-gray-200 border border-[rgba(255,255,255,0.06)] text-xs font-semibold px-2.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            <span>В копилку</span>
+          </button>
+        </div>
+
+        <div class="flex justify-between items-end text-xs mb-2">
+          <span class="text-white font-bold font-mono text-sm">${formatMoney(g.saved)} <span class="text-[#848D99] font-normal text-xs">/ ${formatMoney(g.target)}</span></span>
+          <span class="text-[11px] font-semibold text-[#6C5DD3]">${g.progress}%</span>
+        </div>
+
+        <div class="w-full bg-[rgba(255,255,255,0.06)] h-2 rounded-full overflow-hidden">
+          <div class="bg-gradient-to-r from-[#6C5DD3] to-[#32ADE6] h-full rounded-full transition-all duration-500" style="width: ${g.progress}%"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderBudgetCategoryLimits(monthItems) {
+  const container = document.getElementById('budget-category-limits-list');
+  if (!container || !Cache?.categories) return;
+
+  const cats = Cache.categories.expense || [];
+  const spentMap = {};
+  monthItems.forEach(tx => {
+    spentMap[tx.category] = (spentMap[tx.category] || 0) + tx.amount;
+  });
+
+  container.innerHTML = cats.slice(0, 6).map(cat => {
+    const spent = spentMap[cat.name] || 0;
+    const icon = cat.icon || 'tag';
+
+    return `
+      <div class="bg-[#181B24] border border-[rgba(255,255,255,0.04)] rounded-xl p-3 flex items-center justify-between">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-7 h-7 rounded-lg bg-[#212430] text-gray-300 flex items-center justify-center flex-shrink-0">
+            <i data-lucide="${icon}" class="w-3.5 h-3.5"></i>
+          </div>
+          <span class="text-xs font-semibold text-gray-200 truncate">${escapeHtml(cat.name)}</span>
+        </div>
+        <span class="text-xs font-bold text-white font-mono">${formatMoney(spent)}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+// Управление модальными окнами бюджета
+function openBudgetPlanModal() {
+  const dlg = document.getElementById('budget-plan-dialog');
+  if (!dlg) return;
+
+  const plan = Cache?.budgetPlan || {};
+  setFormattedVal('plan-income-input', plan.monthlyIncome || 120000);
+  setFormattedVal('plan-expense-input', plan.monthlyVariableLimit || 60000);
+
+  updatePlanForecast();
+  dlg.classList.remove('hidden');
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function closeBudgetPlanModal() {
+  const dlg = document.getElementById('budget-plan-dialog');
+  if (dlg) dlg.classList.add('hidden');
+}
+
+function updatePlanForecast() {
+  const inc = getUnformattedVal(document.getElementById('plan-income-input'));
+  const exp = getUnformattedVal(document.getElementById('plan-expense-input'));
+  const bills = Cache?.calendarBills || [];
+  const totalBills = bills.reduce((s, b) => s + (parseFloat(b.amount) || 0), 0);
+
+  const surplus = Math.max(0, inc - exp - totalBills);
+  const surplusEl = document.getElementById('plan-forecast-surplus');
+  const weekHint = document.getElementById('plan-week-hint');
+
+  if (surplusEl) surplusEl.innerText = `+${formatMoney(surplus)}/мес`;
+  if (weekHint) weekHint.innerText = `Базовый лимит недели: ~${formatMoney(Math.round(exp / 4.33))}`;
+}
+
+async function submitBudgetPlan(e) {
+  e.preventDefault();
+  const inc = getUnformattedVal(document.getElementById('plan-income-input'));
+  const exp = getUnformattedVal(document.getElementById('plan-expense-input'));
+
+  showToast('Сохранение плана...', false, true);
+  try {
+    const col = getUserCol('BudgetPlan');
+    const snap = await col.get();
+    const batch = db.batch();
+
+    const planData = {
+      monthlyIncome: inc,
+      monthlyVariableLimit: exp,
+      updatedAt: Date.now()
+    };
+
+    if (snap.empty) {
+      batch.set(col.doc(), planData);
+    } else {
+      batch.update(snap.docs[0].ref, planData);
+    }
+
+    await batch.commit();
+    closeBudgetPlanModal();
+    await fetchAllData();
+    showToast('План бюджета обновлен');
+  } catch (err) {
+    showToast('Ошибка: ' + err.message, true);
+  }
+}
+
+// Добавление платежа календаря
+function openAddBillModal() {
+  const dlg = document.getElementById('calendar-bill-dialog');
+  if (dlg) dlg.classList.remove('hidden');
+}
+
+function closeAddBillModal() {
+  const dlg = document.getElementById('calendar-bill-dialog');
+  if (dlg) dlg.classList.add('hidden');
+}
+
+async function submitCalendarBill(e) {
+  e.preventDefault();
+  const name = document.getElementById('bill-name').value.trim();
+  const amount = getUnformattedVal(document.getElementById('bill-amount'));
+  const day = parseInt(document.getElementById('bill-day').value, 10);
+  const type = document.getElementById('bill-type').value;
+
+  if (!name || !amount) return;
+
+  showToast('Сохранение платежа...', false, true);
+  try {
+    await getUserCol('CalendarBills').add({
+      name,
+      amount,
+      day,
+      type,
+      isPaid: false,
+      createdAt: Date.now()
+    });
+    closeAddBillModal();
+    document.getElementById('calendar-bill-form').reset();
+    await fetchAllData();
+    showToast('Платеж добавлен в календарь');
+  } catch (err) {
+    showToast('Ошибка: ' + err.message, true);
+  }
+}
+
+async function toggleBillPaidStatus(billId, newStatus) {
+  try {
+    await getUserCol('CalendarBills').doc(billId).update({ isPaid: newStatus });
+    await fetchAllData();
+  } catch (e) {}
+}
+
+// Быстрое пополнение виртуальной копилки цели
+let activeTopupGoalId = null;
+let currentTopupMode = 'add';
+
+function openGoalTopupModal(goalId, goalName) {
+  activeTopupGoalId = goalId;
+  const dlg = document.getElementById('goal-topup-dialog');
+  const title = document.getElementById('goal-topup-title');
+  if (title) title.innerText = goalName;
+  document.getElementById('goal-topup-amount').value = '';
+  setTopupMode('add');
+  if (dlg) dlg.classList.remove('hidden');
+}
+
+function closeGoalTopupModal() {
+  const dlg = document.getElementById('goal-topup-dialog');
+  if (dlg) dlg.classList.add('hidden');
+  activeTopupGoalId = null;
+}
+
+function setTopupMode(mode) {
+  currentTopupMode = mode;
+  const addBtn = document.getElementById('tab-topup-add');
+  const subBtn = document.getElementById('tab-topup-sub');
+  if (mode === 'add') {
+    addBtn.className = 'flex-1 py-1.5 rounded-lg font-semibold bg-[#212430] text-white transition-all';
+    subBtn.className = 'flex-1 py-1.5 rounded-lg font-medium text-[#848D99] hover:text-white transition-all';
+  } else {
+    subBtn.className = 'flex-1 py-1.5 rounded-lg font-semibold bg-[#212430] text-white transition-all';
+    addBtn.className = 'flex-1 py-1.5 rounded-lg font-medium text-[#848D99] hover:text-white transition-all';
+  }
+}
+
+async function submitGoalTopup() {
+  if (!activeTopupGoalId) return;
+  const amount = getUnformattedVal(document.getElementById('goal-topup-amount'));
+  if (!amount) return;
+
+  const goal = Cache?.goals?.find(g => g.id === activeTopupGoalId);
+  if (!goal) return;
+
+  let newSaved = currentTopupMode === 'add' ? (goal.saved + amount) : Math.max(0, goal.saved - amount);
+
+  showToast('Обновление цели...', false, true);
+  try {
+    await getUserCol('Goals').doc(activeTopupGoalId).update({ saved: newSaved });
+    closeGoalTopupModal();
+    await fetchAllData();
+    showToast(currentTopupMode === 'add' ? `В цель внесено +${formatMoney(amount)}` : `Из цели снято −${formatMoney(amount)}`);
+  } catch (err) {
+    showToast('Ошибка: ' + err.message, true);
+  }
+}
+
+function openGoalModal() {
+  toggleForm('goal-form-container', 'goal-submit-btn', 'Создать цель', 'goal-form', 'goal');
+}
+
+window.openBudgetPlanModal = openBudgetPlanModal;
+window.closeBudgetPlanModal = closeBudgetPlanModal;
+window.updatePlanForecast = updatePlanForecast;
+window.submitBudgetPlan = submitBudgetPlan;
+window.openAddBillModal = openAddBillModal;
+window.closeAddBillModal = closeAddBillModal;
+window.submitCalendarBill = submitCalendarBill;
+window.toggleBillPaidStatus = toggleBillPaidStatus;
+window.openGoalTopupModal = openGoalTopupModal;
+window.closeGoalTopupModal = closeGoalTopupModal;
+window.setTopupMode = setTopupMode;
+window.submitGoalTopup = submitGoalTopup;
+window.openGoalModal = openGoalModal;
