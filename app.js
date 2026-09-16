@@ -1000,18 +1000,33 @@ function processGoals(goals) {
   });
 }
 
-// -------------------------------------------------------------
-// РАСЧЕТ И РЕНДЕР ЭКРАНА БЮДЖЕТА
-// -------------------------------------------------------------
+// =============================================================
+// ДВИЖОК ЭКРАНА БЮДЖЕТА: ОНБОРДИНГ, ПУЛЬС, АВТОСВЯЗКА ЧЕКОВ И ЦЕЛИ
+// =============================================================
+
 function renderBudgetTab() {
   if (!Cache) return;
 
   const plan = Cache.budgetPlan || {};
+  const wizardEl = document.getElementById('budget-wizard');
+  const dashboardEl = document.getElementById('budget-dashboard');
+
+  // Если бюджет еще ни разу не настраивался пользователем — показываем мастер первого запуска
+  if (!plan.isConfigured) {
+    if (wizardEl) wizardEl.classList.remove('hidden');
+    if (dashboardEl) dashboardEl.classList.add('hidden');
+    initBudgetWizard();
+    return;
+  }
+
+  if (wizardEl) wizardEl.classList.add('hidden');
+  if (dashboardEl) dashboardEl.classList.remove('hidden');
+
   const bills = Cache.calendarBills || [];
   const goals = Cache.goals || [];
   const today = new Date();
 
-  // 1. Расчет полной недели (Пн–Вс)
+  // Расчет недели строго с Понедельника по Воскресенье
   const dayOfWeek = today.getDay();
   const diffToMonday = (dayOfWeek + 6) % 7;
   const startOfWeek = new Date(today);
@@ -1022,7 +1037,6 @@ function renderBudgetTab() {
   endOfWeek.setDate(startOfWeek.getDate() + 6);
   endOfWeek.setHours(23, 59, 59, 999);
 
-  // Считаем траты текущей недели (исключая обязательные платежи календаря)
   const currentMonthId = formatDateStr(today, 'yyyy-MM');
   const monthData = Cache.transactions?.find(m => m.id === currentMonthId);
   const monthItems = monthData ? monthData.items : [];
@@ -1040,12 +1054,12 @@ function renderBudgetTab() {
     }
   });
 
-  const monthlyLimit = plan.monthlyVariableLimit || 60000;
+  const monthlyLimit = plan.monthlyVariableLimit || 0;
   const weeklyBaseLimit = Math.round(monthlyLimit / 4.33);
   const weeklyAvailable = Math.max(0, weeklyBaseLimit - weeklySpent);
   const daysToEndOfWeek = 7 - diffToMonday;
 
-  // Обновляем виджет недели
+  // Виджет недели
   const weekAvailEl = document.getElementById('budget-week-available');
   const weekSubEl = document.getElementById('budget-week-sub');
   const weekBadge = document.getElementById('budget-week-badge');
@@ -1054,7 +1068,7 @@ function renderBudgetTab() {
   if (weekSubEl) weekSubEl.innerText = `Лимит недели: ${formatMoney(weeklyBaseLimit)} • До конца недели ${daysToEndOfWeek} дн.`;
 
   if (weekBadge) {
-    if (weeklySpent > weeklyBaseLimit) {
+    if (weeklyBaseLimit > 0 && weeklySpent > weeklyBaseLimit) {
       weekBadge.innerText = 'Перерасход';
       weekBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-[#FF453A]/15 text-[#FF453A]';
     } else {
@@ -1063,29 +1077,47 @@ function renderBudgetTab() {
     }
   }
 
-  // Обновляем шкалу месяца
+  // Шкала месяца
   const monthStatEl = document.getElementById('budget-month-stat');
   const monthProgressEl = document.getElementById('budget-month-progress');
   if (monthStatEl) monthStatEl.innerText = `${formatMoney(monthlySpent)} из ${formatMoney(monthlyLimit)}`;
   if (monthProgressEl) {
-    const pct = Math.min(100, (monthlySpent / (monthlyLimit || 1)) * 100);
+    const pct = monthlyLimit > 0 ? Math.min(100, (monthlySpent / monthlyLimit) * 100) : 0;
     monthProgressEl.style.width = `${pct}%`;
     monthProgressEl.className = pct >= 95 ? 'bg-[#FF453A] h-full rounded-full transition-all' : (pct >= 75 ? 'bg-[#FF9F0A] h-full rounded-full transition-all' : 'bg-[#30D158] h-full rounded-full transition-all');
   }
 
-  // 2. Рендер календаря обязательных счетов (сетка без горизонтального скролла)
-  renderBudgetCalendar(bills, today);
+  // 2. Рендер календаря счетов (с умной проверкой чеков текущего месяца)
+  renderBudgetCalendar(bills, today, monthItems);
 
   // 3. Рендер целей накопления
   renderBudgetGoals(goals, plan, bills);
 
-  // 4. Рендер лимитов по категориям
-  renderBudgetCategoryLimits(monthItems);
+  // 4. Рендер лимитов по категориям с полноценными прогресс-барами
+  renderBudgetCategoryLimits(monthItems, plan.categoryLimits || {});
 
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-function renderBudgetCalendar(bills, today) {
+// Автоматическая проверка: был ли счет уже оплачен в реальных транзакциях месяца
+function isBillPaidInCurrentMonth(bill, monthItems) {
+  if (bill.isPaid) return true; // Отмечено пользователем вручную
+
+  const billAmount = parseFloat(bill.amount) || 0;
+  const billName = (bill.name || '').toLowerCase();
+
+  // Ищем совпадение в чеках за текущий месяц (по категории, сумме или названию)
+  return monthItems.some(tx => {
+    if (tx.type !== 'Расход') return false;
+    const isAmountMatch = Math.abs(tx.amount - billAmount) <= (billAmount * 0.15); // погрешность до 15% (для ЖКХ)
+    const isCommentMatch = tx.comment && (tx.comment.toLowerCase().includes(billName) || billName.includes(tx.comment.toLowerCase()));
+    const isCategoryMatch = (bill.category && tx.category === bill.category) && isAmountMatch;
+
+    return isCategoryMatch || isCommentMatch;
+  });
+}
+
+function renderBudgetCalendar(bills, today, monthItems) {
   const container = document.getElementById('budget-calendar-list');
   const totalEl = document.getElementById('budget-bills-total');
   if (!container) return;
@@ -1106,8 +1138,8 @@ function renderBudgetCalendar(bills, today) {
 
   container.innerHTML = bills.map(b => {
     const billDay = parseInt(b.day, 10) || 1;
-    const isPast = billDay < currentDay;
-    const isPaid = !!b.isPaid;
+    const isPaid = isBillPaidInCurrentMonth(b, monthItems);
+    const isPast = billDay < currentDay && !isPaid;
 
     let statusBorder = 'border-[rgba(255,255,255,0.06)] bg-[#181B24]';
     let statusBadge = '<span class="text-[10px] text-[#848D99]">Ожидает</span>';
@@ -1124,7 +1156,7 @@ function renderBudgetCalendar(bills, today) {
       <div class="card p-3 rounded-2xl border ${statusBorder} flex flex-col justify-between cursor-pointer transition-all"
            onclick="toggleBillPaidStatus('${b.id}', ${!isPaid})">
         <div class="flex items-start justify-between gap-1 mb-2">
-          <span class="text-[11px] font-bold text-white">${billDay} сен</span>
+          <span class="text-[11px] font-bold text-white">${billDay} число</span>
           ${statusBadge}
         </div>
         <div>
@@ -1151,7 +1183,7 @@ function renderBudgetGoals(goals, plan, bills) {
   if (goals.length === 0) {
     container.innerHTML = `
       <div class="bg-[#181B24] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4 text-center text-xs text-[#848D99]">
-        Целей пока нет. Добавьте цель, чтобы план бюджета автоматически откладывал на неё деньги.
+        Целей пока нет. Добавьте цель, чтобы откладывать на нее свободный остаток.
       </div>
     `;
     return;
@@ -1175,10 +1207,16 @@ function renderBudgetGoals(goals, plan, bills) {
               <p class="text-[11px] text-[#848D99]">${timeHint}</p>
             </div>
           </div>
-          <button type="button" onclick="openGoalTopupModal('${g.id}', '${escapeHtml(g.name)}')" class="bg-[#212430] hover:bg-[#2A2D3C] text-gray-200 border border-[rgba(255,255,255,0.06)] text-xs font-semibold px-2.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1">
-            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-            <span>В копилку</span>
-          </button>
+          
+          <div class="flex items-center gap-1.5 flex-shrink-0">
+            <button type="button" onclick="openGoalTopupModal('${g.id}', '${escapeHtml(g.name)}')" class="bg-[#212430] hover:bg-[#2A2D3C] text-gray-200 border border-[rgba(255,255,255,0.06)] text-xs font-semibold px-2.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <span>Копилка</span>
+            </button>
+            <button type="button" onclick="deleteBudgetGoal('${g.id}', '${escapeHtml(g.name)}')" class="text-gray-500 hover:text-[#FF453A] p-1.5 rounded-lg transition-colors cursor-pointer" title="Удалить цель">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
         </div>
 
         <div class="flex justify-between items-end text-xs mb-2">
@@ -1194,7 +1232,8 @@ function renderBudgetGoals(goals, plan, bills) {
   }).join('');
 }
 
-function renderBudgetCategoryLimits(monthItems) {
+// Рендер лимитов категорий с прогресс-барами
+function renderBudgetCategoryLimits(monthItems, categoryLimits) {
   const container = document.getElementById('budget-category-limits-list');
   if (!container || !Cache?.categories) return;
 
@@ -1204,23 +1243,316 @@ function renderBudgetCategoryLimits(monthItems) {
     spentMap[tx.category] = (spentMap[tx.category] || 0) + tx.amount;
   });
 
-  container.innerHTML = cats.slice(0, 6).map(cat => {
+  container.innerHTML = cats.map(cat => {
     const spent = spentMap[cat.name] || 0;
+    const limit = categoryLimits[cat.name] || 0;
     const icon = cat.icon || 'tag';
+    const pct = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0;
+    const isOver = limit > 0 && spent > limit;
+
+    let barColor = 'bg-[#30D158]';
+    if (isOver) barColor = 'bg-[#FF453A]';
+    else if (pct >= 75) barColor = 'bg-[#FF9F0A]';
 
     return `
-      <div class="bg-[#181B24] border border-[rgba(255,255,255,0.04)] rounded-xl p-3 flex items-center justify-between">
-        <div class="flex items-center gap-2.5 min-w-0">
-          <div class="w-7 h-7 rounded-lg bg-[#212430] text-gray-300 flex items-center justify-center flex-shrink-0">
-            <i data-lucide="${icon}" class="w-3.5 h-3.5"></i>
+      <div class="card bg-[#181B24] border border-[rgba(255,255,255,0.04)] rounded-2xl p-3.5 cursor-pointer hover:border-[rgba(255,255,255,0.12)] transition-all"
+           onclick="openCategoryLimitModal('${escapeHtml(cat.name)}', ${limit})">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-8 h-8 rounded-xl bg-[#212430] text-gray-300 flex items-center justify-center flex-shrink-0">
+              <i data-lucide="${icon}" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h4 class="text-xs font-semibold text-gray-200 truncate">${escapeHtml(cat.name)}</h4>
+              <p class="text-[10px] text-[#848D99]">${limit > 0 ? `Лимит: ${formatMoney(limit)}` : 'Лимит не задан (тап для настройки)'}</p>
+            </div>
           </div>
-          <span class="text-xs font-semibold text-gray-200 truncate">${escapeHtml(cat.name)}</span>
+          <span class="text-xs font-bold font-mono ${isOver ? 'text-[#FF453A]' : 'text-white'}">${formatMoney(spent)}</span>
         </div>
-        <span class="text-xs font-bold text-white font-mono">${formatMoney(spent)}</span>
+
+        ${limit > 0 ? `
+          <div class="w-full bg-[rgba(255,255,255,0.06)] h-1.5 rounded-full overflow-hidden">
+            <div class="${barColor} h-full rounded-full transition-all duration-300" style="width: ${pct}%"></div>
+          </div>
+        ` : ''}
       </div>
     `;
   }).join('');
 }
+
+// -------------------------------------------------------------
+// МАСТЕР ПЕРВОГО ЗАПУСКА БЮДЖЕТА (ХОЛОДНЫЙ СТАРТ)
+// -------------------------------------------------------------
+let wizardData = {
+  goalName: '',
+  goalTarget: 0,
+  income: 0,
+  bills: [],
+  categoryLimits: {}
+};
+
+function initBudgetWizard() {
+  goToWizardStep(1);
+  calculateHistoricalIncomeForWizard();
+}
+
+function goToWizardStep(step) {
+  [1, 2, 3, 4, 5].forEach(i => {
+    const el = document.getElementById(`wizard-step-${i}`);
+    if (el) el.classList.toggle('hidden', i !== step);
+  });
+
+  const titles = [
+    'Создайте цель накопления',
+    'Планируемый доход',
+    'Календарь счетов и списаний',
+    'Лимиты на повседневную жизнь',
+    'Итоговый план бюджета'
+  ];
+  const descs = [
+    'Бюджет строится вокруг ваших целей. Свободные средства будут автоматически приближать эту цель.',
+    'Укажите ориентировочный чистый доход в месяц (по выпискам или вручную).',
+    'Кликните по числу в календаре, чтобы привязать аренду, ЖКХ или разовый платеж.',
+    'Ограничьте траты на супермаркеты, кафе и шопинг с учетом вашей статистики.',
+    'Проверьте рассчитанный недельный баланс и срок достижения цели.'
+  ];
+
+  const badge = document.getElementById('wizard-step-badge');
+  const titleEl = document.getElementById('wizard-step-title');
+  const descEl = document.getElementById('wizard-step-desc');
+
+  if (badge) badge.innerText = `Шаг ${step} из 5`;
+  if (titleEl) titleEl.innerText = titles[step - 1];
+  if (descEl) descEl.innerText = descs[step - 1];
+
+  if (step === 3) renderWizardCalendar();
+  if (step === 4) renderWizardCategoryLimits();
+  if (step === 5) renderWizardSummary();
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function calculateHistoricalIncomeForWizard() {
+  const months = Cache?.transactions || [];
+  if (months.length === 0) {
+    document.getElementById('wiz-calculated-income').innerText = 'Нет выписок';
+    return;
+  }
+
+  const lastMonths = months.slice(0, 3);
+  const totalInc = lastMonths.reduce((s, m) => s + (Number(m.income) || 0), 0);
+  const avg = Math.round(totalInc / lastMonths.length);
+
+  const calcEl = document.getElementById('wiz-calculated-income');
+  const inputEl = document.getElementById('wiz-income-input');
+  if (calcEl) calcEl.innerText = `${formatMoney(avg)}/мес`;
+  if (inputEl && !inputEl.value) setFormattedVal('wiz-income-input', avg);
+}
+
+function renderWizardCalendar() {
+  const grid = document.getElementById('wiz-calendar-grid');
+  if (!grid) return;
+
+  const daysInMonth = 30; // стандартный месяц календаря
+  let html = '';
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const hasBills = wizardData.bills.some(b => b.day === d);
+    html += `
+      <button type="button" onclick="promptAddBillInWizard(${d})" class="h-9 rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer ${hasBills ? 'bg-[#6C5DD3] text-white font-bold' : 'hover:bg-[#212430] text-gray-300'}">
+        <span>${d}</span>
+        ${hasBills ? '<span class="w-1 h-1 rounded-full bg-white mt-0.5"></span>' : ''}
+      </button>
+    `;
+  }
+  grid.innerHTML = html;
+  renderWizardAddedBills();
+}
+
+function promptAddBillInWizard(day) {
+  document.getElementById('bill-day').value = day;
+  openAddBillModal();
+}
+
+function renderWizardAddedBills() {
+  const container = document.getElementById('wiz-bills-added-list');
+  if (!container) return;
+
+  const bills = Cache?.calendarBills || wizardData.bills || [];
+  if (bills.length === 0) {
+    container.innerHTML = '<p class="text-xs text-[#848D99] text-center py-2">Счетов пока не добавлено</p>';
+    return;
+  }
+
+  container.innerHTML = bills.map(b => `
+    <div class="flex items-center justify-between p-2.5 rounded-xl bg-[#12151C] text-xs">
+      <span class="font-medium text-white">${b.day} число: ${escapeHtml(b.name)}</span>
+      <b class="text-[#30D158] font-mono">${formatMoney(b.amount)}</b>
+    </div>
+  `).join('');
+}
+
+function renderWizardCategoryLimits() {
+  const container = document.getElementById('wiz-category-limits-editor');
+  if (!container || !Cache?.categories) return;
+
+  const cats = Cache.categories.expense || [];
+  container.innerHTML = cats.map(cat => `
+    <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-[#12151C]">
+      <span class="text-xs font-medium text-gray-200 truncate flex-1">${escapeHtml(cat.name)}</span>
+      <input type="text" inputmode="decimal" oninput="formatSumInput(this)" data-wiz-cat="${escapeHtml(cat.name)}" placeholder="Без лимита" class="w-28 bg-[#181B24] border border-[rgba(255,255,255,0.06)] text-white text-xs font-bold rounded-lg p-2 text-right outline-none">
+    </div>
+  `).join('');
+}
+
+function renderWizardSummary() {
+  const income = getUnformattedVal(document.getElementById('wiz-income-input')) || 0;
+  const bills = Cache?.calendarBills || wizardData.bills || [];
+  const billsTotal = bills.reduce((s, b) => s + (parseFloat(b.amount) || 0), 0);
+
+  let limitsTotal = 0;
+  wizardData.categoryLimits = {};
+  document.querySelectorAll('[data-wiz-cat]').forEach(inp => {
+    const val = getUnformattedVal(inp);
+    if (val > 0) {
+      limitsTotal += val;
+      wizardData.categoryLimits[inp.dataset.wizCat] = val;
+    }
+  });
+
+  const surplus = Math.max(0, income - billsTotal - limitsTotal);
+  const weekBudget = Math.round(limitsTotal / 4.33);
+
+  document.getElementById('wiz-sum-income').innerText = formatMoney(income);
+  document.getElementById('wiz-sum-bills').innerText = formatMoney(billsTotal);
+  document.getElementById('wiz-sum-limits').innerText = formatMoney(limitsTotal);
+  document.getElementById('wiz-sum-week').innerText = formatMoney(weekBudget);
+  document.getElementById('wiz-sum-surplus').innerText = `+${formatMoney(surplus)}/мес`;
+
+  const goalTarget = getUnformattedVal(document.getElementById('wiz-goal-target')) || 1;
+  const months = surplus > 0 ? Math.ceil(goalTarget / surplus) : 0;
+  document.getElementById('wiz-sum-timeline').innerText = months > 0 ? `Срок достижения цели: ~${months} мес.` : 'При таком плане цель не накопится';
+}
+
+async function finishBudgetOnboarding() {
+  showToast('Запуск бюджета...', false, true);
+
+  const goalName = document.getElementById('wiz-goal-name').value.trim() || 'Моя цель';
+  const goalTarget = getUnformattedVal(document.getElementById('wiz-goal-target')) || 100000;
+  const income = getUnformattedVal(document.getElementById('wiz-income-input')) || 0;
+
+  let limitsTotal = 0;
+  const categoryLimits = {};
+  document.querySelectorAll('[data-wiz-cat]').forEach(inp => {
+    const val = getUnformattedVal(inp);
+    if (val > 0) {
+      limitsTotal += val;
+      categoryLimits[inp.dataset.wizCat] = val;
+    }
+  });
+
+  try {
+    const batch = db.batch();
+
+    // 1. Сохраняем первую цель
+    const goalRef = getUserCol('Goals').doc();
+    batch.set(goalRef, {
+      name: goalName,
+      target: goalTarget,
+      saved: 0,
+      share: 100,
+      status: 'В процессе',
+      createdAt: Date.now()
+    });
+
+    // 2. Сохраняем активированный план
+    const planRef = getUserCol('BudgetPlan').doc('plan');
+    batch.set(planRef, {
+      isConfigured: true,
+      monthlyIncome: income,
+      monthlyVariableLimit: limitsTotal,
+      categoryLimits: categoryLimits,
+      updatedAt: Date.now()
+    });
+
+    await batch.commit();
+    await fetchAllData();
+    showToast('Бюджет успешно настроен!');
+  } catch (err) {
+    showToast('Ошибка сохранения: ' + err.message, true);
+  }
+}
+
+// -------------------------------------------------------------
+// РЕДАКТИРОВАНИЕ ЛИМИТА КАТЕГОРИИ И УДАЛЕНИЕ ЦЕЛИ
+// -------------------------------------------------------------
+let activeEditCategory = null;
+
+function openCategoryLimitModal(catName, currentLimit) {
+  activeEditCategory = catName;
+  const dlg = document.getElementById('category-limit-dialog');
+  const title = document.getElementById('category-limit-title');
+  const inp = document.getElementById('category-limit-amount');
+
+  if (title) title.innerText = catName;
+  if (inp) setFormattedVal('category-limit-amount', currentLimit || '');
+  if (dlg) dlg.classList.remove('hidden');
+}
+
+function closeCategoryLimitModal() {
+  const dlg = document.getElementById('category-limit-dialog');
+  if (dlg) dlg.classList.add('hidden');
+  activeEditCategory = null;
+}
+
+async function submitCategoryLimit() {
+  if (!activeEditCategory) return;
+  const amount = getUnformattedVal(document.getElementById('category-limit-amount'));
+  const plan = Cache?.budgetPlan || {};
+  const limits = plan.categoryLimits || {};
+
+  if (amount > 0) limits[activeEditCategory] = amount;
+  else delete limits[activeEditCategory];
+
+  const totalVarLimit = Object.values(limits).reduce((s, v) => s + v, 0);
+
+  showToast('Сохранение лимита...', false, true);
+  try {
+    await getUserCol('BudgetPlan').doc('plan').set({
+      ...plan,
+      isConfigured: true,
+      monthlyVariableLimit: totalVarLimit,
+      categoryLimits: limits
+    }, { merge: true });
+
+    closeCategoryLimitModal();
+    await fetchAllData();
+    showToast('Лимит обновлен');
+  } catch (err) {
+    showToast('Ошибка: ' + err.message, true);
+  }
+}
+
+function deleteBudgetGoal(goalId, goalName) {
+  showDialog('Удаление цели', `Удалить цель "${goalName}"? Накопленный прогресс будет удален.`, true, async () => {
+    showToast('Удаление цели...', false, true);
+    try {
+      await getUserCol('Goals').doc(goalId).delete();
+      await fetchAllData();
+      showToast('Цель удалена');
+    } catch (e) {
+      showToast('Ошибка удаления', true);
+    }
+  });
+}
+
+window.goToWizardStep = goToWizardStep;
+window.promptAddBillInWizard = promptAddBillInWizard;
+window.finishBudgetOnboarding = finishBudgetOnboarding;
+window.openCategoryLimitModal = openCategoryLimitModal;
+window.closeCategoryLimitModal = closeCategoryLimitModal;
+window.submitCategoryLimit = submitCategoryLimit;
+window.deleteBudgetGoal = deleteBudgetGoal;
 
 // Управление модальными окнами бюджета
 function openBudgetPlanModal() {
