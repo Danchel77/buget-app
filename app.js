@@ -1591,38 +1591,53 @@ function buildCharts() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      animation: { duration: 350, easing: 'easeOutQuart' },
+      animation: { duration: 450, easing: 'easeOutQuart' },
+      transitions: {
+        active: {
+          animation: {
+            duration: 450,
+            easing: 'easeOutCubic'
+          }
+        }
+      },
       interaction: {
-        mode: 'index',
-        intersect: true
+        mode: 'nearest',
+        intersect: false
       },
       onClick: (e, elements, chart) => {
-        if (!elements || elements.length === 0) {
-          // Клик в пустую область графика — сбрасываем подсветку и скрываем тултип
+        const items = chart.getElementsAtEventForMode(e.native || e, 'nearest', { intersect: false }, false);
+        const y = e.y !== undefined ? e.y : (e.native ? e.native.offsetY : 0);
+
+        // Область клика строго вокруг столбца (+25px сверху и +15px снизу)
+        const el = items[0]?.element;
+        const isNearBar = el && y >= (Math.min(el.y, el.base) - 25) && y <= (Math.max(el.y, el.base) + 15);
+
+        if (!items.length || !isNearBar) {
+          chart._activeMonthIndex = -1;
           chart.setActiveElements([]);
           chart.tooltip.setActiveElements([], { x: 0, y: 0 });
           chart.update();
           return;
         }
 
-        const clickedIdx = elements[0].index;
-        const currentActive = chart.getActiveElements();
+        const clickedIdx = items[0].index;
 
-        // Повторный клик по тому же месяцу — снимаем выделение (toggle)
-        if (currentActive.length > 0 && currentActive[0].index === clickedIdx) {
+        // Повторный клик по тому же столбцу — закрывает тултип (toggle)
+        if (chart._activeMonthIndex === clickedIdx) {
+          chart._activeMonthIndex = -1;
           chart.setActiveElements([]);
           chart.tooltip.setActiveElements([], { x: 0, y: 0 });
           chart.update();
         } else {
-          // Выделяем столбцы выбранного месяца и вызываем тултип
+          chart._activeMonthIndex = clickedIdx;
           const activeItems = [
             { datasetIndex: 0, index: clickedIdx },
             { datasetIndex: 1, index: clickedIdx }
           ];
           chart.setActiveElements(activeItems);
           chart.tooltip.setActiveElements(activeItems, {
-            x: elements[0].element.x,
-            y: elements[0].element.y
+            x: el.x,
+            y: el.y
           });
           chart.update();
         }
