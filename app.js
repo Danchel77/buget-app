@@ -1561,8 +1561,8 @@ function buildCharts() {
         {
           label: 'Доходы',
           data: incomes,
-          backgroundColor: 'rgba(54,214,155,.88)',
-          borderColor: '#36d69b',
+          backgroundColor: 'rgba(48, 209, 88, 0.88)',
+          borderColor: '#30D158',
           borderWidth: 0,
           borderRadius: 7,
           borderSkipped: false,
@@ -1572,8 +1572,8 @@ function buildCharts() {
         {
           label: 'Расходы',
           data: expenses,
-          backgroundColor: 'rgba(255,111,125,.88)',
-          borderColor: '#ff6f7d',
+          backgroundColor: 'rgba(255, 69, 58, 0.88)',
+          borderColor: '#FF453A',
           borderWidth: 0,
           borderRadius: 7,
           borderSkipped: false,
@@ -1831,6 +1831,7 @@ function drawBrokerChart() {
         tension: 0.38,
         pointRadius: data.map(d => d.type === 'Пополнение' ? 5 : 3.5),
         pointHoverRadius: 7,
+        pointHitRadius: 20,
         pointBackgroundColor: data.map(d => d.type === 'Пополнение' ? '#30D158' : '#6C5DD3'),
         pointBorderColor: '#181B24',
         pointBorderWidth: 1.5
@@ -1840,8 +1841,40 @@ function drawBrokerChart() {
       responsive: true,
       maintainAspectRatio: false,
       interaction: {
-        mode: 'index',
-        intersect: false
+        mode: 'nearest',
+        intersect: true
+      },
+      onClick: (e, elements, chart) => {
+        if (!elements || elements.length === 0) {
+          chart.setActiveElements([]);
+          chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+          chart.update('none');
+          const balEl = document.getElementById('broker-balance');
+          if (balEl && br) balEl.innerText = formatMoney(br.balance);
+          return;
+        }
+
+        const clickedIdx = elements[0].index;
+        const activeElements = chart.tooltip.getActiveElements();
+
+        // Повторный тап по той же точке закрывает тултип
+        if (activeElements.length > 0 && activeElements[0].index === clickedIdx) {
+          chart.setActiveElements([]);
+          chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+          chart.update('none');
+          const balEl = document.getElementById('broker-balance');
+          if (balEl && br) balEl.innerText = formatMoney(br.balance);
+        } else {
+          chart.setActiveElements([{ datasetIndex: 0, index: clickedIdx }]);
+          chart.tooltip.setActiveElements([{ datasetIndex: 0, index: clickedIdx }], {
+            x: elements[0].element.x,
+            y: elements[0].element.y
+          });
+          chart.update('none');
+          const pt = data[clickedIdx];
+          const balEl = document.getElementById('broker-balance');
+          if (balEl && pt) balEl.innerText = formatMoney(pt.y);
+        }
       },
       plugins: {
         legend: { display: false },
