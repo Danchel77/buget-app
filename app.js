@@ -1831,46 +1831,56 @@ async function submitCalendarBill(e) {
   }
 }
 
-// 4. Шаг 4: Строго 4 основные категории трат + расчет «Прочие расходы»
+// Хранилище категорий, добавленных пользователем вручную на шаге 4
+let wizardCustomCategories = new Set();
+
 function renderWizLimitsEditor() {
   const container = document.getElementById('wiz-category-limits-editor');
   if (!container) return;
 
-  // Рассчитываем средние траты за 3 месяца по всем категориям
   const avgMap = calculateHistoricalCategoryAverages();
 
-  // Строго фиксированные 4 категории для мастера
-  const TARGET_CATEGORIES = [
+  // Стандартные 3 категории
+  const list = [
     { name: 'Продукты', icon: 'shopping-cart' },
     { name: 'Кафе и рестораны', icon: 'utensils' },
-    { name: 'Развлечения', icon: 'gamepad-2' },
-    { name: 'Прочие расходы', icon: 'package' }
+    { name: 'Развлечения', icon: 'gamepad-2' }
   ];
 
-  // Считаем сумму средних трат по «Прочим расходам»
-  // (все категории кроме Продуктов, Кафе и Развлечений)
+  // Добавленные пользователем категории
+  wizardCustomCategories.forEach(catName => {
+    const catObj = Cache?.categories?.expense?.find(c => c.name === catName);
+    list.push({ name: catName, icon: catObj?.icon || 'tag', isCustom: true });
+  });
+
+  // Собирательная категория «Прочие расходы»
+  const accountedNames = list.map(c => c.name);
   let othersAvg = 0;
   Object.keys(avgMap).forEach(cat => {
-    if (cat !== 'Продукты' && cat !== 'Кафе и рестораны' && cat !== 'Развлечения') {
+    if (!accountedNames.includes(cat)) {
       othersAvg += avgMap[cat] || 0;
     }
   });
   avgMap['Прочие расходы'] = othersAvg;
+  list.push({ name: 'Прочие расходы', icon: 'package' });
 
-  container.innerHTML = TARGET_CATEGORIES.map(cat => {
+  container.innerHTML = list.map(cat => {
     const avg = Math.round(avgMap[cat.name] || 0);
     const existingVal = Cache.budgetPlan?.categoryLimits?.[cat.name] || (avg > 0 ? avg : '');
 
     return `
-      <div class="p-3 rounded-2xl bg-[#12151C] border border-[rgba(255,255,255,0.04)] flex items-center justify-between gap-3">
+      <div class="p-3 rounded-2xl bg-[#12151C] border border-[rgba(255,255,255,0.04)] flex items-center justify-between gap-2.5">
         <div class="w-9 h-9 rounded-xl bg-[#1E2330] text-gray-300 flex items-center justify-center flex-shrink-0">
           <i data-lucide="${cat.icon}" class="w-5 h-5 text-[#848D99]"></i>
         </div>
         
-        <div class="flex-1 min-w-0">
-          <div class="text-xs font-bold text-gray-200 truncate">${escapeHtml(cat.name)}</div>
+        <div class="flex-1 min-w-0 pr-1">
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-bold text-gray-200 truncate">${escapeHtml(cat.name)}</span>
+            ${cat.isCustom ? `<button type="button" onclick="removeWizardCustomCat('${escapeHtml(cat.name)}')" class="text-gray-500 hover:text-[#FF453A] text-xs font-bold cursor-pointer">✕</button>` : ''}
+          </div>
           ${avg > 0 ? `
-            <div onclick="applyWizCategoryAvg('${escapeHtml(cat.name)}', ${avg})" class="wiz-adopt-chip mt-1.5" title="Нажмите, чтобы применить среднее">
+            <div onclick="applyWizCategoryAvg('${escapeHtml(cat.name)}', ${avg})" class="wiz-adopt-chip mt-1.5 whitespace-nowrap" title="Нажмите, чтобы применить">
               <span>В среднем: ~${formatMoney(avg)}</span>
               <span class="text-[#727cff] font-bold">↵</span>
             </div>
@@ -1895,6 +1905,53 @@ function renderWizLimitsEditor() {
   updateWizLiveTotal();
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
+
+// НОВЫЕ ФУНКЦИИ: Кнопка «+ Категория» на Шаге 4
+function openAddCategoryLimitPicker() {
+  const allExpenseCats = Cache?.categories?.expense || [];
+  const standardNames = ['Продукты', 'Кафе и рестораны', 'Развлечения', 'Прочие расходы'];
+  
+  const available = allExpenseCats.filter(c => !standardNames.includes(c.name) && !wizardCustomCategories.has(c.name));
+
+  if (available.length === 0) {
+    showAddCategoryDialog('Расход', null);
+    return;
+  }
+
+  const optionsHtml = available.map(c => `
+    <button type="button" onclick="addCategoryToWizard('${escapeHtml(c.name)}')" class="w-full flex items-center justify-between p-3 rounded-xl bg-[#12151C] hover:bg-[#212430] border border-[rgba(255,255,255,0.04)] text-xs text-gray-200 transition-colors cursor-pointer">
+      <div class="flex items-center gap-2.5">
+        <i data-lucide="${c.icon || 'tag'}" class="w-4 h-4 text-[#848D99]"></i>
+        <span>${escapeHtml(c.name)}</span>
+      </div>
+      <span class="text-[#727cff] font-bold">+ Добавить</span>
+    </button>
+  `).join('');
+
+  showDialog('Добавить категорию в лимиты', `
+    <div class="space-y-2 max-h-60 overflow-y-auto pt-2">
+      ${optionsHtml}
+    </div>
+  `, false);
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+window.openAddCategoryLimitPicker = openAddCategoryLimitPicker;
+
+function addCategoryToWizard(catName) {
+  wizardCustomCategories.add(catName);
+  const dlg = document.getElementById('custom-dialog');
+  if (dlg) dlg.classList.add('hidden');
+  renderWizLimitsEditor();
+  showToast(`Категория «${catName}» добавлена`);
+}
+window.addCategoryToWizard = addCategoryToWizard;
+
+function removeWizardCustomCat(catName) {
+  wizardCustomCategories.delete(catName);
+  renderWizLimitsEditor();
+}
+window.removeWizardCustomCat = removeWizardCustomCat;
 
 function selectWizCalendarDay(day) {
   currentWizSelectedDay = day;
@@ -2092,6 +2149,9 @@ async function finishBudgetOnboarding() {
 
     // 5. Полная перезагрузка актуальных данных и переход к дашборду
     await fetchAllData();
+    // Сброс сохраненного шага после успешного запуска бюджета
+    localStorage.removeItem('budget_wizard_step');
+    currentWizardStep = 1;
 
     showToast('Бюджет успешно активирован!');
   } catch (err) {
