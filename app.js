@@ -1472,6 +1472,115 @@ function recalculateWizardIncome() {
   }
 }
 
+// ============================================================
+// ВОССТАНОВЛЕННЫЙ БЛОК: ИМПОРТ ВЫПИСОК, КАЛЕНДАРЬ И ДОХОД В МАСТЕРЕ
+// ============================================================
+
+// 1. Расчет исторического дохода по загруженным выпискам (для шага 2 и после импорта PDF)
+function calculateHistoricalIncomeForWizard() {
+  const txMonths = Cache?.transactions || [];
+  const sourcesContainer = document.getElementById('wiz-income-sources-list');
+  const calcEl = document.getElementById('wiz-calculated-income');
+  const inputEl = document.getElementById('wiz-income-input');
+
+  if (!txMonths || txMonths.length === 0) {
+    if (calcEl) calcEl.innerText = '0 ₽/мес';
+    if (sourcesContainer) {
+      sourcesContainer.innerHTML = '<span class="text-[10px] text-[#848D99]">Нет истории загруженных выписок</span>';
+    }
+    return 0;
+  }
+
+  const monthsCount = Math.min(3, txMonths.length);
+  const sourceTotals = {};
+  let overallIncome = 0;
+
+  for (let i = 0; i < monthsCount; i++) {
+    const items = txMonths[i].items || [];
+    items.forEach(tx => {
+      if (tx.type === 'Доход') {
+        const val = parseFloat(tx.amount) || 0;
+        const cat = tx.category || 'Другое';
+        sourceTotals[cat] = (sourceTotals[cat] || 0) + val;
+        overallIncome += val;
+      }
+    });
+  }
+
+  const avgMonthlyIncome = Math.round(overallIncome / monthsCount);
+
+  // Отрисовка кликабельных чипсов категорий дохода
+  if (sourcesContainer) {
+    const sources = Object.keys(sourceTotals);
+    if (sources.length === 0) {
+      sourcesContainer.innerHTML = '<span class="text-[10px] text-[#848D99]">Доходы в выписках не обнаружены</span>';
+    } else {
+      sourcesContainer.innerHTML = sources.map(src => {
+        const isSelected = wizardActiveIncomeSources ? wizardActiveIncomeSources.has(src) : true;
+        const avgCat = Math.round(sourceTotals[src] / monthsCount);
+        return `
+          <button type="button" data-source="${escapeHtml(src)}" onclick="toggleWizardIncomeSource('${escapeHtml(src)}')" 
+                  class="text-[10px] px-2 py-0.5 rounded-lg font-medium flex items-center gap-1 cursor-pointer transition-all ${
+                    isSelected 
+                      ? 'bg-[#30D158]/15 text-[#30D158] border border-[#30D158]/20' 
+                      : 'bg-[#212430] text-[#848D99] border border-transparent'
+                  }">
+            ${isSelected ? '<i data-lucide="check" class="w-2.5 h-2.5"></i>' : ''}
+            <span>${escapeHtml(src)} (~${formatMoney(avgCat)})</span>
+          </button>
+        `;
+      }).join('');
+    }
+  }
+
+  if (calcEl) calcEl.innerText = `${formatMoney(avgMonthlyIncome)}/мес`;
+  
+  // Автоподстановка в инпут только если там пусто или 0
+  if (inputEl && (!inputEl.value || inputEl.value === '0 ₽' || inputEl.value === '0')) {
+    inputEl.value = formatMoney(avgMonthlyIncome);
+  }
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+  return avgMonthlyIncome;
+}
+
+// 2. Обработка клика по дню календаря (исправляет Uncaught ReferenceError: handleWizardDayClick)
+function handleWizardDayClick(day) {
+  currentWizSelectedDay = parseInt(day, 10) || 1;
+  
+  // Перерендерим сетку, чтобы обновить класс is-selected
+  if (typeof renderWizCalendar === 'function') {
+    renderWizCalendar();
+  } else if (typeof renderWizardCalendarGrid === 'function') {
+    renderWizardCalendarGrid();
+  }
+
+  // Обновляем список счетов для выбранного дня
+  if (typeof renderWizDayBillsList === 'function') {
+    renderWizDayBillsList();
+  }
+
+  // Если открыт тултип или модалка — обновляем заголовок
+  const dayTitle = document.getElementById('wiz-selected-day-label');
+  if (dayTitle) dayTitle.innerText = `${currentWizSelectedDay} число: счета`;
+}
+
+// Алиас для обратной совместимости, если где-то остался старый вызов
+window.selectWizCalendarDay = handleWizardDayClick;
+window.handleWizardDayClick = handleWizardDayClick;
+
+// 3. Вызов загрузки выписки прямо из мастера онбординга
+function triggerPdfImportFromWizard() {
+  const fileInput = document.getElementById('pdf-file-input');
+  if (fileInput) {
+    // Сохраняем флаг, что импорт вызван из мастера
+    window.isImportingFromWizard = true;
+    fileInput.click();
+  } else {
+    showToast('Ошибка: элемент выбора файла не найден', true);
+  }
+}
+
 // Переключение шагов с анимацией полосы прогресса
 function goToWizardStep(step) {
   for (let i = 1; i <= 5; i++) {
