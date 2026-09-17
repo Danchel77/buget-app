@@ -4045,12 +4045,6 @@ function startLongPress(card) {
 }
 
 function handleTouchStart(e) {
-  const card = e.target.closest('.card');
-  if (!card) return;
-  startLongPress(card);
-}
-
-function handleTouchStart(e) {
   // Касания по плавающей панели выбора и ее кнопкам не должны инициировать события карточек
   if (e.target.closest('#selection-panel')) return;
   const card = e.target.closest('.card');
