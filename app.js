@@ -1551,18 +1551,20 @@ function renderWizardCategoryLimits() {
   container.innerHTML = cats.map(cat => {
     const avg = calculateCategoryMonthlyAverage(cat.name);
     return `
-      <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-[#12151C]">
+      <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.03)]">
         <div class="min-w-0 flex-1">
-          <span class="text-xs font-medium text-gray-200 truncate block">${escapeHtml(cat.name)}</span>
-          <span class="text-[9px] text-[#848D99]">${avg > 0 ? `В среднем: ~${formatMoney(avg)}` : 'В среднем: нет данных'}</span>
+          <span class="text-xs font-semibold text-gray-200 truncate block">${escapeHtml(cat.name)}</span>
+          <span class="text-[9px] text-[#848D99]">${avg > 0 ? `В среднем: ~${formatMoney(avg)}/мес` : 'В среднем: 0 ₽'}</span>
         </div>
         <div class="flex items-center gap-1.5 flex-shrink-0">
           ${avg > 0 ? `
-            <button type="button" onclick="applyCatAvgToInput('${escapeHtml(cat.name)}', ${avg})" class="text-[9px] text-blue-400 bg-[#212430] hover:bg-[#2A2D3C] px-1.5 py-1 rounded-md cursor-pointer">
+            <button type="button" onclick="applyCatAvgToInput('${escapeHtml(cat.name)}', ${avg})" class="text-[9px] font-semibold text-[#6C5DD3] bg-[#6C5DD3]/15 hover:bg-[#6C5DD3]/25 px-2 py-1 rounded-lg transition-colors cursor-pointer">
               Подставить
             </button>
           ` : ''}
-          <input type="text" inputmode="decimal" oninput="formatSumInput(this)" data-wiz-cat="${escapeHtml(cat.name)}" placeholder="Лимит" class="w-24 bg-[#181B24] border border-[rgba(255,255,255,0.06)] text-white text-xs font-bold rounded-lg p-1.5 text-right outline-none">
+          <div class="relative">
+            <input type="text" inputmode="decimal" oninput="formatSumInput(this)" data-wiz-cat="${escapeHtml(cat.name)}" placeholder="0 ₽" class="w-24 bg-[#181B24] border border-[rgba(255,255,255,0.1)] focus:border-[#6C5DD3] text-white text-xs font-bold rounded-lg p-1.5 text-right outline-none transition-colors">
+          </div>
         </div>
       </div>
     `;
@@ -1611,6 +1613,7 @@ async function finishBudgetOnboarding() {
 
   const goalName = document.getElementById('wiz-goal-name').value.trim() || 'Моя цель';
   const goalTarget = getUnformattedVal(document.getElementById('wiz-goal-target')) || 100000;
+  const goalSaved = getUnformattedVal(document.getElementById('wiz-goal-saved')) || 0;
   const income = getUnformattedVal(document.getElementById('wiz-income-input')) || 0;
 
   let limitsTotal = 0;
@@ -1630,9 +1633,9 @@ async function finishBudgetOnboarding() {
     batch.set(goalRef, {
       name: goalName,
       target: goalTarget,
-      saved: 0,
+      saved: goalSaved,
       share: 100,
-      status: 'В процессе',
+      status: goalSaved >= goalTarget ? 'Выполнена' : 'В процессе',
       createdAt: Date.now()
     });
 
@@ -1652,7 +1655,6 @@ async function finishBudgetOnboarding() {
     showToast('Ошибка сохранения: ' + err.message, true);
   }
 }
-
 let activeEditCategory = null;
 
 function openCategoryLimitModal(catName, currentLimit) {
