@@ -1409,12 +1409,6 @@ function calculateHistoricalIncomeForWizard() {
   return avgIncome;
 }
 
-// 2. Клик по дню в сетке календаря на Шаге 3
-function handleWizardDayClick(day) {
-  currentWizSelectedDay = parseInt(day, 10) || 1;
-  renderWizCalendar();
-}
-
 // 3. Поддержка долгого тапа по дню в календаре
 let dayLongPressTimer = null;
 
@@ -1691,27 +1685,6 @@ function calculateHistoricalIncomeForWizard() {
   return avgMonthlyIncome;
 }
 
-// 2. Обработка клика по дню календаря (исправляет Uncaught ReferenceError: handleWizardDayClick)
-function handleWizardDayClick(day) {
-  currentWizSelectedDay = parseInt(day, 10) || 1;
-  
-  // Перерендерим сетку, чтобы обновить класс is-selected
-  if (typeof renderWizCalendar === 'function') {
-    renderWizCalendar();
-  } else if (typeof renderWizardCalendarGrid === 'function') {
-    renderWizardCalendarGrid();
-  }
-
-  // Обновляем список счетов для выбранного дня
-  if (typeof renderWizDayBillsList === 'function') {
-    renderWizDayBillsList();
-  }
-
-  // Если открыт тултип или модалка — обновляем заголовок
-  const dayTitle = document.getElementById('wiz-selected-day-label');
-  if (dayTitle) dayTitle.innerText = `${currentWizSelectedDay} число: счета`;
-}
-
 // Алиас для обратной совместимости, если где-то остался старый вызов
 window.selectWizCalendarDay = handleWizardDayClick;
 window.handleWizardDayClick = handleWizardDayClick;
@@ -1776,12 +1749,24 @@ function goToWizardStep(step) {
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-// Рендер сетки календаря на Шаге 3
+// =============================================================
+// ОБНОВЛЕННЫЙ КАЛЕНДАРЬ И ЛИМИТЫ (ШАГИ 3 И 4)
+// =============================================================
+
+// Алиасы для защиты от ошибок отсутствия функции
+window.renderWizardCalendar = renderWizCalendar;
+window.renderWizCalendar = renderWizCalendar;
+
+// 1. Рендер сетки календаря
 function renderWizCalendar() {
   const grid = document.getElementById('wiz-calendar-grid');
+  const totalLabel = document.getElementById('wiz-bills-total-label');
   if (!grid) return;
 
-  const bills = Cache.calendarBills || [];
+  const bills = Cache?.calendarBills || [];
+  const totalSum = bills.reduce((acc, b) => acc + (parseFloat(b.amount) || 0), 0);
+  if (totalLabel) totalLabel.innerText = formatMoney(totalSum);
+
   let html = '';
 
   for (let day = 1; day <= 31; day++) {
@@ -1797,14 +1782,178 @@ function renderWizCalendar() {
     }
 
     html += `
-      <div onclick="selectWizCalendarDay(${day})" class="wiz-day-cell ${isSelected ? 'is-selected' : ''} ${hasBills ? 'has-bills' : ''}">
+      <div onclick="handleWizardDayClick(${day})" class="wiz-day-cell ${isSelected ? 'is-selected' : ''} ${hasBills ? 'has-bills' : ''}">
         <span class="${isSelected ? 'text-white font-bold' : (hasBills ? 'text-gray-200' : 'text-[#848D99]')}">${day}</span>
         ${sumBadge}
       </div>
     `;
   }
   grid.innerHTML = html;
-  renderWizDayBillsList();
+}
+
+// 2. Умный клик по дню: пустой -> сразу добавление, со счетом -> красивый тултип
+function handleWizardDayClick(day) {
+  currentWizSelectedDay = parseInt(day, 10) || 1;
+  const bills = (Cache?.calendarBills || []).filter(b => parseInt(b.day, 10) === currentWizSelectedDay);
+
+  if (bills.length === 0) {
+    // ДЕНЬ ПУСТОЙ: Сразу открываем модалку добавления с подставленным днем!
+    closeWizDayTooltip();
+    openAddBillModal(currentWizSelectedDay);
+  } else {
+    // В ДНЕ ЕСТЬ СЧЕТА: Показываем аккуратный всплывающий тултип
+    showWizDayTooltip(currentWizSelectedDay, bills);
+  }
+  renderWizCalendar();
+}
+window.handleWizardDayClick = handleWizardDayClick;
+
+function showWizDayTooltip(day, bills) {
+  const tooltip = document.getElementById('wiz-day-tooltip');
+  const title = document.getElementById('wiz-tooltip-title');
+  const list = document.getElementById('wiz-tooltip-bills-list');
+  if (!tooltip || !list) return;
+
+  if (title) title.innerText = `${day} число: платежи (${bills.length})`;
+
+  list.innerHTML = bills.map(b => `
+    <div class="flex items-center justify-between p-2 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.04)]">
+      <div class="min-w-0 pr-2 cursor-pointer" onclick="openEditBillModal('${b.id}')">
+        <span class="text-xs font-semibold text-white truncate block">${escapeHtml(b.name)}</span>
+        <span class="text-[11px] font-mono text-gray-400">-${formatMoney(b.amount)}</span>
+      </div>
+      <div class="flex items-center gap-1">
+        <button type="button" onclick="openEditBillModal('${b.id}')" class="text-gray-400 hover:text-white p-1.5 cursor-pointer">
+          <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+        </button>
+        <button type="button" onclick="deleteCalendarBill('${b.id}')" class="text-gray-400 hover:text-[#FF453A] p-1.5 cursor-pointer">
+          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+    </div>
+  `).join('');
+
+  tooltip.classList.remove('hidden');
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function closeWizDayTooltip() {
+  const tooltip = document.getElementById('wiz-day-tooltip');
+  if (tooltip) tooltip.classList.add('hidden');
+}
+window.closeWizDayTooltip = closeWizDayTooltip;
+
+function addAnotherBillFromTooltip() {
+  closeWizDayTooltip();
+  openAddBillModal(currentWizSelectedDay);
+}
+window.addAnotherBillFromTooltip = addAnotherBillFromTooltip;
+
+// 3. Исправление сохранения счета: НЕ сбрасывать мастера на Шаг 1!
+async function submitCalendarBill(e) {
+  e.preventDefault();
+  const editId = document.getElementById('bill-edit-id').value;
+  const name = document.getElementById('bill-name').value.trim();
+  const amount = getUnformattedVal(document.getElementById('bill-amount'));
+  const day = parseInt(document.getElementById('bill-day').value, 10);
+  const type = document.getElementById('bill-type').value;
+
+  if (!name || !amount) return;
+
+  showToast('Сохранение платежа...', false, true);
+  try {
+    const col = getUserCol('CalendarBills');
+    const billData = { name, amount, day, type, isPaid: false, updatedAt: Date.now() };
+
+    if (editId) {
+      await col.doc(editId).update(billData);
+    } else {
+      await col.add({ ...billData, createdAt: Date.now() });
+    }
+
+    closeAddBillModal();
+    document.getElementById('calendar-bill-form').reset();
+    document.getElementById('bill-edit-id').value = '';
+    
+    // Синхронизируем кеш
+    await fetchAllData();
+
+    // ЕСЛИ НАХОДИМСЯ В МАСТЕРЕ: держим Шаг 3!
+    const plan = Cache?.budgetPlan || {};
+    if (!plan.isConfigured) {
+      goToWizardStep(3);
+      renderWizCalendar();
+    }
+    
+    showToast('Платеж сохранен');
+  } catch (err) {
+    showToast('Ошибка: ' + err.message, true);
+  }
+}
+
+// 4. Шаг 4: Строго 4 основные категории трат + расчет «Прочие расходы»
+function renderWizLimitsEditor() {
+  const container = document.getElementById('wiz-category-limits-editor');
+  if (!container) return;
+
+  // Рассчитываем средние траты за 3 месяца по всем категориям
+  const avgMap = calculateHistoricalCategoryAverages();
+
+  // Строго фиксированные 4 категории для мастера
+  const TARGET_CATEGORIES = [
+    { name: 'Продукты', icon: 'shopping-cart' },
+    { name: 'Кафе и рестораны', icon: 'utensils' },
+    { name: 'Развлечения', icon: 'gamepad-2' },
+    { name: 'Прочие расходы', icon: 'package' }
+  ];
+
+  // Считаем сумму средних трат по «Прочим расходам»
+  // (все категории кроме Продуктов, Кафе и Развлечений)
+  let othersAvg = 0;
+  Object.keys(avgMap).forEach(cat => {
+    if (cat !== 'Продукты' && cat !== 'Кафе и рестораны' && cat !== 'Развлечения') {
+      othersAvg += avgMap[cat] || 0;
+    }
+  });
+  avgMap['Прочие расходы'] = othersAvg;
+
+  container.innerHTML = TARGET_CATEGORIES.map(cat => {
+    const avg = Math.round(avgMap[cat.name] || 0);
+    const existingVal = Cache.budgetPlan?.categoryLimits?.[cat.name] || (avg > 0 ? avg : '');
+
+    return `
+      <div class="p-3 rounded-2xl bg-[#12151C] border border-[rgba(255,255,255,0.04)] flex items-center justify-between gap-3">
+        <div class="w-9 h-9 rounded-xl bg-[#1E2330] text-gray-300 flex items-center justify-center flex-shrink-0">
+          <i data-lucide="${cat.icon}" class="w-5 h-5 text-[#848D99]"></i>
+        </div>
+        
+        <div class="flex-1 min-w-0">
+          <div class="text-xs font-bold text-gray-200 truncate">${escapeHtml(cat.name)}</div>
+          ${avg > 0 ? `
+            <div onclick="applyWizCategoryAvg('${escapeHtml(cat.name)}', ${avg})" class="wiz-adopt-chip mt-1.5" title="Нажмите, чтобы применить среднее">
+              <span>В среднем: ~${formatMoney(avg)}</span>
+              <span class="text-[#727cff] font-bold">↵</span>
+            </div>
+          ` : `
+            <span class="text-[10px] text-[#848D99] mt-0.5 block">В среднем: нет данных</span>
+          `}
+        </div>
+
+        <div class="w-28 flex-shrink-0">
+          <input type="text"
+                 inputmode="decimal"
+                 data-wiz-cat="${escapeHtml(cat.name)}"
+                 oninput="formatSumInput(this); updateWizLiveTotal();"
+                 value="${existingVal ? formatMoney(existingVal) : ''}"
+                 placeholder="0 ₽"
+                 class="w-full bg-[#181B24] border border-[rgba(255,255,255,0.08)] text-white text-right font-mono font-bold text-xs rounded-xl px-2.5 py-2 outline-none focus:border-[#6C5DD3] transition-colors">
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  updateWizLiveTotal();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function selectWizCalendarDay(day) {
