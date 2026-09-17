@@ -1154,36 +1154,37 @@ function renderBudgetCalendar(bills, today, monthItems) {
     const isPast = billDay < currentDay && !isPaid;
 
     let statusText = 'Ожидает';
-    let statusClass = 'text-[#848D99] bg-[#212430]';
+    let statusClass = 'text-[#848D99] bg-[#212430] border-transparent';
 
     if (isPaid) {
       statusText = 'Оплачено';
-      statusClass = 'text-[#30D158] bg-[#30D158]/15 font-semibold';
+      statusClass = 'text-[#30D158] bg-[#30D158]/15 border-[#30D158]/30 font-semibold';
     } else if (isPast) {
       statusText = 'Просрочено';
-      statusClass = 'text-[#FF453A] bg-[#FF453A]/15 font-semibold';
+      statusClass = 'text-[#FF453A] bg-[#FF453A]/15 border-[#FF453A]/30 font-semibold';
     }
 
     return `
-      <div class="card p-2.5 rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[#181B24] hover:border-[rgba(255,255,255,0.12)] flex items-center gap-2.5 cursor-pointer transition-all relative overflow-hidden"
+      <div class="card p-3 rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[#181B24] hover:border-[rgba(255,255,255,0.12)] flex flex-col justify-between cursor-pointer transition-all relative overflow-hidden"
            data-id="${b.id}"
            data-table="CalendarBills"
            onclick="openEditBillModal('${b.id}')">
         
         <input type="checkbox" class="select-checkbox hidden" data-id="${b.id}">
 
-        <!-- Стильный календарный блок даты -->
-        <div class="w-10 h-11 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.06)] flex flex-col items-center justify-center flex-shrink-0">
-          <span class="text-[8px] font-bold text-[#6C5DD3] uppercase tracking-wider leading-none">СЕН</span>
-          <span class="text-sm font-black text-white font-mono leading-none mt-1">${billDay}</span>
+        <!-- Верхний ряд: дата слева, бейдж справа (никогда не обрезается) -->
+        <div class="flex items-center justify-between gap-1 mb-2">
+          <div class="flex items-baseline gap-1">
+            <span class="text-[9px] font-bold text-[#6C5DD3] uppercase">СЕН</span>
+            <span class="text-base font-black text-white font-mono leading-none">${billDay}</span>
+          </div>
+          <span class="text-[9px] px-2 py-0.5 rounded-full border ${statusClass} flex-shrink-0">${statusText}</span>
         </div>
 
-        <div class="min-w-0 flex-1">
-          <h4 class="text-xs font-semibold text-gray-200 truncate leading-tight">${escapeHtml(b.name)}</h4>
-          <div class="flex items-center justify-between gap-1 mt-1">
-            <span class="text-xs font-bold text-white font-mono">${formatMoney(b.amount)}</span>
-            <span class="text-[9px] px-1.5 py-0.5 rounded ${statusClass}">${statusText}</span>
-          </div>
+        <!-- Нижний ряд: название и сумма -->
+        <div>
+          <h4 class="text-xs font-medium text-gray-300 truncate leading-tight">${escapeHtml(b.name)}</h4>
+          <p class="text-sm font-bold text-white font-mono mt-1">${formatMoney(b.amount)}</p>
         </div>
       </div>
     `;
