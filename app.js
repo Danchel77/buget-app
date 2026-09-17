@@ -1374,41 +1374,6 @@ let wizardData = {
 // ВОССТАНОВЛЕННЫЕ ФУНКЦИИ МАСТЕРА И КАЛЕНДАРЯ ДНЕЙ
 // =============================================================
 
-// 1. Расчет исторического дохода по выпискам для Шага 2
-function calculateHistoricalIncomeForWizard() {
-  const txMonths = Cache?.transactions || [];
-  const calcEl = document.getElementById('wiz-calculated-income');
-  const inputEl = document.getElementById('wiz-income-input');
-
-  if (!txMonths || txMonths.length === 0) {
-    if (calcEl) calcEl.innerText = '0 ₽/мес';
-    return 0;
-  }
-
-  const monthsCount = Math.min(3, txMonths.length);
-  let totalIncome = 0;
-
-  for (let i = 0; i < monthsCount; i++) {
-    const items = txMonths[i].items || [];
-    items.forEach(tx => {
-      if (tx.type === 'Доход') {
-        const cat = tx.category || 'Другое';
-        if (wizardActiveIncomeSources.has(cat)) {
-          totalIncome += (parseFloat(tx.amount) || 0);
-        }
-      }
-    });
-  }
-
-  const avgIncome = monthsCount > 0 ? Math.round(totalIncome / monthsCount) : 0;
-  if (calcEl) calcEl.innerText = `${formatMoney(avgIncome)}/мес`;
-  
-  if (inputEl && (!inputEl.value || inputEl.value === '0 ₽' || inputEl.value === '0')) {
-    inputEl.value = formatMoney(avgIncome);
-  }
-  return avgIncome;
-}
-
 // 3. Поддержка долгого тапа по дню в календаре
 let dayLongPressTimer = null;
 
@@ -1492,29 +1457,71 @@ function applyCatAvgToInput(catName, avg) {
   applyWizCategoryAvg(catName, avg);
 }
 
+// Текущий шаг мастера сохраняется в localStorage
+let currentWizardStep = parseInt(localStorage.getItem('budget_wizard_step'), 10) || 1;
+
 function initBudgetWizard(forceReset = false) {
-  currentWizardStep = 1;
-  currentWizSelectedDay = 10;
-  
-  // Если у пользователя еще нет настроенного плана — очищаем поля
-  if (!Cache?.budgetPlan?.isConfigured || forceReset) {
+  if (forceReset) {
+    currentWizardStep = 1;
+    localStorage.setItem('budget_wizard_step', '1');
     const gName = document.getElementById('wiz-goal-name');
     const gTarget = document.getElementById('wiz-goal-target');
     const gSaved = document.getElementById('wiz-goal-saved');
     const incInput = document.getElementById('wiz-income-input');
-
     if (gName) gName.value = '';
     if (gTarget) gTarget.value = '';
     if (gSaved) gSaved.value = '';
     if (incInput) incInput.value = '';
-
-    document.querySelectorAll('[data-wiz-cat]').forEach(inp => {
-      inp.value = '';
-    });
+    document.querySelectorAll('[data-wiz-cat]').forEach(inp => inp.value = '');
+    updateWizGoalSlider();
+  } else {
+    currentWizardStep = parseInt(localStorage.getItem('budget_wizard_step'), 10) || currentWizardStep || 1;
   }
 
-  goToWizardStep(1);
+  goToWizardStep(currentWizardStep);
   calculateHistoricalIncomeForWizard();
+}
+
+function goToWizardStep(step) {
+  currentWizardStep = step;
+  localStorage.setItem('budget_wizard_step', String(step));
+
+  for (let i = 1; i <= 5; i++) {
+    const stepEl = document.getElementById(`wizard-step-${i}`);
+    const progEl = document.getElementById(`wiz-progress-${i}`);
+    if (stepEl) {
+      if (i === step) stepEl.classList.remove('hidden');
+      else stepEl.classList.add('hidden');
+    }
+    if (progEl) {
+      progEl.className = i <= step 
+        ? 'h-full rounded-full bg-[#6C5DD3] transition-colors duration-300' 
+        : 'h-full rounded-full bg-[rgba(255,255,255,0.08)] transition-colors duration-300';
+    }
+  }
+
+  const badge = document.getElementById('wizard-step-badge');
+  const title = document.getElementById('wizard-step-title');
+  const counter = document.getElementById('wizard-step-counter');
+  if (counter) counter.innerText = `${step}/5`;
+
+  const titles = [
+    'Создайте цель накопления',
+    'Планируемый доход',
+    'Календарь обязательных счетов',
+    'Лимиты на каждый день',
+    'Итоговый план бюджета'
+  ];
+
+  if (badge) badge.innerText = `Шаг ${step} из 5`;
+  if (title) title.innerText = titles[step - 1] || 'Настройка';
+
+  if (step === 1) updateWizGoalSlider();
+  else if (step === 3) renderWizCalendar();
+  else if (step === 4) renderWizLimitsEditor();
+  else if (step === 5) calculateAndRenderWizSummary();
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 // Текущий выбранный день в мастере для счетов
@@ -1535,12 +1542,19 @@ function selectWizardGoalIcon(icon) {
 }
 
 function updateWizGoalSlider() {
-  const target = getUnformattedVal(document.getElementById('wiz-goal-target')) || 1;
-  const saved = getUnformattedVal(document.getElementById('wiz-goal-saved')) || 0;
-  const pct = Math.min(100, Math.max(0, Math.round((saved / target) * 1000) / 10));
-  
+  const target = getUnformattedVal(document.getElementById('wiz-goal-target'));
+  const saved = getUnformattedVal(document.getElementById('wiz-goal-saved'));
+
   const label = document.getElementById('wiz-goal-pct-label');
   const bar = document.getElementById('wiz-goal-progress-bar');
+
+  if (!target || target <= 0) {
+    if (label) label.innerText = '0%';
+    if (bar) bar.style.width = '0%';
+    return;
+  }
+
+  const pct = Math.min(100, Math.max(0, Math.round((saved / target) * 1000) / 10));
   if (label) label.innerText = `${pct}%`;
   if (bar) bar.style.width = `${pct}%`;
 }
@@ -1617,72 +1631,46 @@ function recalculateWizardIncome() {
 // ВОССТАНОВЛЕННЫЙ БЛОК: ИМПОРТ ВЫПИСОК, КАЛЕНДАРЬ И ДОХОД В МАСТЕРЕ
 // ============================================================
 
-// 1. Расчет исторического дохода по загруженным выпискам (для шага 2 и после импорта PDF)
 function calculateHistoricalIncomeForWizard() {
   const txMonths = Cache?.transactions || [];
-  const sourcesContainer = document.getElementById('wiz-income-sources-list');
   const calcEl = document.getElementById('wiz-calculated-income');
   const inputEl = document.getElementById('wiz-income-input');
 
-  if (!txMonths || txMonths.length === 0) {
+  if (!txMonths.length) {
     if (calcEl) calcEl.innerText = '0 ₽/мес';
-    if (sourcesContainer) {
-      sourcesContainer.innerHTML = '<span class="text-[10px] text-[#848D99]">Нет истории загруженных выписок</span>';
-    }
     return 0;
   }
 
-  const monthsCount = Math.min(3, txMonths.length);
-  const sourceTotals = {};
-  let overallIncome = 0;
+  let minTime = Infinity;
+  let maxTime = -Infinity;
+  let totalIncome = 0;
 
-  for (let i = 0; i < monthsCount; i++) {
-    const items = txMonths[i].items || [];
-    items.forEach(tx => {
+  txMonths.forEach(m => {
+    (m.items || []).forEach(tx => {
+      const t = tx.timestamp || (tx.rawDate ? new Date(tx.rawDate).getTime() : null);
+      if (t) {
+        if (t < minTime) minTime = t;
+        if (t > maxTime) maxTime = t;
+      }
+
       if (tx.type === 'Доход') {
-        const val = parseFloat(tx.amount) || 0;
         const cat = tx.category || 'Другое';
-        sourceTotals[cat] = (sourceTotals[cat] || 0) + val;
-        overallIncome += val;
+        if (wizardActiveIncomeSources.has(cat)) {
+          totalIncome += (parseFloat(tx.amount) || 0);
+        }
       }
     });
-  }
+  });
 
-  const avgMonthlyIncome = Math.round(overallIncome / monthsCount);
+  const diffDays = Math.max(1, Math.round((maxTime - minTime) / (1000 * 60 * 60 * 24)) + 1);
+  const effectiveDays = Math.min(90, diffDays);
+  const avgIncome = Math.round(totalIncome * (30.44 / effectiveDays));
 
-  // Отрисовка кликабельных чипсов категорий дохода
-  if (sourcesContainer) {
-    const sources = Object.keys(sourceTotals);
-    if (sources.length === 0) {
-      sourcesContainer.innerHTML = '<span class="text-[10px] text-[#848D99]">Доходы в выписках не обнаружены</span>';
-    } else {
-      sourcesContainer.innerHTML = sources.map(src => {
-        const isSelected = wizardActiveIncomeSources ? wizardActiveIncomeSources.has(src) : true;
-        const avgCat = Math.round(sourceTotals[src] / monthsCount);
-        return `
-          <button type="button" data-source="${escapeHtml(src)}" onclick="toggleWizardIncomeSource('${escapeHtml(src)}')" 
-                  class="text-[10px] px-2 py-0.5 rounded-lg font-medium flex items-center gap-1 cursor-pointer transition-all ${
-                    isSelected 
-                      ? 'bg-[#30D158]/15 text-[#30D158] border border-[#30D158]/20' 
-                      : 'bg-[#212430] text-[#848D99] border border-transparent'
-                  }">
-            ${isSelected ? '<i data-lucide="check" class="w-2.5 h-2.5"></i>' : ''}
-            <span>${escapeHtml(src)} (~${formatMoney(avgCat)})</span>
-          </button>
-        `;
-      }).join('');
-    }
-  }
-
-  if (calcEl) calcEl.innerText = `${formatMoney(avgMonthlyIncome)}/мес`;
-  
-  // Автоподстановка в инпут только если там пусто или 0
+  if (calcEl) calcEl.innerText = `${formatMoney(avgIncome)}/мес`;
   if (inputEl && (!inputEl.value || inputEl.value === '0 ₽' || inputEl.value === '0')) {
-    inputEl.value = formatMoney(avgMonthlyIncome);
+    inputEl.value = formatMoney(avgIncome);
   }
-
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-  return avgMonthlyIncome;
+  return avgIncome;
 }
 
 // Алиас для обратной совместимости, если где-то остался старый вызов
@@ -1699,54 +1687,6 @@ function triggerPdfImportFromWizard() {
   } else {
     showToast('Ошибка: элемент выбора файла не найден', true);
   }
-}
-
-// Переключение шагов с анимацией полосы прогресса
-function goToWizardStep(step) {
-  for (let i = 1; i <= 5; i++) {
-    const stepEl = document.getElementById(`wizard-step-${i}`);
-    const progEl = document.getElementById(`wiz-progress-${i}`);
-    if (stepEl) {
-      if (i === step) {
-        stepEl.classList.remove('hidden');
-      } else {
-        stepEl.classList.add('hidden');
-      }
-    }
-    if (progEl) {
-      if (i <= step) {
-        progEl.className = 'h-full rounded-full bg-[#6C5DD3] transition-colors duration-300';
-      } else {
-        progEl.className = 'h-full rounded-full bg-[rgba(255,255,255,0.08)] transition-colors duration-300';
-      }
-    }
-  }
-
-  const badge = document.getElementById('wizard-step-badge');
-  const title = document.getElementById('wizard-step-title');
-  const counter = document.getElementById('wizard-step-counter');
-  if (counter) counter.innerText = `${step}/5`;
-
-  const titles = [
-    'Создайте цель накопления',
-    'Планируемый доход',
-    'Календарь обязательных счетов',
-    'Лимиты на каждый день',
-    'Итоговый план бюджета'
-  ];
-
-  if (badge) badge.innerText = `Шаг ${step} из 5`;
-  if (title) title.innerText = titles[step - 1] || 'Настройка';
-
-  if (step === 3) {
-    renderWizCalendar();
-  } else if (step === 4) {
-    renderWizLimitsEditor();
-  } else if (step === 5) {
-    calculateAndRenderWizSummary();
-  }
-
-  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 // =============================================================
@@ -2052,21 +1992,36 @@ function calculateAndRenderWizSummary() {
 // Вспомогательный расчет истории трат из выписок
 function calculateHistoricalCategoryAverages() {
   const map = {};
-  const txMonths = Cache.transactions || [];
-  if (txMonths.length === 0) return map;
+  const txMonths = Cache?.transactions || [];
+  if (!txMonths.length) return map;
 
-  const monthsCount = Math.min(3, txMonths.length);
-  for (let i = 0; i < monthsCount; i++) {
-    const items = txMonths[i].items || [];
-    items.forEach(tx => {
+  let minTime = Infinity;
+  let maxTime = -Infinity;
+  const catTotals = {};
+
+  txMonths.forEach(m => {
+    (m.items || []).forEach(tx => {
+      const t = tx.timestamp || (tx.rawDate ? new Date(tx.rawDate).getTime() : null);
+      if (t) {
+        if (t < minTime) minTime = t;
+        if (t > maxTime) maxTime = t;
+      }
+
       if (tx.type === 'Расход' && tx.category) {
-        map[tx.category] = (map[tx.category] || 0) + (parseFloat(tx.amount) || 0);
+        const val = parseFloat(tx.amount) || 0;
+        catTotals[tx.category] = (catTotals[tx.category] || 0) + val;
       }
     });
-  }
+  });
 
-  Object.keys(map).forEach(cat => {
-    map[cat] = map[cat] / monthsCount;
+  if (minTime === Infinity || maxTime === -Infinity) return map;
+
+  const diffDays = Math.max(1, Math.round((maxTime - minTime) / (1000 * 60 * 60 * 24)) + 1);
+  const effectiveDays = Math.min(90, diffDays);
+  const monthFactor = 30.44 / effectiveDays;
+
+  Object.keys(catTotals).forEach(cat => {
+    map[cat] = Math.round(catTotals[cat] * monthFactor);
   });
 
   return map;
