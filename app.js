@@ -1112,6 +1112,13 @@ function isBillPaidInCurrentMonth(bill, monthItems) {
   });
 }
 
+// Вызов загрузки выписки прямо из мастера онбординга
+function triggerPdfImportFromWizard() {
+  window._returnToWizardStep = 2;
+  openPdfInfoModal();
+}
+window.triggerPdfImportFromWizard = triggerPdfImportFromWizard;
+
 function renderBudgetCalendar(bills, today, monthItems) {
   const container = document.getElementById('budget-calendar-list');
   const totalEl = document.getElementById('budget-bills-total');
@@ -1122,7 +1129,7 @@ function renderBudgetCalendar(bills, today, monthItems) {
 
   if (bills.length === 0) {
     container.innerHTML = `
-      <div class="col-span-2 bg-[#12151C] border border-[rgba(255,255,255,0.04)] rounded-2xl p-4 text-center text-xs text-[#848D99]">
+      <div class="col-span-2 bg-[#181B24] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4 text-center text-xs text-[#848D99]">
         Нет запланированных платежей на этот месяц
       </div>
     `;
@@ -1136,27 +1143,39 @@ function renderBudgetCalendar(bills, today, monthItems) {
     const isPaid = isBillPaidInCurrentMonth(b, monthItems);
     const isPast = billDay < currentDay && !isPaid;
 
-    let statusBorder = 'border-[rgba(255,255,255,0.06)] bg-[#181B24]';
-    let statusBadge = '<span class="text-[10px] text-[#848D99]">Ожидает</span>';
+    let statusClass = 'border-[rgba(255,255,255,0.06)] bg-[#181B24]';
+    let statusBadge = '<span class="text-[9px] text-[#848D99] bg-[#212430] px-1.5 py-0.5 rounded">Ожидает</span>';
 
     if (isPaid) {
-      statusBorder = 'border-[#30D158]/30 bg-[#30D158]/5';
-      statusBadge = '<span class="text-[10px] font-bold text-[#30D158]">Оплачено</span>';
+      statusClass = 'border-[#30D158]/20 bg-[#30D158]/5';
+      statusBadge = '<span class="text-[9px] font-bold text-[#30D158] bg-[#30D158]/15 px-1.5 py-0.5 rounded">Оплачено</span>';
     } else if (isPast) {
-      statusBorder = 'border-[#FF453A]/30 bg-[#FF453A]/5';
-      statusBadge = '<span class="text-[10px] font-bold text-[#FF453A]">Просрочено</span>';
+      statusClass = 'border-[#FF453A]/20 bg-[#FF453A]/5';
+      statusBadge = '<span class="text-[9px] font-bold text-[#FF453A] bg-[#FF453A]/15 px-1.5 py-0.5 rounded">Просрочено</span>';
     }
 
     return `
-      <div class="card p-3 rounded-2xl border ${statusBorder} flex flex-col justify-between cursor-pointer transition-all"
+      <div class="card p-2.5 rounded-2xl border ${statusClass} flex items-center gap-2.5 cursor-pointer transition-all relative overflow-hidden"
+           data-id="${b.id}"
+           data-table="CalendarBills"
            onclick="toggleBillPaidStatus('${b.id}', ${!isPaid})">
-        <div class="flex items-start justify-between gap-1 mb-2">
-          <span class="text-[11px] font-bold text-white">${billDay} число</span>
-          ${statusBadge}
+        
+        <input type="checkbox" class="select-checkbox hidden" data-id="${b.id}">
+
+        <!-- Календарный листок слева -->
+        <div class="w-10 h-11 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.06)] flex flex-col items-center justify-center flex-shrink-0 shadow-inner">
+          <span class="text-[9px] uppercase font-bold text-[#848D99] leading-none">сен</span>
+          <span class="text-sm font-extrabold text-white leading-tight font-mono">${billDay}</span>
         </div>
-        <div>
-          <h4 class="text-xs font-semibold text-gray-200 truncate leading-tight">${escapeHtml(b.name)}</h4>
-          <p class="text-sm font-bold text-white mt-1 font-mono">${formatMoney(b.amount)}</p>
+
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center justify-between gap-1 mb-0.5">
+            <h4 class="text-xs font-semibold text-gray-200 truncate leading-tight">${escapeHtml(b.name)}</h4>
+          </div>
+          <div class="flex items-center justify-between gap-1">
+            <span class="text-xs font-bold text-white font-mono leading-none">${formatMoney(b.amount)}</span>
+            ${statusBadge}
+          </div>
         </div>
       </div>
     `;
@@ -1191,7 +1210,13 @@ function renderBudgetGoals(goals, plan, bills) {
     const timeHint = g.isAchieved ? 'Цель выполнена' : (monthsNeeded > 0 ? `~${monthsNeeded} мес. при текущем плане` : 'Увеличьте профицит');
 
     return `
-      <div class="card bg-[#181B24] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4 shadow-sm">
+      <div class="card bg-[#181B24] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4 shadow-sm cursor-pointer relative"
+           data-id="${g.id}"
+           data-table="Goals"
+           onclick="openCardContextMenu(event, '${escapeHtml(g.name)}', () => editGoal('${g.id}', '${escapeHtml(g.name)}', ${g.target}, '${g.rawDeadline || ''}'), () => deleteBudgetGoal('${g.id}', '${escapeHtml(g.name)}'))">
+        
+        <input type="checkbox" class="select-checkbox hidden" data-id="${g.id}">
+
         <div class="flex items-start justify-between mb-2">
           <div class="flex items-center gap-2.5 min-w-0">
             <div class="w-8 h-8 rounded-xl bg-[#6C5DD3]/15 text-[#6C5DD3] flex items-center justify-center flex-shrink-0">
@@ -1203,15 +1228,10 @@ function renderBudgetGoals(goals, plan, bills) {
             </div>
           </div>
           
-          <div class="flex items-center gap-1.5 flex-shrink-0">
-            <button type="button" onclick="openGoalTopupModal('${g.id}', '${escapeHtml(g.name)}')" class="bg-[#212430] hover:bg-[#2A2D3C] text-gray-200 border border-[rgba(255,255,255,0.06)] text-xs font-semibold px-2.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1">
-              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-              <span>Копилка</span>
-            </button>
-            <button type="button" onclick="deleteBudgetGoal('${g.id}', '${escapeHtml(g.name)}')" class="text-gray-500 hover:text-[#FF453A] p-1.5 rounded-lg transition-colors cursor-pointer" title="Удалить цель">
-              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-            </button>
-          </div>
+          <button type="button" onclick="event.stopPropagation(); openGoalTopupModal('${g.id}', '${escapeHtml(g.name)}')" class="bg-[#212430] hover:bg-[#2A2D3C] text-gray-200 border border-[rgba(255,255,255,0.06)] text-xs font-semibold px-2.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            <span>Пополнить</span>
+          </button>
         </div>
 
         <div class="flex justify-between items-end text-xs mb-2">
@@ -1249,20 +1269,24 @@ function renderBudgetCategoryLimits(monthItems, categoryLimits) {
     else if (pct >= 75) barColor = 'bg-[#FF9F0A]';
 
     return `
-      <div class="card bg-[#181B24] border border-[rgba(255,255,255,0.04)] rounded-xl p-2.5 cursor-pointer hover:border-[rgba(255,255,255,0.12)] transition-all"
+      <div class="py-2.5 flex items-center justify-between gap-3 cursor-pointer group hover:opacity-90 transition-opacity"
            onclick="openCategoryLimitModal('${escapeHtml(cat.name)}', ${limit})">
-        <div class="flex items-center justify-between mb-1.5 min-w-0">
-          <div class="flex items-center gap-1.5 min-w-0">
-            <i data-lucide="${icon}" class="w-3.5 h-3.5 text-[#848D99] flex-shrink-0"></i>
-            <span class="text-[11px] font-semibold text-gray-200 truncate">${escapeHtml(cat.name)}</span>
+        <div class="flex items-center gap-2.5 min-w-0 flex-1">
+          <div class="w-7 h-7 rounded-lg bg-[#212430] text-gray-300 flex items-center justify-center flex-shrink-0">
+            <i data-lucide="${icon}" class="w-3.5 h-3.5"></i>
           </div>
-          <span class="text-[11px] font-bold font-mono ${isOver ? 'text-[#FF453A]' : 'text-gray-300'} flex-shrink-0">${formatMoney(spent)}</span>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center justify-between text-xs mb-1">
+              <span class="font-medium text-gray-200 truncate">${escapeHtml(cat.name)}</span>
+              <span class="font-mono font-bold ${isOver ? 'text-[#FF453A]' : 'text-white'} ml-2">
+                ${formatMoney(spent)} ${limit > 0 ? `<span class="text-[#848D99] font-normal">/ ${formatMoney(limit)}</span>` : ''}
+              </span>
+            </div>
+            <div class="w-full bg-[rgba(255,255,255,0.06)] h-1 rounded-full overflow-hidden">
+              <div class="${barColor} h-full rounded-full transition-all duration-300" style="width: ${limit > 0 ? pct : 0}%"></div>
+            </div>
+          </div>
         </div>
-
-        <div class="w-full bg-[rgba(255,255,255,0.06)] h-1 rounded-full overflow-hidden">
-          <div class="${barColor} h-full rounded-full transition-all duration-300" style="width: ${limit > 0 ? pct : 0}%"></div>
-        </div>
-        <div class="text-[9px] text-[#848D99] mt-1 truncate">${limit > 0 ? `Лимит: ${formatMoney(limit)}` : 'Лимит не задан'}</div>
       </div>
     `;
   }).join('');
