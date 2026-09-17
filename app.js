@@ -397,7 +397,7 @@ async function applySnapshotsToUI([txS, depS, brS, goalS, catS, rulesS, planS, b
   const goalData = goalS ? goalS.docs.map(d => ({ id: d.id, ...d.data() })) : [];
   const planData = planS && !planS.empty ? planS.docs[0].data() : {};
   const billsData = billsS ? billsS.docs.map(d => ({ id: d.id, ...d.data() })) : [];
-
+  
   const processedDeposits = processDeposits(depData, goalData);
   const processedBroker = processBroker(brData, goalData);
   const catData = catS.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1013,7 +1013,7 @@ function renderBudgetTab() {
   const wizardEl = document.getElementById('budget-wizard');
   const dashboardEl = document.getElementById('budget-dashboard');
 
-  // Если бюджет еще ни разу не настраивался пользователем — показываем мастер первого запуска
+  // Если бюджет еще не настроен — держим онбординг
   if (!plan.isConfigured) {
     if (wizardEl) wizardEl.classList.remove('hidden');
     if (dashboardEl) dashboardEl.classList.add('hidden');
@@ -1021,6 +1021,7 @@ function renderBudgetTab() {
     return;
   }
 
+  // Бюджет настроен — показываем дашборд
   if (wizardEl) wizardEl.classList.add('hidden');
   if (dashboardEl) dashboardEl.classList.remove('hidden');
 
@@ -1028,7 +1029,14 @@ function renderBudgetTab() {
   const goals = Cache.goals || [];
   const today = new Date();
 
-  // Расчет недели строго с Понедельника по Воскресенье
+  // Актуализация текущего месяца в шапке
+  const monthLabel = document.getElementById('budget-month-label');
+  if (monthLabel) {
+    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+    monthLabel.innerText = `${monthNames[today.getMonth()]} ${today.getFullYear()}`;
+  }
+
+  // Расчет недели (Пн-Вс)
   const dayOfWeek = today.getDay();
   const diffToMonday = (dayOfWeek + 6) % 7;
   const startOfWeek = new Date(today);
@@ -1041,38 +1049,50 @@ function renderBudgetTab() {
 
   const currentMonthId = formatDateStr(today, 'yyyy-MM');
   const monthData = Cache.transactions?.find(m => m.id === currentMonthId);
-  const monthItems = monthData ? monthData.items : [];
+  const monthItems = monthData ? (monthData.items || []) : [];
 
   let weeklySpent = 0;
   let monthlySpent = 0;
 
   monthItems.forEach(tx => {
     if (tx.type !== 'Расход') return;
-    monthlySpent += tx.amount;
+    const val = parseFloat(tx.amount) || 0;
+    monthlySpent += val;
 
     const txDate = new Date(tx.rawDate);
-    if (txDate >= startOfWeek && txDate <= endOfWeek) {
-      weeklySpent += tx.amount;
+    if (!isNaN(txDate.getTime()) && txDate >= startOfWeek && txDate <= endOfWeek) {
+      weeklySpent += val;
     }
   });
 
-  const monthlyLimit = plan.monthlyVariableLimit || 0;
-  const weeklyBaseLimit = Math.round(monthlyLimit / 4.33);
+  // Защита от деления на ноль и пустых лимитов
+  const monthlyLimit = parseFloat(plan.monthlyVariableLimit) || 0;
+  const weeklyBaseLimit = monthlyLimit > 0 ? Math.round(monthlyLimit / 4.33) : 0;
   const weeklyAvailable = Math.max(0, weeklyBaseLimit - weeklySpent);
-  const daysToEndOfWeek = 7 - diffToMonday;
+  const daysRemainingInWeek = Math.max(1, 7 - diffToMonday);
+  const dailyPace = weeklyBaseLimit > 0 ? Math.round(weeklyAvailable / daysRemainingInWeek) : 0;
 
-  // Обновление недельной шкалы трат
+  // 1. Блок «Недельный пульс»
   const weekAvailEl = document.getElementById('budget-week-available');
   const weekProgLabel = document.getElementById('budget-week-progress-label');
   const weekProgBar = document.getElementById('budget-week-progress-bar');
   const weekBadge = document.getElementById('budget-week-badge');
 
   if (weekAvailEl) weekAvailEl.innerText = formatMoney(weeklyAvailable);
-  if (weekProgLabel) weekProgLabel.innerText = `${formatMoney(weeklySpent)} из ${formatMoney(weeklyBaseLimit)}`;
+  if (weekProgLabel) {
+    weekProgLabel.innerHTML = `${formatMoney(weeklySpent)} из ${formatMoney(weeklyBaseLimit)} ${dailyPace > 0 ? `<span class="text-[#848D99]">(${formatMoney(dailyPace)}/дн)</span>` : ''}`;
+  }
+
   if (weekProgBar) {
     const weekPct = weeklyBaseLimit > 0 ? Math.min(100, (weeklySpent / weeklyBaseLimit) * 100) : 0;
     weekProgBar.style.width = `${weekPct}%`;
-    weekProgBar.className = weekSpent > weeklyBaseLimit ? 'bg-[#FF453A] h-full rounded-full transition-all' : (weekPct >= 80 ? 'bg-[#FF9F0A] h-full rounded-full transition-all' : 'bg-[#30D158] h-full rounded-full transition-all');
+    if (weeklySpent > weeklyBaseLimit && weeklyBaseLimit > 0) {
+      weekProgBar.className = 'bg-[#FF453A] h-full rounded-full transition-all duration-300';
+    } else if (weekPct >= 80) {
+      weekProgBar.className = 'bg-[#FF9F0A] h-full rounded-full transition-all duration-300';
+    } else {
+      weekProgBar.className = 'bg-[#30D158] h-full rounded-full transition-all duration-300';
+    }
   }
 
   if (weekBadge) {
@@ -1090,13 +1110,18 @@ function renderBudgetTab() {
   const monthProgressEl = document.getElementById('budget-month-progress');
   if (monthStatEl) monthStatEl.innerText = `${formatMoney(monthlySpent)} из ${formatMoney(monthlyLimit)}`;
   if (monthProgressEl) {
-    const pct = monthlyLimit > 0 ? Math.min(100, (monthlySpent / monthlyLimit) * 100) : 0;
-    monthProgressEl.style.width = `${pct}%`;
-    monthProgressEl.className = pct >= 95 ? 'bg-[#FF453A] h-full rounded-full transition-all' : (pct >= 75 ? 'bg-[#FF9F0A] h-full rounded-full transition-all' : 'bg-[#30D158] h-full rounded-full transition-all');
+    const mPct = monthlyLimit > 0 ? Math.min(100, (monthlySpent / monthlyLimit) * 100) : 0;
+    monthProgressEl.style.width = `${mPct}%`;
+    monthProgressEl.className = mPct >= 95 ? 'bg-[#FF453A] h-full rounded-full transition-all duration-300' : (mPct >= 75 ? 'bg-[#FF9F0A] h-full rounded-full transition-all duration-300' : 'bg-[#30D158] h-full rounded-full transition-all duration-300');
   }
 
+  // 2. Блок «Календарь счетов»
   renderBudgetCalendar(bills, today, monthItems);
+
+  // 3. Блок «Цели накопления»
   renderBudgetGoals(goals, plan, bills);
+
+  // 4. Блок «Лимиты по категориям»
   renderBudgetCategoryLimits(monthItems, plan.categoryLimits || {});
 
   if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -1262,49 +1287,76 @@ function renderBudgetGoals(goals, plan, bills) {
   }).join('');
 }
 
-function renderBudgetCategoryLimits(monthItems, categoryLimits) {
+function renderBudgetCategoryLimits(monthItems = [], categoryLimits = {}) {
   const container = document.getElementById('budget-category-limits-list');
+  const sectionWrap = container ? container.closest('.space-y-2\\.5') || container.parentElement : null;
   if (!container || !Cache?.categories) return;
 
   const cats = Cache.categories.expense || [];
+  const safeLimits = categoryLimits && typeof categoryLimits === 'object' ? categoryLimits : {};
+
+  // Расчет фактических трат по категориям за текущий месяц
   const spentMap = {};
-  monthItems.forEach(tx => {
-    spentMap[tx.category] = (spentMap[tx.category] || 0) + tx.amount;
+  (monthItems || []).forEach(tx => {
+    if (tx.type === 'Расход' && tx.category) {
+      spentMap[tx.category] = (spentMap[tx.category] || 0) + (parseFloat(tx.amount) || 0);
+    }
   });
 
-  container.innerHTML = cats.map(cat => {
+  // Отбираем только категории с лимитом > 0
+  const activeLimits = cats.filter(c => {
+    const lim = parseFloat(safeLimits[c.name]);
+    return !isNaN(lim) && lim > 0;
+  });
+
+  // Если нет настроенных лимитов — аккуратная заглушка без пустых рамок
+  if (activeLimits.length === 0) {
+    container.innerHTML = `
+      <div class="py-4 px-2 text-center">
+        <p class="text-xs text-[#848D99]">Отдельные лимиты категорий не заданы</p>
+        <button type="button" onclick="openAddCategoryLimitPicker()" class="mt-2 text-xs text-[#6C5DD3] hover:text-[#8274ea] font-semibold transition-colors cursor-pointer">
+          + Настроить лимит категории
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = activeLimits.map(cat => {
     const spent = spentMap[cat.name] || 0;
-    const limit = categoryLimits[cat.name] || 0;
-    const icon = cat.icon || 'tag';
+    const limit = parseFloat(safeLimits[cat.name]) || 0;
+    const icon = cat.icon && cat.icon !== '📦' ? cat.icon : 'tag';
     const pct = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0;
     const isOver = limit > 0 && spent > limit;
 
     let barColor = 'bg-[#30D158]';
     if (isOver) barColor = 'bg-[#FF453A]';
-    else if (pct >= 75) barColor = 'bg-[#FF9F0A]';
+    else if (pct >= 80) barColor = 'bg-[#FF9F0A]';
 
     return `
-      <div class="py-2.5 flex items-center justify-between gap-3 cursor-pointer group hover:opacity-90 transition-opacity"
+      <div class="py-3 flex items-center justify-between gap-3 cursor-pointer group hover:opacity-90 transition-opacity"
            onclick="openCategoryLimitModal('${escapeHtml(cat.name)}', ${limit})">
-        <div class="flex items-center gap-2.5 min-w-0 flex-1">
-          <div class="w-7 h-7 rounded-lg bg-[#212430] text-gray-300 flex items-center justify-center flex-shrink-0">
-            <i data-lucide="${icon}" class="w-3.5 h-3.5"></i>
+        <div class="flex items-center gap-3 min-w-0 flex-1">
+          <div class="w-8 h-8 rounded-xl bg-[#212430] text-gray-300 flex items-center justify-center flex-shrink-0">
+            <i data-lucide="${icon}" class="w-4 h-4 text-[#848D99]"></i>
           </div>
           <div class="min-w-0 flex-1">
-            <div class="flex items-center justify-between text-xs mb-1">
-              <span class="font-medium text-gray-200 truncate">${escapeHtml(cat.name)}</span>
-              <span class="font-mono font-bold ${isOver ? 'text-[#FF453A]' : 'text-white'} ml-2">
-                ${formatMoney(spent)} ${limit > 0 ? `<span class="text-[#848D99] font-normal">/ ${formatMoney(limit)}</span>` : ''}
+            <div class="flex items-center justify-between text-xs mb-1.5">
+              <span class="font-semibold text-gray-200 truncate">${escapeHtml(cat.name)}</span>
+              <span class="font-mono font-bold ${isOver ? 'text-[#FF453A]' : 'text-gray-200'} ml-2">
+                ${formatMoney(spent)} <span class="text-[#848D99] font-normal text-[11px]">/ ${formatMoney(limit)}</span>
               </span>
             </div>
-            <div class="w-full bg-[rgba(255,255,255,0.06)] h-1 rounded-full overflow-hidden">
-              <div class="${barColor} h-full rounded-full transition-all duration-300" style="width: ${limit > 0 ? pct : 0}%"></div>
+            <div class="w-full bg-[rgba(255,255,255,0.06)] h-1.5 rounded-full overflow-hidden">
+              <div class="${barColor} h-full rounded-full transition-all duration-300" style="width: ${pct}%"></div>
             </div>
           </div>
         </div>
       </div>
     `;
   }).join('');
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 // -------------------------------------------------------------
@@ -1668,11 +1720,12 @@ function renderWizardSummary() {
 async function finishBudgetOnboarding() {
   showToast('Запуск бюджета...', false, true);
 
-  const goalName = document.getElementById('wiz-goal-name').value.trim() || 'Моя цель';
+  const goalName = document.getElementById('wiz-goal-name').value.trim() || 'Новая цель';
   const goalTarget = getUnformattedVal(document.getElementById('wiz-goal-target')) || 100000;
   const goalSaved = getUnformattedVal(document.getElementById('wiz-goal-saved')) || 0;
   const income = getUnformattedVal(document.getElementById('wiz-income-input')) || 0;
 
+  // 1. Собираем установленные лимиты категорий
   let limitsTotal = 0;
   const categoryLimits = {};
   document.querySelectorAll('[data-wiz-cat]').forEach(inp => {
@@ -1686,32 +1739,57 @@ async function finishBudgetOnboarding() {
   try {
     const batch = db.batch();
 
-    const goalRef = getUserCol('Goals').doc();
-    batch.set(goalRef, {
-      name: goalName,
-      target: goalTarget,
-      saved: goalSaved,
-      share: 100,
-      status: goalSaved >= goalTarget ? 'Выполнена' : 'В процессе',
-      createdAt: Date.now()
-    });
+    // 2. Создаем или обновляем первую цель накопления
+    const goalsCol = getUserCol('Goals');
+    const existingGoalsSnap = await goalsCol.limit(1).get();
+    let targetGoalRef;
 
+    if (!existingGoalsSnap.empty) {
+      targetGoalRef = existingGoalsSnap.docs[0].ref;
+      batch.update(targetGoalRef, {
+        name: goalName,
+        target: goalTarget,
+        saved: goalSaved,
+        share: 100,
+        status: goalSaved >= goalTarget ? 'Выполнена' : 'В процессе',
+        updatedAt: Date.now()
+      });
+    } else {
+      targetGoalRef = goalsCol.doc();
+      batch.set(targetGoalRef, {
+        name: goalName,
+        target: goalTarget,
+        saved: goalSaved,
+        share: 100,
+        status: goalSaved >= goalTarget ? 'Выполнена' : 'В процессе',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+    }
+
+    // 3. Сохраняем генеральный план бюджета
     const planRef = getUserCol('BudgetPlan').doc('plan');
     batch.set(planRef, {
       isConfigured: true,
       monthlyIncome: income,
-      monthlyVariableLimit: limitsTotal,
+      monthlyVariableLimit: limitsTotal > 0 ? limitsTotal : Math.max(0, income - 40000), // Фоллбэк
       categoryLimits: categoryLimits,
       updatedAt: Date.now()
-    });
+    }, { merge: true });
 
+    // 4. Коммитим все изменения единым пакетом
     await batch.commit();
+
+    // 5. Полная перезагрузка актуальных данных и переход к дашборду
     await fetchAllData();
-    showToast('Бюджет успешно настроен!');
+
+    showToast('Бюджет успешно активирован!');
   } catch (err) {
+    console.error('Ошибка активации бюджета:', err);
     showToast('Ошибка сохранения: ' + err.message, true);
   }
 }
+
 let activeEditCategory = null;
 
 function openCategoryLimitModal(catName, currentLimit) {
