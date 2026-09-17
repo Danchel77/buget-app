@@ -1486,11 +1486,6 @@ function cancelDayLongPress() {
   clearTimeout(dayLongPressTimer);
 }
 
-function openAddBillOnDay(day) {
-  document.getElementById('bill-day').value = day;
-  openAddBillModal();
-}
-
 function openDayBillsModal(day) {
   cancelDayLongPress();
   const dlg = document.getElementById('day-bills-dialog');
@@ -1845,16 +1840,34 @@ async function submitBudgetPlan(e) {
 }
 
 // Добавление платежа календаря
-function openAddBillModal() {
-  document.getElementById('calendar-bill-form').reset();
-  document.getElementById('bill-edit-id').value = '';
-  document.getElementById('bill-dialog-actions').classList.remove('hidden');
-  document.getElementById('bill-delete-btn').classList.add('hidden');
-  document.getElementById('calendar-bill-dialog-title').innerText = 'Платеж в календарь';
+function openAddBillOnDay(day) {
+  openAddBillModal(day);
+}
+
+function openAddBillModal(initialDay = null) {
+  const form = document.getElementById('calendar-bill-form');
+  if (form) form.reset();
+
+  const editIdEl = document.getElementById('bill-edit-id');
+  if (editIdEl) editIdEl.value = '';
+
+  const dayInput = document.getElementById('bill-day');
+  if (dayInput && initialDay) {
+    dayInput.value = initialDay;
+  }
+
+  const actions = document.getElementById('bill-dialog-actions');
+  const deleteBtn = document.getElementById('bill-delete-btn');
+  const title = document.getElementById('calendar-bill-dialog-title');
+
+  if (actions) actions.classList.remove('hidden');
+  if (deleteBtn) deleteBtn.classList.add('hidden');
+  if (title) title.innerText = initialDay ? `Платеж на ${initialDay} число` : 'Платеж в календарь';
 
   const dlg = document.getElementById('calendar-bill-dialog');
   if (dlg) dlg.classList.remove('hidden');
 }
+window.openAddBillModal = openAddBillModal;
 
 function closeAddBillModal() {
   const dlg = document.getElementById('calendar-bill-dialog');
