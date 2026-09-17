@@ -3369,13 +3369,13 @@ async function deleteSelectedItems() {
       });
       await batch.commit();
       disableSelectionMode();
-      fetchAllData();
+      await fetchAllData();
+      showToast("Выбранные записи удалены");
     } catch (e) {
       showToast("Ошибка удаления", true);
     }
   });
 }
-
 function startLongPress(card) {
   longPressTriggered = false;
   clearTimeout(longPressTimer);
