@@ -1119,7 +1119,6 @@ function triggerPdfImportFromWizard() {
 }
 window.triggerPdfImportFromWizard = triggerPdfImportFromWizard;
 
-function renderBudgetCalendar(bills, today, monthItems) {
 // Компактный формат сумм для календаря (40 тыс., 8.5 тыс., 600 ₽)
 function formatCompactThousands(amount) {
   const num = parseFloat(amount) || 0;
