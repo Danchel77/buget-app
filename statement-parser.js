@@ -1027,6 +1027,14 @@ async function importSelectedTransactions() {
     if (typeof fetchCollection === 'function') {
       await fetchCollection('Transactions');
     }
+
+    // Если импорт вызывался из мастера бюджета — возвращаем ровно на Шаг 2
+    if (window._returnToWizardStep) {
+      const returnStep = window._returnToWizardStep;
+      window._returnToWizardStep = null;
+      if (typeof switchTab === 'function') switchTab('budget');
+      if (typeof goToWizardStep === 'function') goToWizardStep(returnStep);
+    }
   } catch (err) {
     console.error('Ошибка импорта:', err);
     showToast('Ошибка при импорте: ' + err.message, true);
