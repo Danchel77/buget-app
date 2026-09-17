@@ -671,3 +671,69 @@ body.selection-mode .selection-panel {
   width: 0 !important;
   height: 0 !important;
 }
+
+/* ---------- Стили Мастера Бюджета (Neobank UI) ---------- */
+.wiz-day-cell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.wiz-day-cell:active {
+  transform: scale(0.92);
+}
+
+.wiz-day-cell.is-selected {
+  border-color: #6C5DD3 !important;
+  background: rgba(108, 93, 211, 0.2) !important;
+}
+
+.wiz-day-cell.has-bills {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Индикатор обязательного платежа: не обманчивый зеленый, а нейтральный белый/серый бейдж */
+.wiz-bill-badge {
+  font-size: 8px;
+  line-height: 1;
+  font-weight: 700;
+  color: #E4E7EC;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 1px 3px;
+  border-radius: 4px;
+  margin-top: 2px;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Чипс подстановки исторического лимита */
+.wiz-adopt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #848D99;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 2px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wiz-adopt-chip:hover {
+  color: #727cff;
+  border-color: rgba(114, 124, 255, 0.3);
+  background: rgba(108, 93, 211, 0.1);
+}
