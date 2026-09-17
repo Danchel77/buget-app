@@ -1999,56 +1999,6 @@ function openAddBillModalFromWizard() {
   openAddBillModal();
 }
 
-// Рендер категорий на Шаге 4 с чипсами быстрого применения
-function renderWizLimitsEditor() {
-  const container = document.getElementById('wiz-category-limits-editor');
-  if (!container || !Cache?.categories) return;
-
-  const cats = Cache.categories.expense || [];
-  
-  // Рассчитываем средние траты за 3 месяца по выпискам
-  const avgMap = calculateHistoricalCategoryAverages();
-
-  container.innerHTML = cats.map(cat => {
-    const avg = Math.round(avgMap[cat.name] || 0);
-    const existingVal = Cache.budgetPlan?.categoryLimits?.[cat.name] || (avg > 0 ? avg : '');
-    const icon = cat.icon || 'tag';
-
-    return `
-      <div class="p-2.5 rounded-2xl bg-[#12151C] border border-[rgba(255,255,255,0.04)] flex items-center justify-between gap-2.5">
-        <div class="w-8 h-8 rounded-xl bg-[#1E2330] text-gray-300 flex items-center justify-center flex-shrink-0">
-          <i data-lucide="${icon}" class="w-4 h-4 text-[#848D99]"></i>
-        </div>
-        
-        <div class="flex-1 min-w-0">
-          <div class="text-xs font-semibold text-gray-200 truncate">${escapeHtml(cat.name)}</div>
-          ${avg > 0 ? `
-            <div onclick="applyWizCategoryAvg('${escapeHtml(cat.name)}', ${avg})" class="wiz-adopt-chip mt-1" title="Нажмите, чтобы применить">
-              <span>Среднее: ~${formatMoney(avg)}</span>
-              <span class="text-[#727cff] font-bold">↵</span>
-            </div>
-          ` : `
-            <span class="text-[10px] text-[#848D99]">Нет истории</span>
-          `}
-        </div>
-
-        <div class="w-28 flex-shrink-0">
-          <input type="text"
-                 inputmode="decimal"
-                 data-wiz-cat="${escapeHtml(cat.name)}"
-                 oninput="formatSumInput(this); updateWizLiveTotal();"
-                 value="${existingVal ? formatMoney(existingVal) : ''}"
-                 placeholder="0 ₽"
-                 class="w-full bg-[#181B24] border border-[rgba(255,255,255,0.08)] text-white text-right font-mono font-bold text-xs rounded-xl px-2.5 py-2 outline-none focus:border-[#6C5DD3] transition-colors">
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  updateWizLiveTotal();
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
-
 function applyWizCategoryAvg(catName, avg) {
   const inp = document.querySelector(`[data-wiz-cat="${catName}"]`);
   if (inp) {
@@ -2420,38 +2370,6 @@ async function deleteCurrentEditingBill() {
   }
 }
 window.deleteCurrentEditingBill = deleteCurrentEditingBill;
-
-async function submitCalendarBill(e) {
-  e.preventDefault();
-  const editId = document.getElementById('bill-edit-id').value;
-  const name = document.getElementById('bill-name').value.trim();
-  const amount = getUnformattedVal(document.getElementById('bill-amount'));
-  const day = parseInt(document.getElementById('bill-day').value, 10);
-  const type = document.getElementById('bill-type').value;
-
-  if (!name || !amount) return;
-
-  showToast('Сохранение платежа...', false, true);
-  try {
-    const col = getUserCol('CalendarBills');
-    const billData = { name, amount, day, type, isPaid: false, updatedAt: Date.now() };
-
-    if (editId) {
-      await col.doc(editId).update(billData);
-    } else {
-      await col.add({ ...billData, createdAt: Date.now() });
-    }
-
-    closeAddBillModal();
-    document.getElementById('calendar-bill-form').reset();
-    document.getElementById('bill-edit-id').value = '';
-    await fetchAllData();
-    renderWizardCalendar();
-    showToast('Платеж сохранен');
-  } catch (err) {
-    showToast('Ошибка: ' + err.message, true);
-  }
-}
 
 async function toggleBillPaidStatus(billId, newStatus) {
   try {
