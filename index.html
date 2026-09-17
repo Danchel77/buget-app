@@ -306,28 +306,31 @@
           </div>
         </div>
 
-        <!-- ШАГ 3: Календарь счетов (Исправлена цветовая семантика: счета — не доход!) -->
+        <!-- ШАГ 3: Календарь счетов (Прямой клик + всплывающий тултип дня) -->
         <div id="wizard-step-3" class="hidden space-y-3 bg-[#181B24] border border-[rgba(255,255,255,0.06)] rounded-3xl p-4 shadow-md animate-fade-in relative">
           <!-- Сетка календаря 1..31 -->
-          <div class="bg-[#12151C] p-2.5 rounded-2xl border border-[rgba(255,255,255,0.04)]">
-            <div class="grid grid-cols-7 gap-1 text-center text-[9px] text-[#848D99] font-bold mb-1.5 uppercase tracking-wider">
+          <div class="bg-[#12151C] p-3 rounded-2xl border border-[rgba(255,255,255,0.04)] relative">
+            <div class="grid grid-cols-7 gap-1 text-center text-[10px] text-[#848D99] font-bold mb-2 uppercase tracking-wider">
               <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
             </div>
             <div id="wiz-calendar-grid" class="grid grid-cols-7 gap-1 text-center text-xs font-mono"></div>
-          </div>
 
-          <!-- Список счетов выбранного дня (Аккуратная плашка) -->
-          <div class="bg-[#12151C] border border-[rgba(255,255,255,0.04)] rounded-2xl p-3">
-            <div class="flex items-center justify-between mb-2">
-              <span id="wiz-selected-day-label" class="text-xs font-bold text-white">10 число: платежи</span>
-              <button type="button" onclick="openAddBillModalFromWizard()" class="text-[11px] text-[#727cff] hover:text-[#8b94ff] font-semibold flex items-center gap-1 cursor-pointer">
-                <i data-lucide="plus" class="w-3 h-3"></i> Добавить
+            <!-- Всплывающий тултип платежей дня прямо над календарем -->
+            <div id="wiz-day-tooltip" class="hidden absolute left-4 right-4 top-12 bg-[#1E222D] border border-[rgba(255,255,255,0.12)] p-3.5 rounded-2xl shadow-2xl space-y-2.5 z-30 animate-fade-in">
+              <div class="flex items-center justify-between pb-2 border-b border-[rgba(255,255,255,0.06)]">
+                <span id="wiz-tooltip-title" class="text-xs font-bold text-white">10 число: платежи</span>
+                <button type="button" onclick="closeWizDayTooltip()" class="w-6 h-6 rounded-full bg-[#2A2D3C] text-gray-400 hover:text-white flex items-center justify-center text-xs cursor-pointer">✕</button>
+              </div>
+              <div id="wiz-tooltip-bills-list" class="space-y-1.5 max-h-36 overflow-y-auto"></div>
+              <button type="button" onclick="addAnotherBillFromTooltip()" class="w-full bg-[#6C5DD3] hover:bg-[#5b4ec2] text-white py-2 rounded-xl text-xs font-semibold active:scale-95 transition-all cursor-pointer">
+                + Добавить еще платеж на этот день
               </button>
             </div>
-            
-            <div id="wiz-day-bills-list" class="space-y-1.5">
-              <!-- Счета рендерятся динамически нейтральным или предупреждающим стилем -->
-            </div>
+          </div>
+
+          <div class="flex items-center justify-between px-2 text-xs text-[#848D99]">
+            <span>Всего счетов на месяц:</span>
+            <b id="wiz-bills-total-label" class="text-white font-mono font-bold">0 ₽</b>
           </div>
 
           <div class="flex gap-2 pt-1">
