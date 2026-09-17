@@ -1862,8 +1862,47 @@ function closeAddBillModal() {
   if (dlg) dlg.classList.add('hidden');
 }
 
+function openEditBillModal(billId) {
+  const bill = Cache?.calendarBills?.find(b => b.id === billId);
+  if (!bill) return;
+
+  const dlg = document.getElementById('calendar-bill-dialog');
+  const title = document.getElementById('calendar-bill-dialog-title');
+  const deleteBtn = document.getElementById('bill-delete-btn');
+
+  document.getElementById('bill-edit-id').value = bill.id;
+  document.getElementById('bill-name').value = bill.name;
+  setFormattedVal('bill-amount', bill.amount);
+  document.getElementById('bill-day').value = bill.day;
+  document.getElementById('bill-type').value = bill.type || 'recurring';
+
+  if (title) title.innerText = 'Редактировать платеж';
+  if (deleteBtn) deleteBtn.classList.remove('hidden');
+
+  if (dlg) dlg.classList.remove('hidden');
+}
+window.openEditBillModal = openEditBillModal;
+
+async function deleteCurrentEditingBill() {
+  const id = document.getElementById('bill-edit-id').value;
+  if (!id) return;
+
+  showToast('Удаление платежа...', false, true);
+  try {
+    await getUserCol('CalendarBills').doc(id).delete();
+    closeAddBillModal();
+    await fetchAllData();
+    renderWizardCalendar();
+    showToast('Платеж удален');
+  } catch (e) {
+    showToast('Ошибка удаления', true);
+  }
+}
+window.deleteCurrentEditingBill = deleteCurrentEditingBill;
+
 async function submitCalendarBill(e) {
   e.preventDefault();
+  const editId = document.getElementById('bill-edit-id').value;
   const name = document.getElementById('bill-name').value.trim();
   const amount = getUnformattedVal(document.getElementById('bill-amount'));
   const day = parseInt(document.getElementById('bill-day').value, 10);
@@ -1873,18 +1912,21 @@ async function submitCalendarBill(e) {
 
   showToast('Сохранение платежа...', false, true);
   try {
-    await getUserCol('CalendarBills').add({
-      name,
-      amount,
-      day,
-      type,
-      isPaid: false,
-      createdAt: Date.now()
-    });
+    const col = getUserCol('CalendarBills');
+    const billData = { name, amount, day, type, isPaid: false, updatedAt: Date.now() };
+
+    if (editId) {
+      await col.doc(editId).update(billData);
+    } else {
+      await col.add({ ...billData, createdAt: Date.now() });
+    }
+
     closeAddBillModal();
     document.getElementById('calendar-bill-form').reset();
+    document.getElementById('bill-edit-id').value = '';
     await fetchAllData();
-    showToast('Платеж добавлен в календарь');
+    renderWizardCalendar();
+    showToast('Платеж сохранен');
   } catch (err) {
     showToast('Ошибка: ' + err.message, true);
   }
