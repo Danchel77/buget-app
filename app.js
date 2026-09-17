@@ -1206,7 +1206,7 @@ function renderBudgetGoals(goals, plan, bills) {
   if (goals.length === 0) {
     container.innerHTML = `
       <div class="bg-[#181B24] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4 text-center text-xs text-[#848D99]">
-        Целей пока нет. Добавьте цель, чтобы откладывать на нее свободный остаток.
+        Целей пока нет. Нажмите «+», чтобы создать цель.
       </div>
     `;
     return;
@@ -1219,10 +1219,10 @@ function renderBudgetGoals(goals, plan, bills) {
     const timeHint = g.isAchieved ? 'Цель выполнена' : (monthsNeeded > 0 ? `~${monthsNeeded} мес. при текущем плане` : 'Увеличьте профицит');
 
     return `
-      <div class="card bg-[#181B24] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4 shadow-sm cursor-pointer relative"
+      <div class="card bg-[#181B24] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4 shadow-sm cursor-pointer relative hover:border-[rgba(255,255,255,0.12)] transition-all"
            data-id="${g.id}"
            data-table="Goals"
-           onclick="openCardContextMenu(event, '${escapeHtml(g.name)}', () => editGoal('${g.id}', '${escapeHtml(g.name)}', ${g.target}, '${g.rawDeadline || ''}'), () => deleteBudgetGoal('${g.id}', '${escapeHtml(g.name)}'))">
+           onclick="openEditGoalModal('${g.id}')">
         
         <input type="checkbox" class="select-checkbox hidden" data-id="${g.id}">
 
@@ -1233,7 +1233,7 @@ function renderBudgetGoals(goals, plan, bills) {
             </div>
             <div class="min-w-0">
               <h4 class="text-sm font-bold text-white truncate">${escapeHtml(g.name)}</h4>
-              <p class="text-[11px] text-[#848D99]">${timeHint}</p>
+              <p class="text-[11px] text-[#848D99]">${timeHint} • Доля: ${g.share}%</p>
             </div>
           </div>
           
