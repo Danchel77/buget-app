@@ -717,23 +717,29 @@ body.selection-mode .selection-panel {
   white-space: nowrap;
 }
 
-/* Чипс подстановки исторического лимита */
+/* Крупный, удобный чипс подстановки среднего значения */
 .wiz-adopt-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  color: #848D99;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 2px 8px;
-  border-radius: 8px;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #A0A9B6;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 4px 10px;
+  border-radius: 10px;
   cursor: pointer;
   transition: all 0.15s ease;
+  user-select: none;
 }
 
 .wiz-adopt-chip:hover {
-  color: #727cff;
-  border-color: rgba(114, 124, 255, 0.3);
-  background: rgba(108, 93, 211, 0.1);
+  color: #ffffff;
+  border-color: rgba(108, 93, 211, 0.4);
+  background: rgba(108, 93, 211, 0.18);
+}
+
+.wiz-adopt-chip:active {
+  transform: scale(0.96);
 }
