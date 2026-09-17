@@ -1006,7 +1006,6 @@ function processGoals(goals) {
 // =============================================================
 // ДВИЖОК ЭКРАНА БЮДЖЕТА: ОНБОРДИНГ, ПУЛЬС, АВТОСВЯЗКА ЧЕКОВ И ЦЕЛИ
 // =============================================================
-let currentWizardStep = 1;
 let wizardSelectedIncomeSources = new Set(['Зарплата', 'Кэшбек']);
 
 function renderBudgetTab() {
