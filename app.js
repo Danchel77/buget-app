@@ -1370,9 +1370,156 @@ let wizardData = {
   categoryLimits: {}
 };
 
+// =============================================================
+// ВОССТАНОВЛЕННЫЕ ФУНКЦИИ МАСТЕРА И КАЛЕНДАРЯ ДНЕЙ
+// =============================================================
+
+// 1. Расчет исторического дохода по выпискам для Шага 2
+function calculateHistoricalIncomeForWizard() {
+  const txMonths = Cache?.transactions || [];
+  const calcEl = document.getElementById('wiz-calculated-income');
+  const inputEl = document.getElementById('wiz-income-input');
+
+  if (!txMonths || txMonths.length === 0) {
+    if (calcEl) calcEl.innerText = '0 ₽/мес';
+    return 0;
+  }
+
+  const monthsCount = Math.min(3, txMonths.length);
+  let totalIncome = 0;
+
+  for (let i = 0; i < monthsCount; i++) {
+    const items = txMonths[i].items || [];
+    items.forEach(tx => {
+      if (tx.type === 'Доход') {
+        const cat = tx.category || 'Другое';
+        if (wizardActiveIncomeSources.has(cat)) {
+          totalIncome += (parseFloat(tx.amount) || 0);
+        }
+      }
+    });
+  }
+
+  const avgIncome = monthsCount > 0 ? Math.round(totalIncome / monthsCount) : 0;
+  if (calcEl) calcEl.innerText = `${formatMoney(avgIncome)}/мес`;
+  
+  if (inputEl && (!inputEl.value || inputEl.value === '0 ₽' || inputEl.value === '0')) {
+    inputEl.value = formatMoney(avgIncome);
+  }
+  return avgIncome;
+}
+
+// 2. Клик по дню в сетке календаря на Шаге 3
+function handleWizardDayClick(day) {
+  currentWizSelectedDay = parseInt(day, 10) || 1;
+  renderWizCalendar();
+}
+
+// 3. Поддержка долгого тапа по дню в календаре
+let dayLongPressTimer = null;
+
+function startDayLongPress(day) {
+  clearTimeout(dayLongPressTimer);
+  dayLongPressTimer = setTimeout(() => {
+    openDayBillsModal(day);
+  }, 500);
+}
+
+function cancelDayLongPress() {
+  clearTimeout(dayLongPressTimer);
+}
+
+// 4. Открытие модального окна добавления счета на выбранное число
+function openAddBillOnDay(day) {
+  openAddBillModal(day);
+}
+
+// 5. Модальное окно управления счетами конкретного дня
+function openDayBillsModal(day) {
+  const dlg = document.getElementById('day-bills-dialog');
+  const title = document.getElementById('day-bills-title');
+  const list = document.getElementById('day-bills-items-list');
+  const addBtn = document.getElementById('btn-add-second-bill');
+
+  if (title) title.innerText = `${day} число: список платежей`;
+  if (dlg) dlg.classList.remove('hidden');
+
+  const bills = (Cache?.calendarBills || []).filter(b => parseInt(b.day, 10) === parseInt(day, 10));
+
+  if (list) {
+    if (bills.length === 0) {
+      list.innerHTML = '<div class="text-center py-4 text-xs text-[#848D99]">Счетов на этот день нет</div>';
+    } else {
+      list.innerHTML = bills.map(b => `
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.04)] text-xs">
+          <div>
+            <div class="font-semibold text-white">${escapeHtml(b.name)}</div>
+            <div class="font-mono text-[11px] text-[#848D99]">${formatMoney(b.amount)}</div>
+          </div>
+          <button type="button" onclick="deleteCalendarBill('${b.id}')" class="text-gray-500 hover:text-[#FF453A] p-1.5 cursor-pointer">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      `).join('');
+    }
+  }
+
+  if (addBtn) {
+    addBtn.onclick = () => {
+      closeDayBillsModal();
+      openAddBillModal(day);
+    };
+  }
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function closeDayBillsModal() {
+  const dlg = document.getElementById('day-bills-dialog');
+  if (dlg) dlg.classList.add('hidden');
+}
+
+// 6. Быстрое удаление счета из календаря
+async function deleteCalendarBill(billId) {
+  showToast('Удаление платежа...', false, true);
+  try {
+    await getUserCol('CalendarBills').doc(billId).delete();
+    closeDayBillsModal();
+    await fetchAllData();
+    renderWizCalendar();
+    showToast('Платеж удален');
+  } catch (e) {
+    showToast('Ошибка удаления', true);
+  }
+}
+
+// 7. Подстановка исторического среднего значения в поле лимита (Шаг 4)
+function applyCatAvgToInput(catName, avg) {
+  applyWizCategoryAvg(catName, avg);
+}
+
 function initBudgetWizard(forceReset = false) {
-  if (forceReset) currentWizardStep = 1;
-  goToWizardStep(currentWizardStep);
+  currentWizardStep = 1;
+  currentWizSelectedDay = 10;
+  
+  // Если у пользователя еще нет настроенного плана — очищаем поля
+  if (!Cache?.budgetPlan?.isConfigured || forceReset) {
+    const gName = document.getElementById('wiz-goal-name');
+    const gTarget = document.getElementById('wiz-goal-target');
+    const gSaved = document.getElementById('wiz-goal-saved');
+    const incInput = document.getElementById('wiz-income-input');
+
+    if (gName) gName.value = '';
+    if (gTarget) gTarget.value = '';
+    if (gSaved) gSaved.value = '';
+    if (incInput) incInput.value = '';
+
+    document.querySelectorAll('[data-wiz-cat]').forEach(inp => {
+      inp.value = '';
+    });
+  }
+
+  goToWizardStep(1);
   calculateHistoricalIncomeForWizard();
 }
 
