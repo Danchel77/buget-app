@@ -78,6 +78,9 @@ let categoryChartObj = null;
 
 let currentAuthMode = 'login'; // 'login' или 'register'
 
+let selectionMode = false;
+let selectedTxIds = new Set();
+
 // Переключение между вкладками Вход / Регистрация
 function setAuthMode(mode) {
   currentAuthMode = mode;
@@ -1408,6 +1411,64 @@ function adoptCalculatedIncome() {
   if (input && val > 0) {
     input.value = formatMoney(val);
     showToast('Сумма дохода подставлена');
+  }
+}
+
+// Переключение активности источников дохода в мастере (Шаг 2)
+let wizardActiveIncomeSources = new Set(['Зарплата', 'Кэшбек']);
+
+function toggleWizardIncomeSource(sourceName) {
+  if (wizardActiveIncomeSources.has(sourceName)) {
+    wizardActiveIncomeSources.delete(sourceName);
+  } else {
+    wizardActiveIncomeSources.add(sourceName);
+  }
+
+  // Обновляем визуальное состояние чипсов
+  document.querySelectorAll('#wiz-income-sources-list [data-source]').forEach(el => {
+    const src = el.dataset.source;
+    if (wizardActiveIncomeSources.has(src)) {
+      el.className = 'text-[10px] bg-[#30D158]/15 text-[#30D158] border border-[#30D158]/20 px-2 py-0.5 rounded-lg font-medium flex items-center gap-1 cursor-pointer transition-all';
+      el.innerHTML = `<i data-lucide="check" class="w-2.5 h-2.5"></i> ${escapeHtml(src)}`;
+    } else {
+      el.className = 'text-[10px] bg-[#212430] text-[#848D99] border border-transparent px-2 py-0.5 rounded-lg font-medium flex items-center gap-1 cursor-pointer transition-all';
+      el.innerHTML = `${escapeHtml(src)}`;
+    }
+  });
+
+  // Пересчитываем сумму по активным источникам
+  recalculateWizardIncome();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function recalculateWizardIncome() {
+  const txMonths = Cache?.transactions || [];
+  if (txMonths.length === 0) return;
+
+  const monthsCount = Math.min(3, txMonths.length);
+  let totalIncome = 0;
+
+  for (let i = 0; i < monthsCount; i++) {
+    const items = txMonths[i].items || [];
+    items.forEach(tx => {
+      if (tx.type === 'Доход') {
+        const cat = tx.category || 'Другое';
+        // Если категория входит в выбранные источники
+        if (wizardActiveIncomeSources.has(cat)) {
+          totalIncome += (parseFloat(tx.amount) || 0);
+        }
+      }
+    });
+  }
+
+  const avgIncome = monthsCount > 0 ? Math.round(totalIncome / monthsCount) : 0;
+  
+  const calcEl = document.getElementById('wiz-calculated-income');
+  const inputEl = document.getElementById('wiz-income-input');
+  
+  if (calcEl) calcEl.innerText = `${formatMoney(avgIncome)}/мес`;
+  if (inputEl && (!inputEl.value || inputEl.value === '0 ₽')) {
+    inputEl.value = formatMoney(avgIncome);
   }
 }
 
@@ -3522,7 +3583,6 @@ function escapeHtml(str) {
 }
 
 // ==================== РЕЖИМ МУЛЬТИВЫДЕЛЕНИЯ ====================
-let selectionMode = false;
 let selectedItems = new Set(); // ключи вида "table:id"
 let longPressTimer = null;
 let longPressTriggered = false;
