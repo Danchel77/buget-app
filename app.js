@@ -1120,6 +1120,17 @@ function triggerPdfImportFromWizard() {
 window.triggerPdfImportFromWizard = triggerPdfImportFromWizard;
 
 function renderBudgetCalendar(bills, today, monthItems) {
+// Компактный формат сумм для календаря (40 тыс., 8.5 тыс., 600 ₽)
+function formatCompactThousands(amount) {
+  const num = parseFloat(amount) || 0;
+  if (num >= 1000) {
+    const k = num / 1000;
+    return `${k % 1 === 0 ? k : k.toFixed(1)} тыс.`;
+  }
+  return `${num} ₽`;
+}
+
+function renderBudgetCalendar(bills, today, monthItems) {
   const container = document.getElementById('budget-calendar-list');
   const totalEl = document.getElementById('budget-bills-total');
   if (!container) return;
@@ -1143,38 +1154,36 @@ function renderBudgetCalendar(bills, today, monthItems) {
     const isPaid = isBillPaidInCurrentMonth(b, monthItems);
     const isPast = billDay < currentDay && !isPaid;
 
-    let statusClass = 'border-[rgba(255,255,255,0.06)] bg-[#181B24]';
-    let statusBadge = '<span class="text-[9px] text-[#848D99] bg-[#212430] px-1.5 py-0.5 rounded">Ожидает</span>';
+    let statusText = 'Ожидает';
+    let statusClass = 'text-[#848D99] bg-[#212430]';
 
     if (isPaid) {
-      statusClass = 'border-[#30D158]/20 bg-[#30D158]/5';
-      statusBadge = '<span class="text-[9px] font-bold text-[#30D158] bg-[#30D158]/15 px-1.5 py-0.5 rounded">Оплачено</span>';
+      statusText = 'Оплачено';
+      statusClass = 'text-[#30D158] bg-[#30D158]/15 font-semibold';
     } else if (isPast) {
-      statusClass = 'border-[#FF453A]/20 bg-[#FF453A]/5';
-      statusBadge = '<span class="text-[9px] font-bold text-[#FF453A] bg-[#FF453A]/15 px-1.5 py-0.5 rounded">Просрочено</span>';
+      statusText = 'Просрочено';
+      statusClass = 'text-[#FF453A] bg-[#FF453A]/15 font-semibold';
     }
 
     return `
-      <div class="card p-2.5 rounded-2xl border ${statusClass} flex items-center gap-2.5 cursor-pointer transition-all relative overflow-hidden"
+      <div class="card p-2.5 rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[#181B24] hover:border-[rgba(255,255,255,0.12)] flex items-center gap-2.5 cursor-pointer transition-all relative overflow-hidden"
            data-id="${b.id}"
            data-table="CalendarBills"
-           onclick="toggleBillPaidStatus('${b.id}', ${!isPaid})">
+           onclick="openEditBillModal('${b.id}')">
         
         <input type="checkbox" class="select-checkbox hidden" data-id="${b.id}">
 
-        <!-- Календарный листок слева -->
-        <div class="w-10 h-11 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.06)] flex flex-col items-center justify-center flex-shrink-0 shadow-inner">
-          <span class="text-[9px] uppercase font-bold text-[#848D99] leading-none">сен</span>
-          <span class="text-sm font-extrabold text-white leading-tight font-mono">${billDay}</span>
+        <!-- Стильный календарный блок даты -->
+        <div class="w-10 h-11 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.06)] flex flex-col items-center justify-center flex-shrink-0">
+          <span class="text-[8px] font-bold text-[#6C5DD3] uppercase tracking-wider leading-none">СЕН</span>
+          <span class="text-sm font-black text-white font-mono leading-none mt-1">${billDay}</span>
         </div>
 
         <div class="min-w-0 flex-1">
-          <div class="flex items-center justify-between gap-1 mb-0.5">
-            <h4 class="text-xs font-semibold text-gray-200 truncate leading-tight">${escapeHtml(b.name)}</h4>
-          </div>
-          <div class="flex items-center justify-between gap-1">
-            <span class="text-xs font-bold text-white font-mono leading-none">${formatMoney(b.amount)}</span>
-            ${statusBadge}
+          <h4 class="text-xs font-semibold text-gray-200 truncate leading-tight">${escapeHtml(b.name)}</h4>
+          <div class="flex items-center justify-between gap-1 mt-1">
+            <span class="text-xs font-bold text-white font-mono">${formatMoney(b.amount)}</span>
+            <span class="text-[9px] px-1.5 py-0.5 rounded ${statusClass}">${statusText}</span>
           </div>
         </div>
       </div>
@@ -1392,46 +1401,48 @@ function toggleWizardIncomeSource(src) {
 let activeCalendarDay = null;
 let dayLongPressTimer = null;
 
+let wizardActiveCategories = ['Продукты', 'Кафе и рестораны', 'Развлечения'];
+
 function renderWizardCalendar() {
   const grid = document.getElementById('wiz-calendar-grid');
-  const countEl = document.getElementById('wiz-bills-count');
   if (!grid) return;
 
   const bills = Cache?.calendarBills || [];
-  if (countEl) countEl.innerText = `Счетов: ${bills.length}`;
-
   let html = '';
+
   for (let d = 1; d <= 31; d++) {
     const dayBills = bills.filter(b => parseInt(b.day, 10) === d);
     const count = dayBills.length;
+    const daySum = dayBills.reduce((s, b) => s + (parseFloat(b.amount) || 0), 0);
 
     html += `
       <button type="button" 
-              onclick="handleWizardDayClick(${d})"
-              onpointerdown="startDayLongPress(${d})"
-              onpointerup="cancelDayLongPress()"
-              onpointerleave="cancelDayLongPress()"
-              class="h-8 rounded-lg flex flex-col items-center justify-center transition-all cursor-pointer relative ${count > 0 ? 'bg-[#6C5DD3] text-white font-bold shadow-sm' : 'hover:bg-[#212430] text-gray-300'}">
-        <span>${d}</span>
-        ${count > 1 ? `<span class="text-[8px] leading-none opacity-90">${count}</span>` : (count === 1 ? `<span class="w-1 h-1 rounded-full bg-white"></span>` : '')}
+              onclick="handleWizardDayClick(event, ${d})"
+              class="h-11 rounded-xl p-1 flex flex-col justify-between transition-all cursor-pointer relative border ${count > 0 ? 'bg-[#6C5DD3]/20 border-[#6C5DD3]/40 text-white' : 'bg-[#181B24] border-transparent hover:bg-[#212430] text-gray-300'}">
+        <div class="flex items-center justify-between w-full leading-none">
+          <span class="font-bold text-[11px]">${d}</span>
+          ${count > 1 ? `<span class="text-[8px] font-bold px-1 bg-[#6C5DD3] text-white rounded-full">${count}</span>` : ''}
+        </div>
+        ${daySum > 0 ? `<span class="text-[8px] font-mono text-[#30D158] font-bold leading-none truncate w-full text-right">${formatCompactThousands(daySum)}</span>` : '<span class="h-2"></span>'}
       </button>
     `;
   }
   grid.innerHTML = html;
 }
 
-function handleWizardDayClick(day) {
+function handleWizardDayClick(e, day) {
   const bills = (Cache?.calendarBills || []).filter(b => parseInt(b.day, 10) === day);
   const tooltip = document.getElementById('wiz-day-tooltip');
   if (!tooltip) return;
 
+  // Если на день нет счетов — сразу открываем создание счета на это число
   if (bills.length === 0) {
     tooltip.classList.add('hidden');
     openAddBillOnDay(day);
     return;
   }
 
-  // Если тултип этого дня уже открыт — закрываем его
+  // Если тултип этого же дня уже открыт — скрываем
   if (activeCalendarDay === day && !tooltip.classList.contains('hidden')) {
     tooltip.classList.add('hidden');
     activeCalendarDay = null;
@@ -1440,25 +1451,31 @@ function handleWizardDayClick(day) {
 
   activeCalendarDay = day;
   tooltip.innerHTML = `
-    <div class="flex items-center justify-between pb-1 border-b border-[rgba(255,255,255,0.06)] font-bold text-white text-[11px]">
-      <span>${day} число (${bills.length})</span>
-      <button type="button" onclick="openDayBillsModal(${day})" class="text-[#6C5DD3] hover:underline text-[10px] cursor-pointer">Настроить</button>
+    <div class="flex items-center justify-between pb-1.5 border-b border-[rgba(255,255,255,0.08)]">
+      <span class="font-bold text-white text-xs">${day} число (${bills.length})</span>
+      <button type="button" onclick="openAddBillOnDay(${day})" class="text-[#6C5DD3] hover:text-[#8274ea] text-[11px] font-semibold flex items-center gap-1 cursor-pointer">
+        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+        <span>Добавить</span>
+      </button>
     </div>
-    <div class="space-y-1">
+    <div class="space-y-1.5 pt-0.5">
       ${bills.map(b => `
-        <div class="flex items-center justify-between gap-2 text-[11px]">
-          <span class="text-gray-300 truncate">${escapeHtml(b.name)}</span>
-          <b class="text-white font-mono">${formatMoney(b.amount)}</b>
+        <div class="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-[#12151C]">
+          <div class="min-w-0 flex-1">
+            <span class="text-xs text-gray-200 truncate block">${escapeHtml(b.name)}</span>
+            <span class="text-[10px] text-[#30D158] font-mono font-bold">${formatMoney(b.amount)}</span>
+          </div>
+          <button type="button" onclick="openEditBillModal('${b.id}')" class="text-gray-400 hover:text-white p-1 rounded-md hover:bg-[#212430] cursor-pointer" title="Редактировать">
+            <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+          </button>
         </div>
       `).join('')}
     </div>
-    <button type="button" onclick="openAddBillOnDay(${day})" class="w-full mt-1.5 py-1 text-center text-[10px] text-blue-400 bg-[#181B24] hover:bg-[#2A2D3C] rounded-lg font-medium cursor-pointer">
-      + Еще платеж на этот день
-    </button>
   `;
   tooltip.classList.remove('hidden');
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
-
+  
 function startDayLongPress(day) {
   clearTimeout(dayLongPressTimer);
   dayLongPressTimer = setTimeout(() => {
@@ -1547,34 +1564,66 @@ function renderWizardCategoryLimits() {
   const container = document.getElementById('wiz-category-limits-editor');
   if (!container || !Cache?.categories) return;
 
-  const cats = Cache.categories.expense || [];
-  container.innerHTML = cats.map(cat => {
-    const avg = calculateCategoryMonthlyAverage(cat.name);
+  // Показываем только выбранные категории (по умолчанию Продукты, Кафе, Развлечения)
+  container.innerHTML = wizardActiveCategories.map(catName => {
+    const avg = calculateCategoryMonthlyAverage(catName);
+    const inputId = `wiz-cat-input-${catName.replace(/\s+/g, '_')}`;
+
     return `
-      <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.03)]">
+      <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.04)]">
         <div class="min-w-0 flex-1">
-          <span class="text-xs font-semibold text-gray-200 truncate block">${escapeHtml(cat.name)}</span>
-          <span class="text-[9px] text-[#848D99]">${avg > 0 ? `В среднем: ~${formatMoney(avg)}/мес` : 'В среднем: 0 ₽'}</span>
+          <span class="text-xs font-semibold text-gray-200 truncate block">${escapeHtml(catName)}</span>
+          <span class="text-[9px] text-[#848D99]">${avg > 0 ? `В среднем: ~${formatMoney(avg)}/мес` : 'В среднем: нет данных'}</span>
         </div>
         <div class="flex items-center gap-1.5 flex-shrink-0">
           ${avg > 0 ? `
-            <button type="button" onclick="applyCatAvgToInput('${escapeHtml(cat.name)}', ${avg})" class="text-[9px] font-semibold text-[#6C5DD3] bg-[#6C5DD3]/15 hover:bg-[#6C5DD3]/25 px-2 py-1 rounded-lg transition-colors cursor-pointer">
+            <button type="button" onclick="applyCatAvgToInput('${inputId}', ${avg})" class="text-[9px] font-semibold text-[#6C5DD3] bg-[#6C5DD3]/15 hover:bg-[#6C5DD3]/25 px-2 py-1 rounded-lg transition-colors cursor-pointer">
               Подставить
             </button>
           ` : ''}
-          <div class="relative">
-            <input type="text" inputmode="decimal" oninput="formatSumInput(this)" data-wiz-cat="${escapeHtml(cat.name)}" placeholder="0 ₽" class="w-24 bg-[#181B24] border border-[rgba(255,255,255,0.1)] focus:border-[#6C5DD3] text-white text-xs font-bold rounded-lg p-1.5 text-right outline-none transition-colors">
+          <div class="relative flex items-center">
+            <input type="text" inputmode="decimal" id="${inputId}" oninput="formatSumInput(this)" data-wiz-cat="${escapeHtml(catName)}" placeholder="0 ₽" class="w-24 bg-[#181B24] border border-[rgba(255,255,255,0.1)] focus:border-[#6C5DD3] text-white text-xs font-bold rounded-lg p-1.5 text-right outline-none">
           </div>
         </div>
       </div>
     `;
   }).join('');
+
+  // Поле для "Прочих расходов"
+  const otherAvg = calculateCategoryMonthlyAverage('Другое');
+  container.innerHTML += `
+    <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.04)] mt-1">
+      <div class="min-w-0 flex-1">
+        <span class="text-xs font-semibold text-gray-300 truncate block">Прочие расходы</span>
+        <span class="text-[9px] text-[#848D99]">Все остальные траты</span>
+      </div>
+      <input type="text" inputmode="decimal" id="wiz-cat-input-other" oninput="formatSumInput(this)" data-wiz-cat="Прочие" placeholder="0 ₽" class="w-24 bg-[#181B24] border border-[rgba(255,255,255,0.1)] focus:border-[#6C5DD3] text-white text-xs font-bold rounded-lg p-1.5 text-right outline-none">
+    </div>
+  `;
 }
 
-function applyCatAvgToInput(catName, avg) {
-  const inp = document.querySelector(`[data-wiz-cat="${catName}"]`);
-  if (inp) setFormattedVal(inp.id || inp, avg);
+function applyCatAvgToInput(inputId, avg) {
+  const inp = document.getElementById(inputId);
+  if (inp) {
+    inp.value = avg;
+    formatSumInput(inp);
+  }
 }
+
+function openAddCategoryLimitPicker() {
+  const allCats = Cache?.categories?.expense?.map(c => c.name) || [];
+  const available = allCats.filter(c => !wizardActiveCategories.includes(c));
+
+  if (available.length === 0) {
+    showToast('Все категории уже добавлены');
+    return;
+  }
+
+  // Добавляем следующую доступную категорию в список лимитов
+  wizardActiveCategories.push(available[0]);
+  renderWizardCategoryLimits();
+}
+window.openAddCategoryLimitPicker = openAddCategoryLimitPicker;
 
 // Шаг 5: Итог без нуля в недельном бюджете
 function renderWizardSummary() {
@@ -1798,6 +1847,12 @@ async function submitBudgetPlan(e) {
 
 // Добавление платежа календаря
 function openAddBillModal() {
+  document.getElementById('calendar-bill-form').reset();
+  document.getElementById('bill-edit-id').value = '';
+  document.getElementById('bill-dialog-actions').classList.remove('hidden');
+  document.getElementById('bill-delete-btn').classList.add('hidden');
+  document.getElementById('calendar-bill-dialog-title').innerText = 'Платеж в календарь';
+
   const dlg = document.getElementById('calendar-bill-dialog');
   if (dlg) dlg.classList.remove('hidden');
 }
