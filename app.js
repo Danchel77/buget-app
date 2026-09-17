@@ -1061,13 +1061,19 @@ function renderBudgetTab() {
   const weeklyAvailable = Math.max(0, weeklyBaseLimit - weeklySpent);
   const daysToEndOfWeek = 7 - diffToMonday;
 
-  // Виджет недели
+  // Обновление недельной шкалы трат
   const weekAvailEl = document.getElementById('budget-week-available');
-  const weekSubEl = document.getElementById('budget-week-sub');
+  const weekProgLabel = document.getElementById('budget-week-progress-label');
+  const weekProgBar = document.getElementById('budget-week-progress-bar');
   const weekBadge = document.getElementById('budget-week-badge');
 
   if (weekAvailEl) weekAvailEl.innerText = formatMoney(weeklyAvailable);
-  if (weekSubEl) weekSubEl.innerText = `Лимит недели: ${formatMoney(weeklyBaseLimit)} • До конца недели ${daysToEndOfWeek} дн.`;
+  if (weekProgLabel) weekProgLabel.innerText = `${formatMoney(weeklySpent)} из ${formatMoney(weeklyBaseLimit)}`;
+  if (weekProgBar) {
+    const weekPct = weeklyBaseLimit > 0 ? Math.min(100, (weeklySpent / weeklyBaseLimit) * 100) : 0;
+    weekProgBar.style.width = `${weekPct}%`;
+    weekProgBar.className = weekSpent > weeklyBaseLimit ? 'bg-[#FF453A] h-full rounded-full transition-all' : (weekPct >= 80 ? 'bg-[#FF9F0A] h-full rounded-full transition-all' : 'bg-[#30D158] h-full rounded-full transition-all');
+  }
 
   if (weekBadge) {
     if (weeklyBaseLimit > 0 && weeklySpent > weeklyBaseLimit) {
@@ -1559,7 +1565,6 @@ function renderWizardCategoryLimits() {
   const container = document.getElementById('wiz-category-limits-editor');
   if (!container || !Cache?.categories) return;
 
-  // Показываем только выбранные категории (по умолчанию Продукты, Кафе, Развлечения)
   container.innerHTML = wizardActiveCategories.map(catName => {
     const avg = calculateCategoryMonthlyAverage(catName);
     const inputId = `wiz-cat-input-${catName.replace(/\s+/g, '_')}`;
@@ -1576,25 +1581,33 @@ function renderWizardCategoryLimits() {
               Подставить
             </button>
           ` : ''}
-          <div class="relative flex items-center">
-            <input type="text" inputmode="decimal" id="${inputId}" oninput="formatSumInput(this)" data-wiz-cat="${escapeHtml(catName)}" placeholder="0 ₽" class="w-24 bg-[#181B24] border border-[rgba(255,255,255,0.1)] focus:border-[#6C5DD3] text-white text-xs font-bold rounded-lg p-1.5 text-right outline-none">
-          </div>
+          <input type="text" inputmode="decimal" id="${inputId}" oninput="formatSumInput(this); updateWizardLiveLimitsTotal();" data-wiz-cat="${escapeHtml(catName)}" placeholder="0 ₽" class="w-24 bg-[#181B24] border border-[rgba(255,255,255,0.1)] focus:border-[#6C5DD3] text-white text-xs font-bold rounded-lg p-1.5 text-right outline-none">
         </div>
       </div>
     `;
   }).join('');
 
-  // Поле для "Прочих расходов"
-  const otherAvg = calculateCategoryMonthlyAverage('Другое');
+  // Прочие расходы
   container.innerHTML += `
-    <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.04)] mt-1">
+    <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.04)]">
       <div class="min-w-0 flex-1">
         <span class="text-xs font-semibold text-gray-300 truncate block">Прочие расходы</span>
         <span class="text-[9px] text-[#848D99]">Все остальные траты</span>
       </div>
-      <input type="text" inputmode="decimal" id="wiz-cat-input-other" oninput="formatSumInput(this)" data-wiz-cat="Прочие" placeholder="0 ₽" class="w-24 bg-[#181B24] border border-[rgba(255,255,255,0.1)] focus:border-[#6C5DD3] text-white text-xs font-bold rounded-lg p-1.5 text-right outline-none">
+      <input type="text" inputmode="decimal" id="wiz-cat-input-other" oninput="formatSumInput(this); updateWizardLiveLimitsTotal();" data-wiz-cat="Прочие" placeholder="0 ₽" class="w-24 bg-[#181B24] border border-[rgba(255,255,255,0.1)] focus:border-[#6C5DD3] text-white text-xs font-bold rounded-lg p-1.5 text-right outline-none">
     </div>
   `;
+
+  updateWizardLiveLimitsTotal();
+}
+
+function updateWizardLiveLimitsTotal() {
+  let total = 0;
+  document.querySelectorAll('[data-wiz-cat]').forEach(inp => {
+    total += getUnformattedVal(inp);
+  });
+  const totalEl = document.getElementById('wiz-limits-live-total');
+  if (totalEl) totalEl.innerText = `${formatMoney(total)}/мес`;
 }
 
 function applyCatAvgToInput(inputId, avg) {
@@ -1781,14 +1794,26 @@ function openBudgetPlanModal() {
   if (!dlg) return;
 
   const plan = Cache?.budgetPlan || {};
-  setFormattedVal('plan-income-input', plan.monthlyIncome || 120000);
-  setFormattedVal('plan-expense-input', plan.monthlyVariableLimit || 60000);
+  setFormattedVal('plan-income-input', plan.monthlyIncome || 0);
+  setFormattedVal('plan-expense-input', plan.monthlyVariableLimit || 0);
+
+  // Расчет реального среднего дохода за 3 месяца
+  const months = Cache?.transactions || [];
+  const lastMonths = months.slice(0, 3);
+  let totalInc = 0;
+  lastMonths.forEach(m => {
+    (m.items || []).forEach(tx => {
+      if (tx.type === 'Доход') totalInc += tx.amount;
+    });
+  });
+  const avgIncome = Math.round(totalInc / Math.max(1, lastMonths.length));
+  const avgEl = document.getElementById('plan-avg-income');
+  if (avgEl) avgEl.innerText = `${formatMoney(avgIncome)}/мес`;
 
   updatePlanForecast();
   dlg.classList.remove('hidden');
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
-
 function closeBudgetPlanModal() {
   const dlg = document.getElementById('budget-plan-dialog');
   if (dlg) dlg.classList.add('hidden');
@@ -2006,9 +2031,98 @@ async function submitGoalTopup() {
   }
 }
 
+// Управление созданием и редактированием целей бюджета
 function openGoalModal() {
-  toggleForm('goal-form-container', 'goal-submit-btn', 'Создать цель', 'goal-form', 'goal');
+  const form = document.getElementById('budget-goal-form');
+  if (form) form.reset();
+
+  document.getElementById('goal-edit-id').value = '';
+  document.getElementById('goal-share-input').value = 100;
+  document.getElementById('goal-share-label').innerText = '100%';
+  document.getElementById('goal-delete-btn').classList.add('hidden');
+  document.getElementById('budget-goal-dialog-title').innerText = 'Новая цель';
+
+  const dlg = document.getElementById('budget-goal-dialog');
+  if (dlg) dlg.classList.remove('hidden');
 }
+window.openGoalModal = openGoalModal;
+
+function openEditGoalModal(goalId) {
+  const goal = Cache?.goals?.find(g => g.id === goalId);
+  if (!goal) return;
+
+  document.getElementById('goal-edit-id').value = goal.id;
+  document.getElementById('goal-name-input').value = goal.name;
+  setFormattedVal('goal-target-input', goal.target);
+  setFormattedVal('goal-saved-input', goal.saved);
+  document.getElementById('goal-share-input').value = goal.share || 100;
+  document.getElementById('goal-share-label').innerText = (goal.share || 100) + '%';
+  document.getElementById('goal-delete-btn').classList.remove('hidden');
+  document.getElementById('budget-goal-dialog-title').innerText = 'Редактировать цель';
+
+  const dlg = document.getElementById('budget-goal-dialog');
+  if (dlg) dlg.classList.remove('hidden');
+}
+window.openEditGoalModal = openEditGoalModal;
+
+function closeGoalModal() {
+  const dlg = document.getElementById('budget-goal-dialog');
+  if (dlg) dlg.classList.add('hidden');
+}
+window.closeGoalModal = closeGoalModal;
+
+async function submitBudgetGoal(e) {
+  e.preventDefault();
+  const editId = document.getElementById('goal-edit-id').value;
+  const name = document.getElementById('goal-name-input').value.trim();
+  const target = getUnformattedVal(document.getElementById('goal-target-input'));
+  const saved = getUnformattedVal(document.getElementById('goal-saved-input'));
+  const share = parseInt(document.getElementById('goal-share-input').value, 10) || 100;
+
+  if (!name || !target) return;
+
+  showToast('Сохранение цели...', false, true);
+  try {
+    const col = getUserCol('Goals');
+    const goalData = {
+      name,
+      target,
+      saved,
+      share,
+      status: saved >= target ? 'Выполнена' : 'В процессе',
+      updatedAt: Date.now()
+    };
+
+    if (editId) {
+      await col.doc(editId).update(goalData);
+    } else {
+      await col.add({ ...goalData, createdAt: Date.now() });
+    }
+
+    closeGoalModal();
+    await fetchAllData();
+    showToast('Цель сохранена');
+  } catch (err) {
+    showToast('Ошибка: ' + err.message, true);
+  }
+}
+window.submitBudgetGoal = submitBudgetGoal;
+
+async function deleteCurrentEditingGoal() {
+  const editId = document.getElementById('goal-edit-id').value;
+  if (!editId) return;
+
+  showToast('Удаление цели...', false, true);
+  try {
+    await getUserCol('Goals').doc(editId).delete();
+    closeGoalModal();
+    await fetchAllData();
+    showToast('Цель удалена');
+  } catch (err) {
+    showToast('Ошибка: ' + err.message, true);
+  }
+}
+window.deleteCurrentEditingGoal = deleteCurrentEditingGoal;
 
 window.openBudgetPlanModal = openBudgetPlanModal;
 window.closeBudgetPlanModal = closeBudgetPlanModal;
