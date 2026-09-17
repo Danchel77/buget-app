@@ -201,14 +201,15 @@
             <input type="text" id="wiz-goal-name" placeholder="Например: отпуск, ноутбук..." class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white text-xs rounded-xl p-2.5 outline-none focus:border-[#6C5DD3]">
           </div>
 
-          <div>
-            <label class="block text-[10px] text-[#848D99] uppercase font-bold mb-1">Сумма цели (₽)</label>
-            <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="wiz-goal-target" placeholder="0 ₽" class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white font-bold text-sm rounded-xl p-2.5 outline-none focus:border-[#6C5DD3]">
-          </div>
-
-          <div class="bg-[#12151C] border border-[rgba(255,255,255,0.04)] rounded-xl p-2.5 flex items-center gap-2">
-            <i data-lucide="info" class="w-3.5 h-3.5 text-[#6C5DD3] flex-shrink-0"></i>
-            <p class="text-[11px] text-[#848D99] leading-tight">Вносите траты вручную или загружайте PDF-выписки в разделе «Траты».</p>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] text-[#848D99] uppercase font-bold mb-1">Сумма цели (₽)</label>
+              <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="wiz-goal-target" placeholder="0 ₽" class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white font-bold text-sm rounded-xl p-2.5 outline-none focus:border-[#6C5DD3]">
+            </div>
+            <div>
+              <label class="block text-[10px] text-[#848D99] uppercase font-bold mb-1">Уже отложено (₽)</label>
+              <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="wiz-goal-saved" placeholder="0 ₽" class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white font-bold text-sm rounded-xl p-2.5 outline-none focus:border-[#6C5DD3]">
+            </div>
           </div>
 
           <button type="button" onclick="goToWizardStep(2)" class="w-full bg-[#6C5DD3] hover:bg-[#5b4ec2] text-white py-2.5 rounded-xl text-xs font-semibold shadow-md active:scale-95 cursor-pointer mt-1">
@@ -218,6 +219,17 @@
 
         <!-- Шаг 2: Доход -->
         <div id="wizard-step-2" class="hidden space-y-2.5 bg-[#181B24] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4">
+          <div class="bg-[#12151C] border border-[rgba(255,255,255,0.04)] rounded-xl p-3 flex items-center justify-between gap-2">
+            <div class="min-w-0 flex-1">
+              <div class="text-xs font-bold text-white">Загрузить историю выписок</div>
+              <p class="text-[10px] text-[#848D99] leading-tight mt-0.5">Добавит чеки и рассчитает средний доход за 3 месяца</p>
+            </div>
+            <button type="button" onclick="triggerPdfImportFromWizard()" class="bg-[#212430] hover:bg-[#2A2D3C] text-[#6C5DD3] hover:text-[#8274ea] border border-[rgba(255,255,255,0.06)] px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 flex-shrink-0 cursor-pointer">
+              <i data-lucide="file-up" class="w-3.5 h-3.5"></i>
+              <span>PDF-выписка</span>
+            </button>
+          </div>
+
           <div id="wiz-income-stats-box" class="bg-[#12151C] border border-[rgba(255,255,255,0.04)] rounded-xl p-2.5 space-y-1.5">
             <div class="flex items-center justify-between text-xs">
               <span class="text-[#848D99]">Средний доход:</span>
@@ -356,9 +368,8 @@
               <p class="text-[11px] text-[#848D99] uppercase tracking-wider font-bold">Календарь платежей</p>
               <p id="budget-bills-total" class="text-xs text-gray-400 mt-0.5">Обязательные счета: 0 ₽</p>
             </div>
-            <button type="button" onclick="openAddBillModal()" class="text-xs text-[#6C5DD3] hover:text-[#8274ea] bg-[#6C5DD3]/10 hover:bg-[#6C5DD3]/20 border border-[#6C5DD3]/20 px-3 py-1.5 rounded-xl font-semibold transition-all flex items-center gap-1 cursor-pointer">
-              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-              <span>Платеж</span>
+            <button type="button" onclick="openAddBillModal()" class="w-8 h-8 rounded-xl bg-[#181B24] hover:bg-[#212430] border border-[rgba(255,255,255,0.06)] text-gray-200 flex items-center justify-center transition-all cursor-pointer shadow-sm active:scale-95" title="Добавить платеж">
+              <i data-lucide="plus" class="w-4 h-4 text-[#6C5DD3]"></i>
             </button>
           </div>
 
@@ -373,27 +384,28 @@
               <p class="text-[11px] text-[#848D99] uppercase tracking-wider font-bold">Цели накопления</p>
               <p id="budget-goals-surplus" class="text-xs text-gray-400 mt-0.5">Накопления по плану: +0 ₽/мес</p>
             </div>
-            <button type="button" onclick="openGoalModal()" class="text-xs text-[#6C5DD3] hover:text-[#8274ea] bg-[#6C5DD3]/10 hover:bg-[#6C5DD3]/20 border border-[#6C5DD3]/20 px-3 py-1.5 rounded-xl font-semibold transition-all flex items-center gap-1 cursor-pointer">
-              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-              <span>Новая цель</span>
+            <button type="button" onclick="openGoalModal()" class="w-8 h-8 rounded-xl bg-[#181B24] hover:bg-[#212430] border border-[rgba(255,255,255,0.06)] text-gray-200 flex items-center justify-center transition-all cursor-pointer shadow-sm active:scale-95" title="Новая цель">
+              <i data-lucide="plus" class="w-4 h-4 text-[#6C5DD3]"></i>
             </button>
           </div>
 
           <div id="budget-goals-list" class="space-y-3"></div>
         </div>
 
-        <!-- 4. Лимиты категорий (компактная 2-колоночная сетка без скролла) -->
+        <!-- 4. Лимиты категорий (единый монолитный виджет) -->
         <div class="space-y-2.5 pb-6">
           <div class="flex items-center justify-between px-1">
             <p class="text-[11px] text-[#848D99] uppercase tracking-wider font-bold">Лимиты по категориям</p>
             <span class="text-xs text-[#848D99]">План на месяц</span>
           </div>
 
-          <div id="budget-category-limits-list" class="grid grid-cols-2 gap-1.5"></div>
+          <div class="bg-[#181B24] border border-[rgba(255,255,255,0.06)] rounded-3xl p-3.5 shadow-sm">
+            <div id="budget-category-limits-list" class="divide-y divide-[rgba(255,255,255,0.03)]"></div>
+          </div>
         </div>
       </div>
     </div>
-
+    
     <!-- ЭКРАН ТРАНЗАКЦИЙ -->
     <div id="transactions-tab" class="space-y-4 hidden animate-fade-in">
       <div class="grid grid-cols-2 gap-3 mb-2">
