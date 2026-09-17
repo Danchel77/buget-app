@@ -873,11 +873,12 @@
   <div id="calendar-bill-dialog" class="fixed inset-0 bg-black/80 z-[150] hidden flex flex-col justify-center items-center p-4 backdrop-blur-sm animate-fade-in">
     <div class="bg-[#181B24] border border-[rgba(255,255,255,0.08)] w-full max-w-sm rounded-3xl p-5 shadow-2xl">
       <div class="flex items-center justify-between pb-3 mb-4 border-b border-[rgba(255,255,255,0.06)]">
-        <h3 class="font-bold text-white text-base">Платеж в календарь</h3>
+        <h3 id="calendar-bill-dialog-title" class="font-bold text-white text-base">Платеж в календарь</h3>
         <button type="button" onclick="closeAddBillModal()" class="w-7 h-7 rounded-full bg-[#212430] text-gray-400 hover:text-white flex items-center justify-center cursor-pointer text-sm">✕</button>
       </div>
 
       <form id="calendar-bill-form" onsubmit="submitCalendarBill(event)" class="space-y-3">
+        <input type="hidden" id="bill-edit-id">
         <input type="text" id="bill-name" placeholder="Название (ЖКХ, Аренда, Подписка)" required class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white rounded-xl p-3 outline-none text-xs">
         <input type="text" inputmode="decimal" oninput="formatSumInput(this)" id="bill-amount" placeholder="Сумма (₽)" required class="w-full bg-[#12151C] border border-[rgba(255,255,255,0.08)] text-white font-bold rounded-xl p-3 outline-none text-sm">
         
@@ -895,10 +896,13 @@
           </div>
         </div>
 
-        <div class="flex gap-2 pt-2">
+        <div id="bill-dialog-actions" class="flex gap-2 pt-2">
           <button type="button" onclick="closeAddBillModal()" class="flex-1 bg-[#212430] hover:bg-[#2A2D3C] text-gray-300 py-3 rounded-xl text-xs font-semibold cursor-pointer">Отмена</button>
           <button type="submit" class="flex-1 bg-[#6C5DD3] hover:bg-[#5b4ec2] text-white py-3 rounded-xl text-xs font-semibold shadow-md active:scale-95 cursor-pointer">Сохранить</button>
         </div>
+        <button type="button" id="bill-delete-btn" onclick="deleteCurrentEditingBill()" class="hidden w-full text-center text-xs text-[#FF453A] hover:bg-[#FF453A]/10 py-2 rounded-xl transition-colors cursor-pointer mt-1">
+          Удалить платеж
+        </button>
       </form>
     </div>
   </div>
