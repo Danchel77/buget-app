@@ -13,12 +13,12 @@ if ('serviceWorker' in navigator) {
 // Firebase Configuration & Initialization
 // ==========================================
 const firebaseConfig = {
-  apiKey: "AIzaSyD-EXAMPLE_KEY",
-  authDomain: "your-app.firebaseapp.com",
-  projectId: "your-app",
-  storageBucket: "your-app.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef"
+  apiKey: "AIzaSyC_JkUF__UfStFrTKecRasKqKBKXlQ4D88",
+  authDomain: "familybudget-4245a.firebaseapp.com",
+  projectId: "familybudget-4245a",
+  storageBucket: "familybudget-4245a.firebasestorage.app",
+  messagingSenderId: "129164761119",
+  appId: "1:129164761119:web:0303fd6ccd41e071655d2a"
 };
 
 // Инициализируем приложение
