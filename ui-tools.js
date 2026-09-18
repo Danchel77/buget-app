@@ -479,6 +479,10 @@ function triggerPdfImportFromWizard() {
 // 5. Global Document Event Listeners
 // ==========================================
 
+// Инициализация кастомных дейтпикеров
+document.addEventListener('DOMContentLoaded', setupCustomDatePickers);
+setTimeout(setupCustomDatePickers, 500);
+
 // При скролле страницы скрываются меню, календарь и всплывающие тултипы
 window.addEventListener('scroll', () => {
   closeCardContextMenu();
@@ -486,16 +490,7 @@ window.addEventListener('scroll', () => {
   hideAllChartTooltips();
 }, { passive: true, capture: true });
 
-document.addEventListener('click', (e) => {
-  // Закрытие контекстного меню при клике мимо
-  if (activeContextCard && !e.target.closest('.context-menu-btn') && !e.target.closest('.context-menu')) {
-    closeCardContextMenu();
-  }
-
-document.addEventListener('DOMContentLoaded', setupCustomDatePickers);
-setTimeout(setupCustomDatePickers, 500);
-
-// Глобальное перехватывание клика: блокирует нативный диалог Android и открывает #custom-datepicker
+// Перехват нативного календаря Android / iOS (Capture phase)
 document.addEventListener('click', (e) => {
   const dateInput = e.target.closest('input[type="date"]');
   if (dateInput) {
@@ -515,20 +510,79 @@ document.addEventListener('pointerdown', (e) => {
     dateInput.setAttribute('inputmode', 'none');
   }
 }, true);
-  
-  // Закрытие DatePicker при клике мимо
+
+// Глобальный клик: мультиселект, закрытие меню и тултипов
+document.addEventListener('click', (e) => {
+  // 1. Кнопки плавающей панели мультивыбора
+  if (e.target.id === 'cancel-selection' || e.target.closest('#cancel-selection')) {
+    e.stopPropagation();
+    cancelSelection();
+    return;
+  }
+  if (e.target.id === 'delete-selected' || e.target.closest('#delete-selected')) {
+    e.stopPropagation();
+    deleteSelectedItems();
+    return;
+  }
+
+  // 2. Игнорируем «фантомный» клик сразу после срабатывания долгого нажатия
+  if (suppressClick) {
+    suppressClick = false;
+    return;
+  }
+
+  // 3. Выбор карточек при активном режиме мультиселекта
+  if (selectionMode) {
+    const card = e.target.closest('.card');
+    if (card) {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleItemSelection(card.dataset.id, card.dataset.table);
+      return;
+    }
+  }
+
+  // 4. Закрытие контекстного мини-меню карточки при клике мимо
+  if (activeContextCard && !e.target.closest('#card-context-menu') && !e.target.closest('.context-menu-btn')) {
+    closeCardContextMenu();
+  }
+
+  // 5. Закрытие DatePicker при клике вне его
   const picker = document.getElementById('custom-datepicker');
-  if (picker && picker.style.display === 'flex') {
-    if (!e.target.closest('.datepicker-content') && !e.target.closest('.date-input-wrap') && !e.target.closest('input[type="date"]')) {
+  if (picker && !picker.classList.contains('hidden')) {
+    if (!e.target.closest('#custom-datepicker') && !e.target.closest('input[type="date"]')) {
       closeCustomDatePicker();
     }
   }
-  // Закрытие тултипов на графиках (то, что я пропустил!)
+
+  // 6. Закрытие тултипов на графиках
   if (typeof hideAllChartTooltips === 'function') {
     hideAllChartTooltips(e);
   }
+
+  // 7. Кнопки вызова категорий (если кликнули по ним)
+  if (e.target.classList.contains('manage-categories-btn')) {
+    if (typeof showManageCategoriesDialog === 'function') showManageCategoriesDialog();
+    return;
+  }
+  if (e.target.classList.contains('add-category-btn')) {
+    const row = e.target.closest('.tx-item');
+    if (row && typeof showAddCategoryDialog === 'function') {
+      const type = row.querySelector('.tx-type:checked')?.value || 'Расход';
+      const select = row.querySelector('.tx-category');
+      showAddCategoryDialog(type, select);
+    }
+    return;
+  }
 });
 
+// Слушатели долгого нажатия и мыши для мультиселекта
+document.addEventListener('touchstart', handleTouchStart, { passive: true });
+document.addEventListener('touchend', handleTouchEnd);
+document.addEventListener('touchmove', handleTouchMove, { passive: true });
+document.addEventListener('mousedown', handleMouseDown);
+document.addEventListener('mouseup', handleMouseUp);
+document.addEventListener('mousemove', handleMouseMove);
 
 // ==========================================
 // Global Scope Exports
