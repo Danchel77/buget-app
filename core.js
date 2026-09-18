@@ -268,6 +268,7 @@ const formatMoney = (sum, isInputOrDetails = false) => new Intl.NumberFormat('ru
   minimumFractionDigits: isInputOrDetails ? 2 : 0, // Убираем копейки везде по умолчанию
   maximumFractionDigits: isInputOrDetails ? 2 : 0
 }).format(sum).replace(',', '.'); // Использует неразрывные пробелы встроенно
+
 const getUnformattedVal = (el) => parseFloat(el.value.replace(/\s/g, '')) || 0;
 const setFormattedVal = (id, val) => {
   const el = document.getElementById(id);
@@ -294,11 +295,6 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-/**
- * ИСПРАВЛЕННАЯ ФУНКЦИЯ:
- * Устранено смещение часовых поясов (UTC toISOString),
- * даты теперь формируются строго по локальному времени пользователя.
- */
 function formatDateStr(dateStr, format) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
