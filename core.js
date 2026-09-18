@@ -42,16 +42,17 @@ db.enablePersistence({ synchronizeTabs: true }).catch(err => {
 // Global Application State (Cache)
 // ==========================================
 window.Cache = {
-  Transactions: [],
-  Categories: [],
-  Rules: [],
-  Deposits: [],
-  Broker: [],
-  BrokerHistory: [],
-  BudgetPlans: [],
-  CalendarBills: [],
-  BudgetGoals: []
+  transactions: [],
+  categories: { expense: [], income: [] },
+  deposits: [],
+  broker: null,
+  goals: [],
+  categoryRules: [],
+  budgetPlan: {},
+  calendarBills: [],
+  settings: {}
 };
+let Cache = window.Cache;
 
 // Переменные текущего редактирования
 let currentEditId = null;
@@ -129,6 +130,49 @@ async function fetchCollection(table) {
   }
 }
 
+// Гибридная загрузка: системный словарь из default-rules.js + пользовательские оверрайды из Firestore
+async function processOrSeedRules(snapshot) {
+  const userDocs = snapshot ? snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) : [];
+  const norm = (str) => typeof StatementCategorizer !== 'undefined' ? StatementCategorizer.normalize(str) : String(str || '').toLowerCase().trim();
+
+  const disabledPatterns = new Set(
+    userDocs.filter(d => d.disabled).map(d => norm(d.pattern))
+  );
+
+  const customRules = userDocs.filter(d => !d.disabled && d.pattern && d.category).map(d => ({
+    id: d.id,
+    pattern: d.pattern.trim(),
+    category: d.category,
+    isSystem: false
+  }));
+
+  const customMap = new Map();
+  customRules.forEach(r => customMap.set(norm(r.pattern), r));
+
+  const systemDefaults = window.DEFAULT_CATEGORY_RULES || [];
+  const combined = [];
+
+  systemDefaults.forEach((rule, idx) => {
+    const patKey = norm(rule.pattern);
+    if (disabledPatterns.has(patKey)) return;
+
+    if (customMap.has(patKey)) {
+      combined.push(customMap.get(patKey));
+      customMap.delete(patKey);
+    } else {
+      combined.push({
+        id: 'sys_' + idx,
+        pattern: rule.pattern,
+        category: rule.category,
+        isSystem: true
+      });
+    }
+  });
+
+  customMap.forEach(rule => combined.push(rule));
+  return combined;
+}
+
 async function applySnapshotsToUI([txS, depS, brS, goalS, catS, rulesS, planS, billsS]) {
   const txData = txS.docs.map(d => ({ id: d.id, ...d.data() }));
   const depData = depS.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -157,7 +201,7 @@ async function applySnapshotsToUI([txS, depS, brS, goalS, catS, rulesS, planS, b
   };
   window.Cache = Cache;
 
-  updateGoalDropdowns();
+  if (typeof updateGoalDropdowns === 'function') updateGoalDropdowns();
   renderBudgetTab();
   renderTransactions();
   renderDeposits();
@@ -407,3 +451,5 @@ window.formatDateStr = formatDateStr;
 window.escapeHtml = escapeHtml;
 window.showToast = showToast;
 window.showDialog = showDialog;
+window.initNewUserIfNeeded = initNewUserIfNeeded;
+window.processOrSeedRules = processOrSeedRules;
