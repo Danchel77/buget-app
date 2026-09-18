@@ -98,6 +98,17 @@ async function deleteSelectedItems() {
   });
 }
 
+function attachSelectionPanelDirectEvents() {
+  const cancelBtn = document.getElementById('cancel-selection');
+  const deleteBtn = document.getElementById('delete-selected');
+  if (!cancelBtn || !deleteBtn) return;
+
+  cancelBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); cancelSelection(); };
+  cancelBtn.ontouchend = (e) => { e.preventDefault(); e.stopPropagation(); cancelSelection(); };
+  deleteBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); deleteSelectedItems(); };
+  deleteBtn.ontouchend = (e) => { e.preventDefault(); e.stopPropagation(); deleteSelectedItems(); };
+}
+
 function cancelSelection() {
   longPressTriggered = false;
   suppressClick = false;
@@ -162,8 +173,6 @@ function handleMouseMove(e) {
 // ==========================================
 // 2. Context Menu (Контекстное меню)
 // ==========================================
-let activeContextCard = null;
-
 function openCardContextMenu(e, title, onEdit, onDelete) {
   if (selectionMode) {
     if (e) e.stopPropagation();
