@@ -9,7 +9,6 @@ window._returnToProfile = false;
 // ==========================================
 // Authentication Functions
 // ==========================================
-
 // Переключение между вкладками Вход / Регистрация
 function setAuthMode(mode) {
   currentAuthMode = mode;
@@ -123,7 +122,6 @@ function logoutUser() {
 // ==========================================
 // Account & Data Management
 // ==========================================
-
 // Полное удаление аккаунта и всех его подколлекций
 async function deleteCurrentAccountAndData() {
   const user = auth.currentUser;
