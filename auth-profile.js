@@ -259,11 +259,14 @@ function applyBrokerVisibility(show) {
   }
 }
 
-function openSubModalFromProfile(modalId) {
-  window._returnToProfile = true;
-  closeProfileModal();
-  if (modalId === 'manage-categories-modal') {
-    showManageCategoriesDialog();
+function openSubModalFromProfile(type) {
+  closeProfileModal(); // временно закрываем профиль
+  window._returnToProfile = true; // ставим маячок возврата
+
+  if (type === 'categories') {
+    if (typeof showManageCategoriesDialog === 'function') showManageCategoriesDialog();
+  } else if (type === 'rules') {
+    if (typeof openRulesEditorModal === 'function') openRulesEditorModal();
   }
 }
 
@@ -279,4 +282,3 @@ window.openProfileModal = openProfileModal;
 window.closeProfileModal = closeProfileModal;
 window.toggleBrokerSetting = toggleBrokerSetting;
 window.openSubModalFromProfile = openSubModalFromProfile;
-
