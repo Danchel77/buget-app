@@ -256,9 +256,6 @@ function hideAllChartTooltips(e) {
 // ==========================================
 // 3. Custom DatePicker (Кастомный календарь)
 // ==========================================
-let activeDateInput = null;
-let currentPickerDate = new Date();
-
 function setupCustomDatePickers() {
   document.querySelectorAll('input[type="date"]').forEach(input => {
     input.readOnly = true;
