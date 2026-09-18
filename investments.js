@@ -176,7 +176,7 @@ function getDepositDurationStr(startDate, endDate) {
 }
 
 // ==========================================
-// 2. Broker (Брокерский счет: расчеты и графики)
+// 2.  (Брокерский счет: расчеты и графики)
 // ==========================================
 function processBroker(ops, goals) {
   const goalsMap = {};
@@ -521,6 +521,37 @@ function setBrokerTimeframe(tf) {
     btn.className = `broker-tf-btn flex-1 py-1 text-center rounded-lg transition-all cursor-pointer ${isAct ? 'bg-[#212430] text-white font-semibold' : 'text-[#848D99] hover:text-white'}`;
   });
   drawBrokerChart();
+}
+
+function updateGoalDropdowns() {
+  if (!Cache) return;
+  let html = '<option value="">Без привязки к цели</option>';
+  Cache.goals.forEach(g => {
+    if (!g.isAchieved) html += `<option value="${g.id}">${g.name}</option>`;
+  });
+  const depGoal = document.getElementById('dep-goal');
+  if (depGoal) depGoal.innerHTML = html;
+
+  // Меню быстрого выбора цели в брокере
+  const brokerMenu = document.getElementById('broker-goal-dropdown');
+  if (brokerMenu) {
+    let bHtml = `
+      <button type="button" onclick="selectBrokerGoal('')" class="w-full text-left px-3 py-2 text-xs rounded-xl text-gray-400 hover:bg-[#212430] hover:text-white transition-colors cursor-pointer">
+        Без привязки к цели
+      </button>
+    `;
+    Cache.goals.forEach(g => {
+      const isCur = Cache.broker?.goalId === g.id;
+      bHtml += `
+        <button type="button" onclick="selectBrokerGoal('${g.id}')" class="w-full text-left px-3 py-2 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${isCur ? 'bg-[#6C5DD3]/15 text-[#6C5DD3] font-semibold' : 'text-gray-200 hover:bg-[#212430]'}">
+          <span class="truncate">${escapeHtml(g.name)}</span>
+          ${isCur ? '<i data-lucide="check" class="w-3.5 h-3.5"></i>' : ''}
+        </button>
+      `;
+    });
+    brokerMenu.innerHTML = bHtml;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
 }
 
 // ==========================================
