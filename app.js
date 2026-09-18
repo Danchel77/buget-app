@@ -838,20 +838,6 @@ function smartPositionDropdown(menu, triggerBtn) {
   }
 }
 
-// Хелпер склонения месяцев для вкладов
-function getDepositDurationStr(startDate, endDate) {
-  const totalDays = Math.max(1, Math.round((endDate - startDate) / 86400000));
-  let months = Math.round(totalDays / 30.4375);
-  if (months < 1) months = 1;
-
-  const mod10 = months % 10;
-  const mod100 = months % 100;
-  if (mod100 >= 11 && mod100 <= 19) return `${months} месяцев`;
-  if (mod10 === 1) return `${months} месяц`;
-  if (mod10 >= 2 && mod10 <= 4) return `${months} месяца`;
-  return `${months} месяцев`;
-}
-
 
 // --- ЛОГИКА ЦЕЛЕЙ (АВТОНОМНЫЕ ВИРТУАЛЬНЫЕ КОПИЛКИ) ---
 function processGoals(goals) {
