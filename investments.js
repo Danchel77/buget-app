@@ -147,9 +147,33 @@ function submitDeposit(e) {
   });
 }
 
-function editDep(id) // Без изменений
+function editDep(id, name, amount, rate, start, end, goalId) {
+  currentEditId = id;
+  currentEditTable = 'Deposits';
+  document.getElementById('dep-name').value = name;
+  setFormattedVal('dep-amount', amount);
+  setFormattedVal('dep-rate', rate);
+  document.getElementById('dep-start').value = start;
+  document.getElementById('dep-end').value = end;
+  document.getElementById('dep-goal').value = goalId || '';
+  document.getElementById('dep-submit-btn').innerText = 'Сохранить изменения';
+  document.getElementById('deposit-form-container').classList.remove('hidden');
+  window.scrollTo(0, 0);
+}
 
-function getDepositDurationStr(dep) // Без изменений
+// Хелпер склонения месяцев для вкладов
+function getDepositDurationStr(startDate, endDate) {
+  const totalDays = Math.max(1, Math.round((endDate - startDate) / 86400000));
+  let months = Math.round(totalDays / 30.4375);
+  if (months < 1) months = 1;
+
+  const mod10 = months % 10;
+  const mod100 = months % 100;
+  if (mod100 >= 11 && mod100 <= 19) return `${months} месяцев`;
+  if (mod10 === 1) return `${months} месяц`;
+  if (mod10 >= 2 && mod10 <= 4) return `${months} месяца`;
+  return `${months} месяцев`;
+}
 
 // ==========================================
 // 2. Broker (Брокерский счет: расчеты и графики)
@@ -502,17 +526,118 @@ function setBrokerTimeframe(tf) {
 // ==========================================
 // 3. Broker UI (Поповеры и меню)
 // ==========================================
+function toggleBrokerPopover(type, e) {
+  if (e) e.stopPropagation();
+  const popDep = document.getElementById('broker-popover-deposit');
+  const popBal = document.getElementById('broker-popover-balance');
+  const goalMenu = document.getElementById('broker-goal-dropdown');
+  if (goalMenu) goalMenu.classList.add('hidden');
 
-function toggleBrokerPopover(id, type) // Без изменений
+  const today = new Date().toISOString().split('T')[0];
 
-function closeAllBrokerPopovers() // Без изменений
+  if (type === 'deposit') {
+    if (popBal) popBal.classList.add('hidden');
+    if (popDep) {
+      const isHidden = popDep.classList.contains('hidden');
+      popDep.classList.toggle('hidden', !isHidden);
+      if (isHidden) {
+        document.getElementById('popover-dep-date').value = today;
+        document.getElementById('popover-dep-amount').value = '';
+        document.getElementById('popover-dep-balance').value = '';
+      }
+    }
+  } else {
+    if (popDep) popDep.classList.add('hidden');
+    if (popBal) {
+      const isHidden = popBal.classList.contains('hidden');
+      popBal.classList.toggle('hidden', !isHidden);
+      if (isHidden) {
+        document.getElementById('popover-bal-date').value = today;
+        document.getElementById('popover-bal-input').value = '';
+      }
+    }
+  }
+}
 
-function submitBrokerPopover(id, type) // Без изменений
+function closeAllBrokerPopovers() {
+  const popDep = document.getElementById('broker-popover-deposit');
+  const popBal = document.getElementById('broker-popover-balance');
+  const goalMenu = document.getElementById('broker-goal-dropdown');
+  if (popDep) popDep.classList.add('hidden');
+  if (popBal) popBal.classList.add('hidden');
+  if (goalMenu) goalMenu.classList.add('hidden');
+}
 
-function toggleBrokerGoalDropdown(id) // Без изменений
+async function submitBrokerPopover(type) {
+  if (type === 'Пополнение') {
+    const date = document.getElementById('popover-dep-date').value || new Date().toISOString().split('T')[0];
+    const amount = getUnformattedVal(document.getElementById('popover-dep-amount'));
+    const balance = getUnformattedVal(document.getElementById('popover-dep-balance')) || amount;
+    if (!amount) return showToast('Введите сумму пополнения', true);
+    
+    closeAllBrokerPopovers();
+    try {
+      await getUserCol('Broker').add({ type: 'Пополнение', date, amount, balance });
+      await fetchAllData();
+      
+    } catch (e) {
+      showToast('Ошибка сохранения: ' + e.message, true);
+    }
+  } else {
+    const date = document.getElementById('popover-bal-date').value || new Date().toISOString().split('T')[0];
+    const balance = getUnformattedVal(document.getElementById('popover-bal-input'));
+    if (!balance && balance !== 0) return showToast('Введите баланс', true);
+    closeAllBrokerPopovers();
+   
+    try {
+      await getUserCol('Broker').add({ type: 'Баланс', date, amount: balance, balance });
+      await fetchAllData();
+    } catch (e) {
+      showToast('Ошибка сохранения: ' + e.message, true);
+    }
+  }
+}
 
-function selectBrokerGoal(id, goalName) // Без изменений
+function toggleBrokerGoalDropdown(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('broker-goal-dropdown');
+  if (!menu) return;
 
+  const isClosed = menu.classList.contains('hidden');
+  closeAllBrokerPopovers();
+
+  if (isClosed) {
+    menu.classList.remove('hidden');
+  }
+}
+
+async function selectBrokerGoal(goalId) {
+  closeAllBrokerPopovers();
+  showToast('Сохранение цели...', false, true);
+  try {
+    const col = getUserCol('Broker');
+    // Очищаем все предыдущие записи привязки цели
+    const snap = await col.where('type', '==', 'Цель').get();
+    const batch = db.batch();
+    snap.docs.forEach(doc => batch.delete(doc.ref));
+
+    // Если выбрана конкретная цель — сохраняем её. Если "Без цели" — оставляем очищенным
+    if (goalId) {
+      const newDoc = col.doc();
+      batch.set(newDoc, {
+        type: 'Цель',
+        date: new Date().toISOString().split('T')[0],
+        goalId: goalId,
+        timestamp: Date.now()
+      });
+    }
+
+    await batch.commit();
+    await fetchAllData();
+  } catch (err) {
+    showToast('Ошибка привязки цели: ' + err.message, true);
+  }
+}
 
 // ==========================================
 // 4. Global Event Listeners (Инвестиции)
