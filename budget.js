@@ -11,7 +11,6 @@ let currentTopupMode = 'topup';
 // ==========================================
 // 1. Budget Dashboard (Дашборд Бюджета)
 // ==========================================
-
 function renderBudgetTab() {
   if (!Cache) return;
 
@@ -123,10 +122,8 @@ function renderBudgetTab() {
 
   // 2. Блок «Календарь счетов»
   renderBudgetCalendar(bills, today, monthItems);
-
   // 3. Блок «Цели накопления»
   renderBudgetGoals(goals, plan, bills);
-
   // 4. Блок «Лимиты по категориям»
   renderBudgetCategoryLimits(monthItems, plan.categoryLimits || {});
 
@@ -441,9 +438,28 @@ async function submitCalendarBill(e) {
   }
 }
 
-function deleteCurrentEditingBill() // Без изменений
+async function deleteCurrentEditingBill() {
+  const id = document.getElementById('bill-edit-id').value;
+  if (!id) return;
 
-function toggleBillPaidStatus(id) // Без изменений
+  showToast('Удаление платежа...', false, true);
+  try {
+    await getUserCol('CalendarBills').doc(id).delete();
+    closeAddBillModal();
+    await fetchAllData();
+    renderWizardCalendar();
+    showToast('Платеж удален');
+  } catch (e) {
+    showToast('Ошибка удаления', true);
+  }
+}
+
+async function toggleBillPaidStatus(billId, newStatus) {
+  try {
+    await getUserCol('CalendarBills').doc(billId).update({ isPaid: newStatus });
+    await fetchAllData();
+  } catch (e) {}
+}
 
 // Модальное окно управления счетами конкретного дня
 function openDayBillsModal(day) {
@@ -503,43 +519,168 @@ async function deleteCalendarBill(billId) {
     showToast('Ошибка удаления', true);
   }
 }
-/**
- * ИСПРАВЛЕНО: Оставлена только ОДНА копия этой функции (дубликат удален).
- */
-function openAddBillOnDay(day) {
-  openAddBillModal(day);
-}
-
 
 // ==========================================
 // 3. Budget Goals (Цели и Копилки)
 // ==========================================
+function processGoals(goals) {
+  return goals.map(g => {
+    const tar = parseFloat(g.target) || 0;
+    const sav = parseFloat(g.saved) || 0;
+    const share = parseFloat(g.share) || (goals.length > 0 ? Math.round(100 / goals.length) : 100);
+    return {
+      id: g.id,
+      name: g.name,
+      target: tar,
+      saved: sav,
+      share: share,
+      progress: Math.min(100, tar > 0 ? (sav / tar) * 100 : 0).toFixed(1),
+      isAchieved: sav >= tar
+    };
+  });
+}
 
-function processGoals() // Без изменений
+// Управление созданием и редактированием целей бюджета
+function openGoalModal() {
+  const form = document.getElementById('budget-goal-form');
+  if (form) form.reset();
 
-function openGoalModal() // Без изменений
+  document.getElementById('goal-edit-id').value = '';
+  document.getElementById('goal-share-input').value = 100;
+  document.getElementById('goal-share-label').innerText = '100%';
+  document.getElementById('goal-delete-btn').classList.add('hidden');
+  document.getElementById('budget-goal-dialog-title').innerText = 'Новая цель';
 
-function closeGoalModal() // Без изменений
+  const dlg = document.getElementById('budget-goal-dialog');
+  if (dlg) dlg.classList.remove('hidden');
+}
 
-function openEditGoalModal(id) // Без изменений
+function closeGoalModal() {
+  const dlg = document.getElementById('budget-goal-dialog');
+  if (dlg) dlg.classList.add('hidden');
+}
 
-function submitBudgetGoal(e) // Без изменений
+function openEditGoalModal(goalId) {
+  const goal = Cache?.goals?.find(g => g.id === goalId);
+  if (!goal) return;
 
-function deleteCurrentEditingGoal() // Без изменений
+  document.getElementById('goal-edit-id').value = goal.id;
+  document.getElementById('goal-name-input').value = goal.name;
+  setFormattedVal('goal-target-input', goal.target);
+  setFormattedVal('goal-saved-input', goal.saved);
+  document.getElementById('goal-share-input').value = goal.share || 100;
+  document.getElementById('goal-share-label').innerText = (goal.share || 100) + '%';
+  document.getElementById('goal-delete-btn').classList.remove('hidden');
+  document.getElementById('budget-goal-dialog-title').innerText = 'Редактировать цель';
 
-function deleteBudgetGoal(id) // Без изменений
+  const dlg = document.getElementById('budget-goal-dialog');
+  if (dlg) dlg.classList.remove('hidden');
+}
 
-function openGoalTopupModal(id, mode) // Без изменений
+async function submitBudgetGoal(e) {
+  e.preventDefault();
+  const editId = document.getElementById('goal-edit-id').value;
+  const name = document.getElementById('goal-name-input').value.trim();
+  const target = getUnformattedVal(document.getElementById('goal-target-input'));
+  const saved = getUnformattedVal(document.getElementById('goal-saved-input'));
+  const share = parseInt(document.getElementById('goal-share-input').value, 10) || 100;
 
-function closeGoalTopupModal() // Без изменений
+  if (!name || !target) return;
 
-function submitGoalTopup(e) // Без изменений
+  showToast('Сохранение цели...', false, true);
+  try {
+    const col = getUserCol('Goals');
+    const goalData = {
+      name,
+      target,
+      saved,
+      share,
+      status: saved >= target ? 'Выполнена' : 'В процессе',
+      updatedAt: Date.now()
+    };
 
+    if (editId) {
+      await col.doc(editId).update(goalData);
+    } else {
+      await col.add({ ...goalData, createdAt: Date.now() });
+    }
+
+    closeGoalModal();
+    await fetchAllData();
+    showToast('Цель сохранена');
+  } catch (err) {
+    showToast('Ошибка: ' + err.message, true);
+  }
+}
+
+async function deleteCurrentEditingGoal() {
+  const editId = document.getElementById('goal-edit-id').value;
+  if (!editId) return;
+
+  showToast('Удаление цели...', false, true);
+  try {
+    await getUserCol('Goals').doc(editId).delete();
+    closeGoalModal();
+    await fetchAllData();
+    showToast('Цель удалена');
+  } catch (err) {
+    showToast('Ошибка: ' + err.message, true);
+  }
+}
+
+function deleteBudgetGoal(goalId, goalName) {
+  showDialog('Удаление цели', `Удалить цель "${goalName}"? Накопленный прогресс будет удален.`, true, async () => {
+    showToast('Удаление цели...', false, true);
+    try {
+      await getUserCol('Goals').doc(goalId).delete();
+      await fetchAllData();
+      showToast('Цель удалена');
+    } catch (e) {
+      showToast('Ошибка удаления', true);
+    }
+  });
+}
+
+function openGoalTopupModal(goalId, goalName) {
+  activeTopupGoalId = goalId;
+  const dlg = document.getElementById('goal-topup-dialog');
+  const title = document.getElementById('goal-topup-title');
+  if (title) title.innerText = goalName;
+  document.getElementById('goal-topup-amount').value = '';
+  setTopupMode('add');
+  if (dlg) dlg.classList.remove('hidden');
+}
+
+function closeGoalTopupModal() {
+  const dlg = document.getElementById('goal-topup-dialog');
+  if (dlg) dlg.classList.add('hidden');
+  activeTopupGoalId = null;
+}
+
+async function submitGoalTopup() {
+  if (!activeTopupGoalId) return;
+  const amount = getUnformattedVal(document.getElementById('goal-topup-amount'));
+  if (!amount) return;
+
+  const goal = Cache?.goals?.find(g => g.id === activeTopupGoalId);
+  if (!goal) return;
+
+  let newSaved = currentTopupMode === 'add' ? (goal.saved + amount) : Math.max(0, goal.saved - amount);
+
+  showToast('Обновление цели...', false, true);
+  try {
+    await getUserCol('Goals').doc(activeTopupGoalId).update({ saved: newSaved });
+    closeGoalTopupModal();
+    await fetchAllData();
+    showToast(currentTopupMode === 'add' ? `В цель внесено +${formatMoney(amount)}` : `Из цели снято −${formatMoney(amount)}`);
+  } catch (err) {
+    showToast('Ошибка: ' + err.message, true);
+  }
+}
 
 // ==========================================
 // 4. Budget Wizard (Мастер настройки)
 // ==========================================
-
 function initBudgetWizard(forceReset = false) {
   if (forceReset) {
     currentWizardStep = 1;
@@ -835,9 +976,111 @@ function renderWizLimitsEditor() {
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-function calculateAndRenderWizSummary() // Без изменений
+// Расчет финансовой квитанции на Шаге 5
+function calculateAndRenderWizSummary() {
+  const income = getUnformattedVal(document.getElementById('wiz-income-input')) || 0;
+  
+  // Считаем обязательные платежи из календаря
+  const bills = Cache.calendarBills || [];
+  const billsTotal = bills.reduce((acc, b) => acc + (parseFloat(b.amount) || 0), 0);
 
-function finishBudgetOnboarding() // Без изменений
+  // Считаем сумму установленных лимитов
+  let limitsTotal = 0;
+  document.querySelectorAll('[data-wiz-cat]').forEach(inp => {
+    limitsTotal += getUnformattedVal(inp) || 0;
+  });
+
+  const surplus = Math.max(0, income - billsTotal - limitsTotal);
+  const weekly = limitsTotal > 0 ? Math.round(limitsTotal / 4.33) : 0;
+
+  const goalTarget = getUnformattedVal(document.getElementById('wiz-goal-target')) || 100000;
+  const goalSaved = getUnformattedVal(document.getElementById('wiz-goal-saved')) || 0;
+  const remainingToGoal = Math.max(0, goalTarget - goalSaved);
+  const monthsToGoal = surplus > 0 ? Math.ceil(remainingToGoal / surplus) : 0;
+
+  document.getElementById('wiz-sum-income').innerText = formatMoney(income);
+  document.getElementById('wiz-sum-bills').innerText = `-${formatMoney(billsTotal)}`;
+  document.getElementById('wiz-sum-limits').innerText = `-${formatMoney(limitsTotal)}`;
+  document.getElementById('wiz-sum-surplus').innerText = `+${formatMoney(surplus)}/мес`;
+  document.getElementById('wiz-sum-week').innerText = formatMoney(weekly);
+  document.getElementById('wiz-sum-timeline').innerText = monthsToGoal > 0 ? `~${monthsToGoal} мес.` : 'Цель достигнута!';
+}
+
+async function finishBudgetOnboarding() {
+  showToast('Запуск бюджета...', false, true);
+
+  const goalName = document.getElementById('wiz-goal-name').value.trim() || 'Новая цель';
+  const goalTarget = getUnformattedVal(document.getElementById('wiz-goal-target')) || 100000;
+  const goalSaved = getUnformattedVal(document.getElementById('wiz-goal-saved')) || 0;
+  const income = getUnformattedVal(document.getElementById('wiz-income-input')) || 0;
+
+  // 1. Собираем установленные лимиты категорий
+  let limitsTotal = 0;
+  const categoryLimits = {};
+  document.querySelectorAll('[data-wiz-cat]').forEach(inp => {
+    const val = getUnformattedVal(inp);
+    if (val > 0) {
+      limitsTotal += val;
+      categoryLimits[inp.dataset.wizCat] = val;
+    }
+  });
+
+  try {
+    const batch = db.batch();
+
+    // 2. Создаем или обновляем первую цель накопления
+    const goalsCol = getUserCol('Goals');
+    const existingGoalsSnap = await goalsCol.limit(1).get();
+    let targetGoalRef;
+
+    if (!existingGoalsSnap.empty) {
+      targetGoalRef = existingGoalsSnap.docs[0].ref;
+      batch.update(targetGoalRef, {
+        name: goalName,
+        target: goalTarget,
+        saved: goalSaved,
+        share: 100,
+        status: goalSaved >= goalTarget ? 'Выполнена' : 'В процессе',
+        updatedAt: Date.now()
+      });
+    } else {
+      targetGoalRef = goalsCol.doc();
+      batch.set(targetGoalRef, {
+        name: goalName,
+        target: goalTarget,
+        saved: goalSaved,
+        share: 100,
+        status: goalSaved >= goalTarget ? 'Выполнена' : 'В процессе',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+    }
+
+    // 3. Сохраняем генеральный план бюджета
+    const planRef = getUserCol('BudgetPlan').doc('plan');
+    batch.set(planRef, {
+      isConfigured: true,
+      monthlyIncome: income,
+      monthlyVariableLimit: limitsTotal > 0 ? limitsTotal : Math.max(0, income - 40000), // Фоллбэк
+      categoryLimits: categoryLimits,
+      updatedAt: Date.now()
+    }, { merge: true });
+
+    // 4. Коммитим все изменения единым пакетом
+    await batch.commit();
+
+    // 5. Полная перезагрузка актуальных данных и переход к дашборду
+    await fetchAllData();
+    // Сброс сохраненного шага после успешного запуска бюджета
+    localStorage.removeItem('budget_wizard_step');
+    currentWizardStep = 1;
+
+    showToast('Бюджет успешно активирован!');
+  } catch (err) {
+    console.error('Ошибка активации бюджета:', err);
+    showToast('Ошибка сохранения: ' + err.message, true);
+  }
+}
 
 function openCategoryLimitModal(catName, currentLimit) {
   activeEditCategory = catName;
@@ -884,19 +1127,14 @@ async function submitCategoryLimit() {
   }
 }
 
-function applyWizCategoryAvg(catName, avg) // Без изменений
+function applyWizCategoryAvg(catName, avg) {
+  const inp = document.querySelector(`[data-wiz-cat="${catName}"]`);
+  if (inp) {
+    inp.value = formatMoney(avg);
+    updateWizLiveTotal();
+  }
+}
 
-/**
- * ИСПРАВЛЕНО: Бессмысленная прокси-обертка applyCatAvgToInput удалена! 
- * Если в вашем HTML был вызов onclick="applyCatAvgToInput(...)",
- * замените его в HTML на onclick="applyWizCategoryAvg(...)".
- */
-
-/**
- * ИСПРАВЛЕНО: Конфликт имен устранен.
- * Ранее эта функция и window.handleWizardDayClick путались.
- * Оставлена единая логика выбора дня.
- */
 function handleWizardDayClick(day) {
   currentWizSelectedDay = day;
   renderWizCalendar();
@@ -909,7 +1147,6 @@ function handleWizardDayClick(day) {
 // ==========================================
 // Global Scope Exports
 // ==========================================
-
 window.renderBudgetTab = renderBudgetTab;
 window.renderBudgetCalendar = renderBudgetCalendar;
 window.renderBudgetGoals = renderBudgetGoals;
