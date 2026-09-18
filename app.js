@@ -907,55 +907,11 @@ let currentWizardStep = parseInt(localStorage.getItem('budget_wizard_step'), 10)
 let currentWizSelectedDay = 10;
 let wizGoalIcon = '💻';
 
-function openWizardIconPicker() {
-  const picker = document.getElementById('wiz-icon-picker');
-  if (picker) picker.classList.toggle('hidden');
-}
-
-function selectWizardGoalIcon(icon) {
-  wizGoalIcon = icon;
-  const display = document.getElementById('wiz-goal-icon-display');
-  if (display) display.innerText = icon;
-  const picker = document.getElementById('wiz-icon-picker');
-  if (picker) picker.classList.add('hidden');
-}
-
-function adoptCalculatedIncome() {
-  const calcText = document.getElementById('wiz-calculated-income')?.innerText || '0';
-  const val = parseInt(calcText.replace(/[^\d]/g, ''), 10) || 0;
-  const input = document.getElementById('wiz-income-input');
-  if (input && val > 0) {
-    input.value = formatMoney(val);
-    showToast('Сумма дохода подставлена');
-  }
-}
 
 // Переключение активности источников дохода в мастере (Шаг 2)
 let wizardActiveIncomeSources = new Set(['Зарплата', 'Кэшбек']);
 
-function toggleWizardIncomeSource(sourceName) {
-  if (wizardActiveIncomeSources.has(sourceName)) {
-    wizardActiveIncomeSources.delete(sourceName);
-  } else {
-    wizardActiveIncomeSources.add(sourceName);
-  }
 
-  // Обновляем визуальное состояние чипсов
-  document.querySelectorAll('#wiz-income-sources-list [data-source]').forEach(el => {
-    const src = el.dataset.source;
-    if (wizardActiveIncomeSources.has(src)) {
-      el.className = 'text-[10px] bg-[#30D158]/15 text-[#30D158] border border-[#30D158]/20 px-2 py-0.5 rounded-lg font-medium flex items-center gap-1 cursor-pointer transition-all';
-      el.innerHTML = `<i data-lucide="check" class="w-2.5 h-2.5"></i> ${escapeHtml(src)}`;
-    } else {
-      el.className = 'text-[10px] bg-[#212430] text-[#848D99] border border-transparent px-2 py-0.5 rounded-lg font-medium flex items-center gap-1 cursor-pointer transition-all';
-      el.innerHTML = `${escapeHtml(src)}`;
-    }
-  });
-
-  // Пересчитываем сумму по активным источникам
-  recalculateWizardIncome();
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
 
 // ============================================================
 // ВОССТАНОВЛЕННЫЙ БЛОК: ИМПОРТ ВЫПИСОК, КАЛЕНДАРЬ И ДОХОД В МАСТЕРЕ
@@ -1010,10 +966,6 @@ window.handleWizardDayClick = handleWizardDayClick;
 
 window.closeWizDayTooltip = closeWizDayTooltip;
 
-function addAnotherBillFromTooltip() {
-  closeWizDayTooltip();
-  openAddBillModal(currentWizSelectedDay);
-}
 window.addAnotherBillFromTooltip = addAnotherBillFromTooltip;
 
 // Хранилище категорий, добавленных пользователем вручную на шаге 4
@@ -1053,117 +1005,11 @@ function openAddCategoryLimitPicker() {
 }
 window.openAddCategoryLimitPicker = openAddCategoryLimitPicker;
 
-function addCategoryToWizard(catName) {
-  wizardCustomCategories.add(catName);
-  const dlg = document.getElementById('custom-dialog');
-  if (dlg) dlg.classList.add('hidden');
-  renderWizLimitsEditor();
-  showToast(`Категория «${catName}» добавлена`);
-}
-window.addCategoryToWizard = addCategoryToWizard;
-
-function removeWizardCustomCat(catName) {
-  wizardCustomCategories.delete(catName);
-  renderWizLimitsEditor();
-}
-window.removeWizardCustomCat = removeWizardCustomCat;
 
 function selectWizCalendarDay(day) {
   currentWizSelectedDay = day;
   renderWizCalendar();
 }
-
-function renderWizDayBillsList() {
-  const container = document.getElementById('wiz-day-bills-list');
-  const label = document.getElementById('wiz-selected-day-label');
-  if (label) label.innerText = `${currentWizSelectedDay} число: счета`;
-  if (!container) return;
-
-  const bills = (Cache.calendarBills || []).filter(b => parseInt(b.day, 10) === currentWizSelectedDay);
-
-  if (bills.length === 0) {
-    container.innerHTML = `
-      <div class="py-2 text-center text-[11px] text-[#848D99]">
-        Нет списаний на этот день
-      </div>
-    `;
-    return;
-  }
-
-  container.innerHTML = bills.map(b => `
-    <div class="flex items-center justify-between p-2 rounded-xl bg-[#181B24] border border-[rgba(255,255,255,0.04)]">
-      <div class="flex items-center gap-2 min-w-0">
-        <div class="w-6 h-6 rounded-lg bg-[#212430] flex items-center justify-center text-xs text-gray-300">
-          <i data-lucide="receipt" class="w-3.5 h-3.5 text-[#848D99]"></i>
-        </div>
-        <span class="text-xs font-medium text-gray-200 truncate">${escapeHtml(b.name)}</span>
-      </div>
-      <b class="text-xs font-mono font-semibold text-gray-200 ml-2">-${formatMoney(b.amount)}</b>
-    </div>
-  `).join('');
-
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
-
-function openAddBillModalFromWizard() {
-  const dayInput = document.getElementById('bill-day');
-  if (dayInput) dayInput.value = currentWizSelectedDay;
-  openAddBillModal();
-}
-
-
-function updateWizLiveTotal() {
-  let total = 0;
-  document.querySelectorAll('[data-wiz-cat]').forEach(inp => {
-    total += getUnformattedVal(inp) || 0;
-  });
-
-  const totalEl = document.getElementById('wiz-limits-live-total');
-  const weeklyEl = document.getElementById('wiz-live-weekly-estimate');
-  if (totalEl) totalEl.innerText = `${formatMoney(total)}/мес`;
-  if (weeklyEl) weeklyEl.innerText = `~${formatMoney(Math.round(total / 4.33))}`;
-}
-
-
-
-// Вспомогательный расчет истории трат из выписок
-function calculateHistoricalCategoryAverages() {
-  const map = {};
-  const txMonths = Cache?.transactions || [];
-  if (!txMonths.length) return map;
-
-  let minTime = Infinity;
-  let maxTime = -Infinity;
-  const catTotals = {};
-
-  txMonths.forEach(m => {
-    (m.items || []).forEach(tx => {
-      const t = tx.timestamp || (tx.rawDate ? new Date(tx.rawDate).getTime() : null);
-      if (t) {
-        if (t < minTime) minTime = t;
-        if (t > maxTime) maxTime = t;
-      }
-
-      if (tx.type === 'Расход' && tx.category) {
-        const val = parseFloat(tx.amount) || 0;
-        catTotals[tx.category] = (catTotals[tx.category] || 0) + val;
-      }
-    });
-  });
-
-  if (minTime === Infinity || maxTime === -Infinity) return map;
-
-  const diffDays = Math.max(1, Math.round((maxTime - minTime) / (1000 * 60 * 60 * 24)) + 1);
-  const effectiveDays = Math.min(90, diffDays);
-  const monthFactor = 30.44 / effectiveDays;
-
-  Object.keys(catTotals).forEach(cat => {
-    map[cat] = Math.round(catTotals[cat] * monthFactor);
-  });
-
-  return map;
-}
-
 
 let activeEditCategory = null;
 
@@ -1977,90 +1823,6 @@ function editGoal(id, name, target, deadline) {
   document.getElementById('goal-submit-btn').innerText = 'Сохранить изменения';
   document.getElementById('goal-form-container').classList.remove('hidden');
   window.scrollTo(0, 0);
-}
-
-function openGoalSheet(id, name, target, rawDeadline) {
-  openActionSheet(
-    id, 
-    name, 
-    `Цель: ${formatMoney(target)}`,
-    () => editGoal(id, name, target, rawDeadline),
-    () => deleteRecord('Goals', id)
-  );
-}
-
-// Умный определитель векторной иконки цели по смыслу названия
-function getGoalIcon(name) {
-  const n = (name || '').toLowerCase();
-  if (/квартир|дом|ремонт|жиль/i.test(n)) return 'home';
-  if (/машин|авто|тачк|мото/i.test(n)) return 'car';
-  if (/отпуск|море|путешеств|билет|тур/i.test(n)) return 'plane';
-  if (/учеб|курс|образов/i.test(n)) return 'graduation-cap';
-  if (/подушк|безопасн|резерв/i.test(n)) return 'shield-check';
-  if (/инвест|акци/i.test(n)) return 'trending-up';
-  if (/телефон|ноут|комп|айфон|гаджет/i.test(n)) return 'smartphone';
-  return 'target';
-}
-
-function renderGoals() {
-  const data = Cache.goals || [];
-  if (data.length === 0) {
-    document.getElementById('goals-list').innerHTML = '<div class="text-center text-[#848D99] py-10 text-[13px]">Целей нет</div>';
-    return;
-  }
-  document.getElementById('goals-list').innerHTML = data.map(g => {
-    const goalIcon = getGoalIcon(g.name);
-
-    // Расчет ежемесячного плана пополнений для достижения цели в срок
-    let paceBadge = '';
-    if (g.rawDeadline && !g.isAchieved) {
-      const now = new Date();
-      const dl = new Date(g.rawDeadline);
-      const monthsRemaining = Math.max(1, Math.round((dl - now) / (1000 * 60 * 60 * 24 * 30.4375)));
-      const remainingSum = Math.max(0, g.target - g.saved);
-      const monthlyNeed = Math.ceil(remainingSum / monthsRemaining);
-      paceBadge = `<span class="text-[11px] text-[#848D99] font-normal">Осталось ${monthsRemaining} мес. • <span class="whitespace-nowrap">Вносить ~${formatMoney(monthlyNeed)}/мес.</span></span>`;
-    }
-
-    return `
-      <div class="card rounded-2xl w-full flex flex-col p-5 cursor-pointer overflow-hidden mb-4 border border-[rgba(255,255,255,0.06)] ${g.isAchieved ? 'ring-1 ring-[#30D158]/40 bg-[#30D158]/5' : 'bg-[#181B24]'}" 
-           data-id="${g.id}" data-table="Goals"
-           onclick="openCardContextMenu(event, '${escapeHtml(g.name)}', () => editGoal('${g.id}', '${escapeHtml(g.name)}', ${g.target}, '${g.rawDeadline}'), () => deleteRecord('Goals', '${g.id}'))">
-        
-        <div class="flex justify-between items-start w-full mb-3">
-          <div class="flex items-center gap-3 min-w-0">
-            <div class="w-10 h-10 rounded-2xl ${g.isAchieved ? 'bg-[#30D158]/15 text-[#30D158]' : 'bg-[#6C5DD3]/15 text-[#6C5DD3]'} flex items-center justify-center flex-shrink-0">
-              <i data-lucide="${goalIcon}" class="w-5 h-5"></i>
-            </div>
-            <div class="min-w-0">
-              <h3 class="text-[16px] font-semibold text-gray-100 truncate leading-tight">${escapeHtml(g.name)}</h3>
-              <div class="mt-0.5">${paceBadge || `<span class="text-[11px] text-[#848D99]">До ${escapeHtml(g.deadlineStr)}</span>`}</div>
-            </div>
-          </div>
-
-          ${g.isAchieved 
-            ? `<span class="px-2.5 py-0.5 text-[10px] font-bold tracking-wider uppercase bg-[#30D158]/20 text-[#30D158] rounded-full flex-shrink-0">Выполнена</span>`
-            : `<span class="text-[15px] font-bold ${g.progress >= 75 ? 'text-emerald-400' : 'text-[#6C5DD3]'}">${g.progress}%</span>`
-          }
-        </div>
-
-        <div class="flex items-end justify-between w-full mt-2 mb-2">
-          <div class="text-[13px] font-medium tracking-wide">
-            <span class="text-white text-[17px] font-bold">${formatMoney(g.saved)}</span>
-            <span class="text-gray-600 mx-1">из</span>
-            <span class="text-gray-400">${formatMoney(g.target)}</span>
-          </div>
-        </div>
-
-        <!-- Выразительный градиентный прогресс-бар высотой 8.5px -->
-        <div class="w-full bg-[rgba(255,255,255,0.06)] h-[8.5px] rounded-full overflow-hidden">
-          <div class="h-full rounded-full transition-all duration-500 ${g.isAchieved ? 'bg-[#30D158]' : 'bg-gradient-to-r from-[#6C5DD3] to-[#32ADE6]'}" style="width:${g.progress}%"></div>
-        </div>
-      </div>
-    `;
-  }).join('');
-  
-  if(typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function escapeHtml(str) {
