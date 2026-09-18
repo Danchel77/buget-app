@@ -502,6 +502,7 @@ function drawBrokerChart() {
       }
     }
   });
+  window.brokerChartObj = brokerChartObj;
 
   // Сброс баланса при завершении скраббинга
   canvas.onmouseleave = () => {
@@ -673,11 +674,9 @@ async function selectBrokerGoal(goalId) {
 // ==========================================
 // 4. Global Event Listeners (Инвестиции)
 // ==========================================
-
 // Глобальный клик для закрытия поповеров брокера при клике в пустоту.
-// (Если в вашем коде есть похожий обработчик рядом с closeAllBrokerPopovers — вставьте его сюда).
 document.addEventListener('click', (e) => {
-  if (!e.target.closest('.broker-item') && !e.target.closest('.broker-popover')) {
+  if (!e.target.closest('.custom-dropdown-wrap') && !e.target.closest('.custom-dropdown-menu')) {
     if (typeof closeAllBrokerPopovers === 'function') closeAllBrokerPopovers();
   }
 });
@@ -701,3 +700,4 @@ window.closeAllBrokerPopovers = closeAllBrokerPopovers;
 window.submitBrokerPopover = submitBrokerPopover;
 window.toggleBrokerGoalDropdown = toggleBrokerGoalDropdown;
 window.selectBrokerGoal = selectBrokerGoal;
+window.updateGoalDropdowns = updateGoalDropdowns;
