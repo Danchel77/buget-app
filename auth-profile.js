@@ -130,7 +130,7 @@ async function deleteCurrentAccountAndData() {
   showDialog('Удаление аккаунта', 'ВНИМАНИЕ! Все ваши транзакции, вклады, цели и настройки будут безвозвратно удалены. Продолжить?', true, async () => {
     showToast('Удаление всех данных аккаунта...', false, true);
     try {
-      const tables = ['Transactions', 'Deposits', 'Broker', 'Goals', 'Categories', 'CategoryRules'];
+      const tables = ['Transactions', 'Deposits', 'Broker', 'Goals', 'Categories', 'CategoryRules', 'BudgetPlan', 'CalendarBills'];
 
       // 1. Стираем все подколлекции пользователя
       for (const table of tables) {
@@ -280,3 +280,5 @@ window.openProfileModal = openProfileModal;
 window.closeProfileModal = closeProfileModal;
 window.toggleBrokerSetting = toggleBrokerSetting;
 window.openSubModalFromProfile = openSubModalFromProfile;
+window.loadUserSettings = loadUserSettings;
+window.applyBrokerVisibility = applyBrokerVisibility;
