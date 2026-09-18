@@ -3274,20 +3274,6 @@ function updateAnalyticsForMonth(monthId) {
 // ГРАФИК БРОКЕРА С ТАЙМФРЕЙМАМИ, ГРАДИЕНТОМ И СКРАББИНГОМ
 // -------------------------------------------------------------
 
-function editDep(id, name, amount, rate, start, end, goalId) {
-  currentEditId = id;
-  currentEditTable = 'Deposits';
-  document.getElementById('dep-name').value = name;
-  setFormattedVal('dep-amount', amount);
-  setFormattedVal('dep-rate', rate);
-  document.getElementById('dep-start').value = start;
-  document.getElementById('dep-end').value = end;
-  document.getElementById('dep-goal').value = goalId || '';
-  document.getElementById('dep-submit-btn').innerText = 'Сохранить изменения';
-  document.getElementById('deposit-form-container').classList.remove('hidden');
-  window.scrollTo(0, 0);
-}
-
 function submitBrokerOperation(e) {
   e.preventDefault();
   const type = document.getElementById('broker-type').value;
