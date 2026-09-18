@@ -345,6 +345,84 @@ function isBillPaidInCurrentMonth(bill, monthItems) {
   });
 }
 
+// Управление модальными окнами бюджета
+function openBudgetPlanModal() {
+  const dlg = document.getElementById('budget-plan-dialog');
+  if (!dlg) return;
+
+  const plan = Cache?.budgetPlan || {};
+  setFormattedVal('plan-income-input', plan.monthlyIncome || 0);
+  setFormattedVal('plan-expense-input', plan.monthlyVariableLimit || 0);
+
+  // Расчет реального среднего дохода за 3 месяца
+  const months = Cache?.transactions || [];
+  const lastMonths = months.slice(0, 3);
+  let totalInc = 0;
+  lastMonths.forEach(m => {
+    (m.items || []).forEach(tx => {
+      if (tx.type === 'Доход') totalInc += tx.amount;
+    });
+  });
+  const avgIncome = Math.round(totalInc / Math.max(1, lastMonths.length));
+  const avgEl = document.getElementById('plan-avg-income');
+  if (avgEl) avgEl.innerText = `${formatMoney(avgIncome)}/мес`;
+
+  updatePlanForecast();
+  dlg.classList.remove('hidden');
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function closeBudgetPlanModal() {
+  const dlg = document.getElementById('budget-plan-dialog');
+  if (dlg) dlg.classList.add('hidden');
+}
+
+function updatePlanForecast() {
+  const inc = getUnformattedVal(document.getElementById('plan-income-input'));
+  const exp = getUnformattedVal(document.getElementById('plan-expense-input'));
+  const bills = Cache?.calendarBills || [];
+  const totalBills = bills.reduce((s, b) => s + (parseFloat(b.amount) || 0), 0);
+
+  const surplus = Math.max(0, inc - exp - totalBills);
+  const surplusEl = document.getElementById('plan-forecast-surplus');
+  const weekHint = document.getElementById('plan-week-hint');
+
+  if (surplusEl) surplusEl.innerText = `+${formatMoney(surplus)}/мес`;
+  if (weekHint) weekHint.innerText = `Базовый лимит недели: ~${formatMoney(Math.round(exp / 4.33))}`;
+}
+
+async function submitBudgetPlan(e) {
+  e.preventDefault();
+  const inc = getUnformattedVal(document.getElementById('plan-income-input'));
+  const exp = getUnformattedVal(document.getElementById('plan-expense-input'));
+
+  showToast('Сохранение плана...', false, true);
+  try {
+    const col = getUserCol('BudgetPlan');
+    const snap = await col.get();
+    const batch = db.batch();
+
+    const planData = {
+      monthlyIncome: inc,
+      monthlyVariableLimit: exp,
+      updatedAt: Date.now()
+    };
+
+    if (snap.empty) {
+      batch.set(col.doc(), planData);
+    } else {
+      batch.update(snap.docs[0].ref, planData);
+    }
+
+    await batch.commit();
+    closeBudgetPlanModal();
+    await fetchAllData();
+    showToast('План бюджета обновлен');
+  } catch (err) {
+    showToast('Ошибка: ' + err.message, true);
+  }
+}
+
 // ==========================================
 // 2. Calendar Bills (Счета и платежи)
 // ==========================================
@@ -540,6 +618,80 @@ function processGoals(goals) {
   });
 }
 
+function renderGoals() {
+  const data = Cache.goals || [];
+  if (data.length === 0) {
+    document.getElementById('goals-list').innerHTML = '<div class="text-center text-[#848D99] py-10 text-[13px]">Целей нет</div>';
+    return;
+  }
+  document.getElementById('goals-list').innerHTML = data.map(g => {
+    const goalIcon = getGoalIcon(g.name);
+
+    // Расчет ежемесячного плана пополнений для достижения цели в срок
+    let paceBadge = '';
+    if (g.rawDeadline && !g.isAchieved) {
+      const now = new Date();
+      const dl = new Date(g.rawDeadline);
+      const monthsRemaining = Math.max(1, Math.round((dl - now) / (1000 * 60 * 60 * 24 * 30.4375)));
+      const remainingSum = Math.max(0, g.target - g.saved);
+      const monthlyNeed = Math.ceil(remainingSum / monthsRemaining);
+      paceBadge = `<span class="text-[11px] text-[#848D99] font-normal">Осталось ${monthsRemaining} мес. • <span class="whitespace-nowrap">Вносить ~${formatMoney(monthlyNeed)}/мес.</span></span>`;
+    }
+
+    return `
+      <div class="card rounded-2xl w-full flex flex-col p-5 cursor-pointer overflow-hidden mb-4 border border-[rgba(255,255,255,0.06)] ${g.isAchieved ? 'ring-1 ring-[#30D158]/40 bg-[#30D158]/5' : 'bg-[#181B24]'}" 
+           data-id="${g.id}" data-table="Goals"
+           onclick="openCardContextMenu(event, '${escapeHtml(g.name)}', () => editGoal('${g.id}', '${escapeHtml(g.name)}', ${g.target}, '${g.rawDeadline}'), () => deleteRecord('Goals', '${g.id}'))">
+        
+        <div class="flex justify-between items-start w-full mb-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-10 h-10 rounded-2xl ${g.isAchieved ? 'bg-[#30D158]/15 text-[#30D158]' : 'bg-[#6C5DD3]/15 text-[#6C5DD3]'} flex items-center justify-center flex-shrink-0">
+              <i data-lucide="${goalIcon}" class="w-5 h-5"></i>
+            </div>
+            <div class="min-w-0">
+              <h3 class="text-[16px] font-semibold text-gray-100 truncate leading-tight">${escapeHtml(g.name)}</h3>
+              <div class="mt-0.5">${paceBadge || `<span class="text-[11px] text-[#848D99]">До ${escapeHtml(g.deadlineStr)}</span>`}</div>
+            </div>
+          </div>
+
+          ${g.isAchieved 
+            ? `<span class="px-2.5 py-0.5 text-[10px] font-bold tracking-wider uppercase bg-[#30D158]/20 text-[#30D158] rounded-full flex-shrink-0">Выполнена</span>`
+            : `<span class="text-[15px] font-bold ${g.progress >= 75 ? 'text-emerald-400' : 'text-[#6C5DD3]'}">${g.progress}%</span>`
+          }
+        </div>
+
+        <div class="flex items-end justify-between w-full mt-2 mb-2">
+          <div class="text-[13px] font-medium tracking-wide">
+            <span class="text-white text-[17px] font-bold">${formatMoney(g.saved)}</span>
+            <span class="text-gray-600 mx-1">из</span>
+            <span class="text-gray-400">${formatMoney(g.target)}</span>
+          </div>
+        </div>
+
+        <!-- Выразительный градиентный прогресс-бар высотой 8.5px -->
+        <div class="w-full bg-[rgba(255,255,255,0.06)] h-[8.5px] rounded-full overflow-hidden">
+          <div class="h-full rounded-full transition-all duration-500 ${g.isAchieved ? 'bg-[#30D158]' : 'bg-gradient-to-r from-[#6C5DD3] to-[#32ADE6]'}" style="width:${g.progress}%"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  if(typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+// Умный определитель векторной иконки цели по смыслу названия
+function getGoalIcon(name) {
+  const n = (name || '').toLowerCase();
+  if (/квартир|дом|ремонт|жиль/i.test(n)) return 'home';
+  if (/машин|авто|тачк|мото/i.test(n)) return 'car';
+  if (/отпуск|море|путешеств|билет|тур/i.test(n)) return 'plane';
+  if (/учеб|курс|образов/i.test(n)) return 'graduation-cap';
+  if (/подушк|безопасн|резерв/i.test(n)) return 'shield-check';
+  if (/инвест|акци/i.test(n)) return 'trending-up';
+  if (/телефон|ноут|комп|айфон|гаджет/i.test(n)) return 'smartphone';
+  return 'target';
+}
+
 // Управление созданием и редактированием целей бюджета
 function openGoalModal() {
   const form = document.getElementById('budget-goal-form');
@@ -641,6 +793,16 @@ function deleteBudgetGoal(goalId, goalName) {
   });
 }
 
+function openGoalSheet(id, name, target, rawDeadline) {
+  openActionSheet(
+    id, 
+    name, 
+    `Цель: ${formatMoney(target)}`,
+    () => editGoal(id, name, target, rawDeadline),
+    () => deleteRecord('Goals', id)
+  );
+}
+
 function openGoalTopupModal(goalId, goalName) {
   activeTopupGoalId = goalId;
   const dlg = document.getElementById('goal-topup-dialog');
@@ -655,6 +817,19 @@ function closeGoalTopupModal() {
   const dlg = document.getElementById('goal-topup-dialog');
   if (dlg) dlg.classList.add('hidden');
   activeTopupGoalId = null;
+}
+
+function setTopupMode(mode) {
+  currentTopupMode = mode;
+  const addBtn = document.getElementById('tab-topup-add');
+  const subBtn = document.getElementById('tab-topup-sub');
+  if (mode === 'add') {
+    addBtn.className = 'flex-1 py-1.5 rounded-lg font-semibold bg-[#212430] text-white transition-all';
+    subBtn.className = 'flex-1 py-1.5 rounded-lg font-medium text-[#848D99] hover:text-white transition-all';
+  } else {
+    subBtn.className = 'flex-1 py-1.5 rounded-lg font-semibold bg-[#212430] text-white transition-all';
+    addBtn.className = 'flex-1 py-1.5 rounded-lg font-medium text-[#848D99] hover:text-white transition-all';
+  }
 }
 
 async function submitGoalTopup() {
@@ -745,6 +920,19 @@ function goToWizardStep(step) {
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
+function openWizardIconPicker() {
+  const picker = document.getElementById('wiz-icon-picker');
+  if (picker) picker.classList.toggle('hidden');
+}
+
+function selectWizardGoalIcon(icon) {
+  wizGoalIcon = icon;
+  const display = document.getElementById('wiz-goal-icon-display');
+  if (display) display.innerText = icon;
+  const picker = document.getElementById('wiz-icon-picker');
+  if (picker) picker.classList.add('hidden');
+}
+
 function updateWizGoalSlider() {
   const target = getUnformattedVal(document.getElementById('wiz-goal-target'));
   const saved = getUnformattedVal(document.getElementById('wiz-goal-saved'));
@@ -794,6 +982,16 @@ function recalculateWizardIncome() {
   }
 }
 
+function adoptCalculatedIncome() {
+  const calcText = document.getElementById('wiz-calculated-income')?.innerText || '0';
+  const val = parseInt(calcText.replace(/[^\d]/g, ''), 10) || 0;
+  const input = document.getElementById('wiz-income-input');
+  if (input && val > 0) {
+    input.value = formatMoney(val);
+    showToast('Сумма дохода подставлена');
+  }
+}
+
 function calculateHistoricalIncomeForWizard() {
   const txMonths = Cache?.transactions || [];
   const calcEl = document.getElementById('wiz-calculated-income');
@@ -836,6 +1034,35 @@ function calculateHistoricalIncomeForWizard() {
   return avgIncome;
 }
 
+function toggleWizardIncomeSource(sourceName) {
+  if (wizardActiveIncomeSources.has(sourceName)) {
+    wizardActiveIncomeSources.delete(sourceName);
+  } else {
+    wizardActiveIncomeSources.add(sourceName);
+  }
+
+  // Обновляем визуальное состояние чипсов
+  document.querySelectorAll('#wiz-income-sources-list [data-source]').forEach(el => {
+    const src = el.dataset.source;
+    if (wizardActiveIncomeSources.has(src)) {
+      el.className = 'text-[10px] bg-[#30D158]/15 text-[#30D158] border border-[#30D158]/20 px-2 py-0.5 rounded-lg font-medium flex items-center gap-1 cursor-pointer transition-all';
+      el.innerHTML = `<i data-lucide="check" class="w-2.5 h-2.5"></i> ${escapeHtml(src)}`;
+    } else {
+      el.className = 'text-[10px] bg-[#212430] text-[#848D99] border border-transparent px-2 py-0.5 rounded-lg font-medium flex items-center gap-1 cursor-pointer transition-all';
+      el.innerHTML = `${escapeHtml(src)}`;
+    }
+  });
+
+  // Пересчитываем сумму по активным источникам
+  recalculateWizardIncome();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function addAnotherBillFromTooltip() {
+  closeWizDayTooltip();
+  openAddBillModal(currentWizSelectedDay);
+}
+
 // Рендер сетки календаря
 function renderWizCalendar() {
   const grid = document.getElementById('wiz-calendar-grid');
@@ -868,6 +1095,44 @@ function renderWizCalendar() {
     `;
   }
   grid.innerHTML = html;
+}
+
+function renderWizDayBillsList() {
+  const container = document.getElementById('wiz-day-bills-list');
+  const label = document.getElementById('wiz-selected-day-label');
+  if (label) label.innerText = `${currentWizSelectedDay} число: счета`;
+  if (!container) return;
+
+  const bills = (Cache.calendarBills || []).filter(b => parseInt(b.day, 10) === currentWizSelectedDay);
+
+  if (bills.length === 0) {
+    container.innerHTML = `
+      <div class="py-2 text-center text-[11px] text-[#848D99]">
+        Нет списаний на этот день
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = bills.map(b => `
+    <div class="flex items-center justify-between p-2 rounded-xl bg-[#181B24] border border-[rgba(255,255,255,0.04)]">
+      <div class="flex items-center gap-2 min-w-0">
+        <div class="w-6 h-6 rounded-lg bg-[#212430] flex items-center justify-center text-xs text-gray-300">
+          <i data-lucide="receipt" class="w-3.5 h-3.5 text-[#848D99]"></i>
+        </div>
+        <span class="text-xs font-medium text-gray-200 truncate">${escapeHtml(b.name)}</span>
+      </div>
+      <b class="text-xs font-mono font-semibold text-gray-200 ml-2">-${formatMoney(b.amount)}</b>
+    </div>
+  `).join('');
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function openAddBillModalFromWizard() {
+  const dayInput = document.getElementById('bill-day');
+  if (dayInput) dayInput.value = currentWizSelectedDay;
+  openAddBillModal();
 }
 
 function showWizDayTooltip(day, bills) {
@@ -974,6 +1239,69 @@ function renderWizLimitsEditor() {
 
   updateWizLiveTotal();
   if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function addCategoryToWizard(catName) {
+  wizardCustomCategories.add(catName);
+  const dlg = document.getElementById('custom-dialog');
+  if (dlg) dlg.classList.add('hidden');
+  renderWizLimitsEditor();
+  showToast(`Категория «${catName}» добавлена`);
+}
+
+function removeWizardCustomCat(catName) {
+  wizardCustomCategories.delete(catName);
+  renderWizLimitsEditor();
+}
+
+function updateWizLiveTotal() {
+  let total = 0;
+  document.querySelectorAll('[data-wiz-cat]').forEach(inp => {
+    total += getUnformattedVal(inp) || 0;
+  });
+
+  const totalEl = document.getElementById('wiz-limits-live-total');
+  const weeklyEl = document.getElementById('wiz-live-weekly-estimate');
+  if (totalEl) totalEl.innerText = `${formatMoney(total)}/мес`;
+  if (weeklyEl) weeklyEl.innerText = `~${formatMoney(Math.round(total / 4.33))}`;
+}
+
+// Вспомогательный расчет истории трат из выписок
+function calculateHistoricalCategoryAverages() {
+  const map = {};
+  const txMonths = Cache?.transactions || [];
+  if (!txMonths.length) return map;
+
+  let minTime = Infinity;
+  let maxTime = -Infinity;
+  const catTotals = {};
+
+  txMonths.forEach(m => {
+    (m.items || []).forEach(tx => {
+      const t = tx.timestamp || (tx.rawDate ? new Date(tx.rawDate).getTime() : null);
+      if (t) {
+        if (t < minTime) minTime = t;
+        if (t > maxTime) maxTime = t;
+      }
+
+      if (tx.type === 'Расход' && tx.category) {
+        const val = parseFloat(tx.amount) || 0;
+        catTotals[tx.category] = (catTotals[tx.category] || 0) + val;
+      }
+    });
+  });
+
+  if (minTime === Infinity || maxTime === -Infinity) return map;
+
+  const diffDays = Math.max(1, Math.round((maxTime - minTime) / (1000 * 60 * 60 * 24)) + 1);
+  const effectiveDays = Math.min(90, diffDays);
+  const monthFactor = 30.44 / effectiveDays;
+
+  Object.keys(catTotals).forEach(cat => {
+    map[cat] = Math.round(catTotals[cat] * monthFactor);
+  });
+
+  return map;
 }
 
 // Расчет финансовой квитанции на Шаге 5
