@@ -862,22 +862,6 @@ function processGoals(goals) {
 // =============================================================
 let wizardSelectedIncomeSources = new Set(['Зарплата', 'Кэшбек']);
 
-function isBillPaidInCurrentMonth(bill, monthItems) {
-  if (bill.isPaid) return true;
-
-  const billAmount = parseFloat(bill.amount) || 0;
-  const billName = (bill.name || '').toLowerCase();
-
-  return monthItems.some(tx => {
-    if (tx.type !== 'Расход') return false;
-    const isAmountMatch = Math.abs(tx.amount - billAmount) <= (billAmount * 0.15);
-    const isCommentMatch = tx.comment && (tx.comment.toLowerCase().includes(billName) || billName.includes(tx.comment.toLowerCase()));
-    const isCategoryMatch = (bill.category && tx.category === bill.category) && isAmountMatch;
-
-    return isCategoryMatch || isCommentMatch;
-  });
-}
-
 // Вызов загрузки выписки прямо из мастера онбординга
 function triggerPdfImportFromWizard() {
   window._returnToWizardStep = 2;
@@ -926,65 +910,6 @@ function openAddBillOnDay(day) {
   openAddBillModal(day);
 }
 
-// 5. Модальное окно управления счетами конкретного дня
-function openDayBillsModal(day) {
-  const dlg = document.getElementById('day-bills-dialog');
-  const title = document.getElementById('day-bills-title');
-  const list = document.getElementById('day-bills-items-list');
-  const addBtn = document.getElementById('btn-add-second-bill');
-
-  if (title) title.innerText = `${day} число: список платежей`;
-  if (dlg) dlg.classList.remove('hidden');
-
-  const bills = (Cache?.calendarBills || []).filter(b => parseInt(b.day, 10) === parseInt(day, 10));
-
-  if (list) {
-    if (bills.length === 0) {
-      list.innerHTML = '<div class="text-center py-4 text-xs text-[#848D99]">Счетов на этот день нет</div>';
-    } else {
-      list.innerHTML = bills.map(b => `
-        <div class="flex items-center justify-between p-2.5 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.04)] text-xs">
-          <div>
-            <div class="font-semibold text-white">${escapeHtml(b.name)}</div>
-            <div class="font-mono text-[11px] text-[#848D99]">${formatMoney(b.amount)}</div>
-          </div>
-          <button type="button" onclick="deleteCalendarBill('${b.id}')" class="text-gray-500 hover:text-[#FF453A] p-1.5 cursor-pointer">
-            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-          </button>
-        </div>
-      `).join('');
-    }
-  }
-
-  if (addBtn) {
-    addBtn.onclick = () => {
-      closeDayBillsModal();
-      openAddBillModal(day);
-    };
-  }
-
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
-
-function closeDayBillsModal() {
-  const dlg = document.getElementById('day-bills-dialog');
-  if (dlg) dlg.classList.add('hidden');
-}
-
-// 6. Быстрое удаление счета из календаря
-async function deleteCalendarBill(billId) {
-  showToast('Удаление платежа...', false, true);
-  try {
-    await getUserCol('CalendarBills').doc(billId).delete();
-    closeDayBillsModal();
-    await fetchAllData();
-    renderWizCalendar();
-    showToast('Платеж удален');
-  } catch (e) {
-    showToast('Ошибка удаления', true);
-  }
-}
-
 // 7. Подстановка исторического среднего значения в поле лимита (Шаг 4)
 function applyCatAvgToInput(catName, avg) {
   applyWizCategoryAvg(catName, avg);
@@ -992,70 +917,6 @@ function applyCatAvgToInput(catName, avg) {
 
 // Текущий шаг мастера сохраняется в localStorage
 let currentWizardStep = parseInt(localStorage.getItem('budget_wizard_step'), 10) || 1;
-
-function initBudgetWizard(forceReset = false) {
-  if (forceReset) {
-    currentWizardStep = 1;
-    localStorage.setItem('budget_wizard_step', '1');
-    const gName = document.getElementById('wiz-goal-name');
-    const gTarget = document.getElementById('wiz-goal-target');
-    const gSaved = document.getElementById('wiz-goal-saved');
-    const incInput = document.getElementById('wiz-income-input');
-    if (gName) gName.value = '';
-    if (gTarget) gTarget.value = '';
-    if (gSaved) gSaved.value = '';
-    if (incInput) incInput.value = '';
-    document.querySelectorAll('[data-wiz-cat]').forEach(inp => inp.value = '');
-    updateWizGoalSlider();
-  } else {
-    currentWizardStep = parseInt(localStorage.getItem('budget_wizard_step'), 10) || currentWizardStep || 1;
-  }
-
-  goToWizardStep(currentWizardStep);
-  calculateHistoricalIncomeForWizard();
-}
-
-function goToWizardStep(step) {
-  currentWizardStep = step;
-  localStorage.setItem('budget_wizard_step', String(step));
-
-  for (let i = 1; i <= 5; i++) {
-    const stepEl = document.getElementById(`wizard-step-${i}`);
-    const progEl = document.getElementById(`wiz-progress-${i}`);
-    if (stepEl) {
-      if (i === step) stepEl.classList.remove('hidden');
-      else stepEl.classList.add('hidden');
-    }
-    if (progEl) {
-      progEl.className = i <= step 
-        ? 'h-full rounded-full bg-[#6C5DD3] transition-colors duration-300' 
-        : 'h-full rounded-full bg-[rgba(255,255,255,0.08)] transition-colors duration-300';
-    }
-  }
-
-  const badge = document.getElementById('wizard-step-badge');
-  const title = document.getElementById('wizard-step-title');
-  const counter = document.getElementById('wizard-step-counter');
-  if (counter) counter.innerText = `${step}/5`;
-
-  const titles = [
-    'Создайте цель накопления',
-    'Планируемый доход',
-    'Календарь обязательных счетов',
-    'Лимиты на каждый день',
-    'Итоговый план бюджета'
-  ];
-
-  if (badge) badge.innerText = `Шаг ${step} из 5`;
-  if (title) title.innerText = titles[step - 1] || 'Настройка';
-
-  if (step === 1) updateWizGoalSlider();
-  else if (step === 3) renderWizCalendar();
-  else if (step === 4) renderWizLimitsEditor();
-  else if (step === 5) calculateAndRenderWizSummary();
-
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
 
 // Текущий выбранный день в мастере для счетов
 let currentWizSelectedDay = 10;
@@ -1072,24 +933,6 @@ function selectWizardGoalIcon(icon) {
   if (display) display.innerText = icon;
   const picker = document.getElementById('wiz-icon-picker');
   if (picker) picker.classList.add('hidden');
-}
-
-function updateWizGoalSlider() {
-  const target = getUnformattedVal(document.getElementById('wiz-goal-target'));
-  const saved = getUnformattedVal(document.getElementById('wiz-goal-saved'));
-
-  const label = document.getElementById('wiz-goal-pct-label');
-  const bar = document.getElementById('wiz-goal-progress-bar');
-
-  if (!target || target <= 0) {
-    if (label) label.innerText = '0%';
-    if (bar) bar.style.width = '0%';
-    return;
-  }
-
-  const pct = Math.min(100, Math.max(0, Math.round((saved / target) * 1000) / 10));
-  if (label) label.innerText = `${pct}%`;
-  if (bar) bar.style.width = `${pct}%`;
 }
 
 function adoptCalculatedIncome() {
@@ -1129,82 +972,11 @@ function toggleWizardIncomeSource(sourceName) {
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-function recalculateWizardIncome() {
-  const txMonths = Cache?.transactions || [];
-  if (txMonths.length === 0) return;
-
-  const monthsCount = Math.min(3, txMonths.length);
-  let totalIncome = 0;
-
-  for (let i = 0; i < monthsCount; i++) {
-    const items = txMonths[i].items || [];
-    items.forEach(tx => {
-      if (tx.type === 'Доход') {
-        const cat = tx.category || 'Другое';
-        // Если категория входит в выбранные источники
-        if (wizardActiveIncomeSources.has(cat)) {
-          totalIncome += (parseFloat(tx.amount) || 0);
-        }
-      }
-    });
-  }
-
-  const avgIncome = monthsCount > 0 ? Math.round(totalIncome / monthsCount) : 0;
-  
-  const calcEl = document.getElementById('wiz-calculated-income');
-  const inputEl = document.getElementById('wiz-income-input');
-  
-  if (calcEl) calcEl.innerText = `${formatMoney(avgIncome)}/мес`;
-  if (inputEl && (!inputEl.value || inputEl.value === '0 ₽')) {
-    inputEl.value = formatMoney(avgIncome);
-  }
-}
-
 // ============================================================
 // ВОССТАНОВЛЕННЫЙ БЛОК: ИМПОРТ ВЫПИСОК, КАЛЕНДАРЬ И ДОХОД В МАСТЕРЕ
 // ============================================================
 
-function calculateHistoricalIncomeForWizard() {
-  const txMonths = Cache?.transactions || [];
-  const calcEl = document.getElementById('wiz-calculated-income');
-  const inputEl = document.getElementById('wiz-income-input');
 
-  if (!txMonths.length) {
-    if (calcEl) calcEl.innerText = '0 ₽/мес';
-    return 0;
-  }
-
-  let minTime = Infinity;
-  let maxTime = -Infinity;
-  let totalIncome = 0;
-
-  txMonths.forEach(m => {
-    (m.items || []).forEach(tx => {
-      const t = tx.timestamp || (tx.rawDate ? new Date(tx.rawDate).getTime() : null);
-      if (t) {
-        if (t < minTime) minTime = t;
-        if (t > maxTime) maxTime = t;
-      }
-
-      if (tx.type === 'Доход') {
-        const cat = tx.category || 'Другое';
-        if (wizardActiveIncomeSources.has(cat)) {
-          totalIncome += (parseFloat(tx.amount) || 0);
-        }
-      }
-    });
-  });
-
-  const diffDays = Math.max(1, Math.round((maxTime - minTime) / (1000 * 60 * 60 * 24)) + 1);
-  const effectiveDays = Math.min(90, diffDays);
-  const avgIncome = Math.round(totalIncome * (30.44 / effectiveDays));
-
-  if (calcEl) calcEl.innerText = `${formatMoney(avgIncome)}/мес`;
-  if (inputEl && (!inputEl.value || inputEl.value === '0 ₽' || inputEl.value === '0')) {
-    inputEl.value = formatMoney(avgIncome);
-  }
-  return avgIncome;
-}
 
 // Алиас для обратной совместимости, если где-то остался старый вызов
 window.selectWizCalendarDay = handleWizardDayClick;
@@ -1230,39 +1002,7 @@ function triggerPdfImportFromWizard() {
 window.renderWizardCalendar = renderWizCalendar;
 window.renderWizCalendar = renderWizCalendar;
 
-// 1. Рендер сетки календаря
-function renderWizCalendar() {
-  const grid = document.getElementById('wiz-calendar-grid');
-  const totalLabel = document.getElementById('wiz-bills-total-label');
-  if (!grid) return;
 
-  const bills = Cache?.calendarBills || [];
-  const totalSum = bills.reduce((acc, b) => acc + (parseFloat(b.amount) || 0), 0);
-  if (totalLabel) totalLabel.innerText = formatMoney(totalSum);
-
-  let html = '';
-
-  for (let day = 1; day <= 31; day++) {
-    const dayBills = bills.filter(b => parseInt(b.day, 10) === day);
-    const hasBills = dayBills.length > 0;
-    const isSelected = day === currentWizSelectedDay;
-    const totalDaySum = dayBills.reduce((acc, b) => acc + (parseFloat(b.amount) || 0), 0);
-
-    let sumBadge = '';
-    if (hasBills) {
-      const shortSum = totalDaySum >= 1000 ? `${Math.round(totalDaySum / 1000)}k` : `${totalDaySum}`;
-      sumBadge = `<span class="wiz-bill-badge">${shortSum}</span>`;
-    }
-
-    html += `
-      <div onclick="handleWizardDayClick(${day})" class="wiz-day-cell ${isSelected ? 'is-selected' : ''} ${hasBills ? 'has-bills' : ''}">
-        <span class="${isSelected ? 'text-white font-bold' : (hasBills ? 'text-gray-200' : 'text-[#848D99]')}">${day}</span>
-        ${sumBadge}
-      </div>
-    `;
-  }
-  grid.innerHTML = html;
-}
 
 // 2. Умный клик по дню: пустой -> сразу добавление, со счетом -> красивый тултип
 function handleWizardDayClick(day) {
@@ -1281,39 +1021,8 @@ function handleWizardDayClick(day) {
 }
 window.handleWizardDayClick = handleWizardDayClick;
 
-function showWizDayTooltip(day, bills) {
-  const tooltip = document.getElementById('wiz-day-tooltip');
-  const title = document.getElementById('wiz-tooltip-title');
-  const list = document.getElementById('wiz-tooltip-bills-list');
-  if (!tooltip || !list) return;
 
-  if (title) title.innerText = `${day} число: платежи (${bills.length})`;
 
-  list.innerHTML = bills.map(b => `
-    <div class="flex items-center justify-between p-2 rounded-xl bg-[#12151C] border border-[rgba(255,255,255,0.04)]">
-      <div class="min-w-0 pr-2 cursor-pointer" onclick="openEditBillModal('${b.id}')">
-        <span class="text-xs font-semibold text-white truncate block">${escapeHtml(b.name)}</span>
-        <span class="text-[11px] font-mono text-gray-400">-${formatMoney(b.amount)}</span>
-      </div>
-      <div class="flex items-center gap-1">
-        <button type="button" onclick="openEditBillModal('${b.id}')" class="text-gray-400 hover:text-white p-1.5 cursor-pointer">
-          <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-        </button>
-        <button type="button" onclick="deleteCalendarBill('${b.id}')" class="text-gray-400 hover:text-[#FF453A] p-1.5 cursor-pointer">
-          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-        </button>
-      </div>
-    </div>
-  `).join('');
-
-  tooltip.classList.remove('hidden');
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
-
-function closeWizDayTooltip() {
-  const tooltip = document.getElementById('wiz-day-tooltip');
-  if (tooltip) tooltip.classList.add('hidden');
-}
 window.closeWizDayTooltip = closeWizDayTooltip;
 
 function addAnotherBillFromTooltip() {
@@ -1322,122 +1031,10 @@ function addAnotherBillFromTooltip() {
 }
 window.addAnotherBillFromTooltip = addAnotherBillFromTooltip;
 
-// 3. Исправление сохранения счета: НЕ сбрасывать мастера на Шаг 1!
-async function submitCalendarBill(e) {
-  e.preventDefault();
-  const editId = document.getElementById('bill-edit-id').value;
-  const name = document.getElementById('bill-name').value.trim();
-  const amount = getUnformattedVal(document.getElementById('bill-amount'));
-  const day = parseInt(document.getElementById('bill-day').value, 10);
-  const type = document.getElementById('bill-type').value;
-
-  if (!name || !amount) return;
-
-  showToast('Сохранение платежа...', false, true);
-  try {
-    const col = getUserCol('CalendarBills');
-    const billData = { name, amount, day, type, isPaid: false, updatedAt: Date.now() };
-
-    if (editId) {
-      await col.doc(editId).update(billData);
-    } else {
-      await col.add({ ...billData, createdAt: Date.now() });
-    }
-
-    closeAddBillModal();
-    document.getElementById('calendar-bill-form').reset();
-    document.getElementById('bill-edit-id').value = '';
-    
-    // Синхронизируем кеш
-    await fetchAllData();
-
-    // ЕСЛИ НАХОДИМСЯ В МАСТЕРЕ: держим Шаг 3!
-    const plan = Cache?.budgetPlan || {};
-    if (!plan.isConfigured) {
-      goToWizardStep(3);
-      renderWizCalendar();
-    }
-    
-    showToast('Платеж сохранен');
-  } catch (err) {
-    showToast('Ошибка: ' + err.message, true);
-  }
-}
-
 // Хранилище категорий, добавленных пользователем вручную на шаге 4
 let wizardCustomCategories = new Set();
 
-function renderWizLimitsEditor() {
-  const container = document.getElementById('wiz-category-limits-editor');
-  if (!container) return;
 
-  const avgMap = calculateHistoricalCategoryAverages();
-
-  // Стандартные 3 категории
-  const list = [
-    { name: 'Продукты', icon: 'shopping-cart' },
-    { name: 'Кафе и рестораны', icon: 'utensils' },
-    { name: 'Развлечения', icon: 'gamepad-2' }
-  ];
-
-  // Добавленные пользователем категории
-  wizardCustomCategories.forEach(catName => {
-    const catObj = Cache?.categories?.expense?.find(c => c.name === catName);
-    list.push({ name: catName, icon: catObj?.icon || 'tag', isCustom: true });
-  });
-
-  // Собирательная категория «Прочие расходы»
-  const accountedNames = list.map(c => c.name);
-  let othersAvg = 0;
-  Object.keys(avgMap).forEach(cat => {
-    if (!accountedNames.includes(cat)) {
-      othersAvg += avgMap[cat] || 0;
-    }
-  });
-  avgMap['Прочие расходы'] = othersAvg;
-  list.push({ name: 'Прочие расходы', icon: 'package' });
-
-  container.innerHTML = list.map(cat => {
-    const avg = Math.round(avgMap[cat.name] || 0);
-    const existingVal = Cache.budgetPlan?.categoryLimits?.[cat.name] || (avg > 0 ? avg : '');
-
-    return `
-      <div class="p-3 rounded-2xl bg-[#12151C] border border-[rgba(255,255,255,0.04)] flex items-center justify-between gap-2.5">
-        <div class="w-9 h-9 rounded-xl bg-[#1E2330] text-gray-300 flex items-center justify-center flex-shrink-0">
-          <i data-lucide="${cat.icon}" class="w-5 h-5 text-[#848D99]"></i>
-        </div>
-        
-        <div class="flex-1 min-w-0 pr-1">
-          <div class="flex items-center gap-1.5">
-            <span class="text-xs font-bold text-gray-200 truncate">${escapeHtml(cat.name)}</span>
-            ${cat.isCustom ? `<button type="button" onclick="removeWizardCustomCat('${escapeHtml(cat.name)}')" class="text-gray-500 hover:text-[#FF453A] text-xs font-bold cursor-pointer">✕</button>` : ''}
-          </div>
-          ${avg > 0 ? `
-            <div onclick="applyWizCategoryAvg('${escapeHtml(cat.name)}', ${avg})" class="wiz-adopt-chip mt-1.5 whitespace-nowrap" title="Нажмите, чтобы применить">
-              <span>В среднем: ~${formatMoney(avg)}</span>
-              <span class="text-[#727cff] font-bold">↵</span>
-            </div>
-          ` : `
-            <span class="text-[10px] text-[#848D99] mt-0.5 block">В среднем: нет данных</span>
-          `}
-        </div>
-
-        <div class="w-28 flex-shrink-0">
-          <input type="text"
-                 inputmode="decimal"
-                 data-wiz-cat="${escapeHtml(cat.name)}"
-                 oninput="formatSumInput(this); updateWizLiveTotal();"
-                 value="${existingVal ? formatMoney(existingVal) : ''}"
-                 placeholder="0 ₽"
-                 class="w-full bg-[#181B24] border border-[rgba(255,255,255,0.08)] text-white text-right font-mono font-bold text-xs rounded-xl px-2.5 py-2 outline-none focus:border-[#6C5DD3] transition-colors">
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  updateWizLiveTotal();
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
 
 // НОВЫЕ ФУНКЦИИ: Кнопка «+ Категория» на Шаге 4
 function openAddCategoryLimitPicker() {
@@ -1695,50 +1292,8 @@ async function finishBudgetOnboarding() {
 
 let activeEditCategory = null;
 
-function openCategoryLimitModal(catName, currentLimit) {
-  activeEditCategory = catName;
-  const dlg = document.getElementById('category-limit-dialog');
-  const title = document.getElementById('category-limit-title');
-  const inp = document.getElementById('category-limit-amount');
 
-  if (title) title.innerText = catName;
-  if (inp) setFormattedVal('category-limit-amount', currentLimit || '');
-  if (dlg) dlg.classList.remove('hidden');
-}
 
-function closeCategoryLimitModal() {
-  const dlg = document.getElementById('category-limit-dialog');
-  if (dlg) dlg.classList.add('hidden');
-  activeEditCategory = null;
-}
-
-async function submitCategoryLimit() {
-  if (!activeEditCategory) return;
-  const amount = getUnformattedVal(document.getElementById('category-limit-amount'));
-  const plan = Cache?.budgetPlan || {};
-  const limits = plan.categoryLimits || {};
-
-  if (amount > 0) limits[activeEditCategory] = amount;
-  else delete limits[activeEditCategory];
-
-  const totalVarLimit = Object.values(limits).reduce((s, v) => s + v, 0);
-
-  showToast('Сохранение лимита...', false, true);
-  try {
-    await getUserCol('BudgetPlan').doc('plan').set({
-      ...plan,
-      isConfigured: true,
-      monthlyVariableLimit: totalVarLimit,
-      categoryLimits: limits
-    }, { merge: true });
-
-    closeCategoryLimitModal();
-    await fetchAllData();
-    showToast('Лимит обновлен');
-  } catch (err) {
-    showToast('Ошибка: ' + err.message, true);
-  }
-}
 
 function deleteBudgetGoal(goalId, goalName) {
   showDialog('Удаление цели', `Удалить цель "${goalName}"? Накопленный прогресс будет удален.`, true, async () => {
@@ -1851,55 +1406,12 @@ function openAddBillOnDay(day) {
   openAddBillModal(day);
 }
 
-function openAddBillModal(initialDay = null) {
-  const form = document.getElementById('calendar-bill-form');
-  if (form) form.reset();
 
-  const editIdEl = document.getElementById('bill-edit-id');
-  if (editIdEl) editIdEl.value = '';
-
-  const dayInput = document.getElementById('bill-day');
-  if (dayInput && initialDay) {
-    dayInput.value = initialDay;
-  }
-
-  const actions = document.getElementById('bill-dialog-actions');
-  const deleteBtn = document.getElementById('bill-delete-btn');
-  const title = document.getElementById('calendar-bill-dialog-title');
-
-  if (actions) actions.classList.remove('hidden');
-  if (deleteBtn) deleteBtn.classList.add('hidden');
-  if (title) title.innerText = initialDay ? `Платеж на ${initialDay} число` : 'Платеж в календарь';
-
-  const dlg = document.getElementById('calendar-bill-dialog');
-  if (dlg) dlg.classList.remove('hidden');
-}
 window.openAddBillModal = openAddBillModal;
 
-function closeAddBillModal() {
-  const dlg = document.getElementById('calendar-bill-dialog');
-  if (dlg) dlg.classList.add('hidden');
-}
 
-function openEditBillModal(billId) {
-  const bill = Cache?.calendarBills?.find(b => b.id === billId);
-  if (!bill) return;
 
-  const dlg = document.getElementById('calendar-bill-dialog');
-  const title = document.getElementById('calendar-bill-dialog-title');
-  const deleteBtn = document.getElementById('bill-delete-btn');
 
-  document.getElementById('bill-edit-id').value = bill.id;
-  document.getElementById('bill-name').value = bill.name;
-  setFormattedVal('bill-amount', bill.amount);
-  document.getElementById('bill-day').value = bill.day;
-  document.getElementById('bill-type').value = bill.type || 'recurring';
-
-  if (title) title.innerText = 'Редактировать платеж';
-  if (deleteBtn) deleteBtn.classList.remove('hidden');
-
-  if (dlg) dlg.classList.remove('hidden');
-}
 window.openEditBillModal = openEditBillModal;
 
 async function deleteCurrentEditingBill() {
