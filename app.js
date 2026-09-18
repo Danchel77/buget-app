@@ -1170,18 +1170,7 @@ let activeEditCategory = null;
 
 
 
-function deleteBudgetGoal(goalId, goalName) {
-  showDialog('Удаление цели', `Удалить цель "${goalName}"? Накопленный прогресс будет удален.`, true, async () => {
-    showToast('Удаление цели...', false, true);
-    try {
-      await getUserCol('Goals').doc(goalId).delete();
-      await fetchAllData();
-      showToast('Цель удалена');
-    } catch (e) {
-      showToast('Ошибка удаления', true);
-    }
-  });
-}
+
 
 window.goToWizardStep = goToWizardStep;
 window.toggleWizardIncomeSource = toggleWizardIncomeSource;
@@ -1280,21 +1269,6 @@ async function submitBudgetPlan(e) {
 let activeTopupGoalId = null;
 let currentTopupMode = 'add';
 
-function openGoalTopupModal(goalId, goalName) {
-  activeTopupGoalId = goalId;
-  const dlg = document.getElementById('goal-topup-dialog');
-  const title = document.getElementById('goal-topup-title');
-  if (title) title.innerText = goalName;
-  document.getElementById('goal-topup-amount').value = '';
-  setTopupMode('add');
-  if (dlg) dlg.classList.remove('hidden');
-}
-
-function closeGoalTopupModal() {
-  const dlg = document.getElementById('goal-topup-dialog');
-  if (dlg) dlg.classList.add('hidden');
-  activeTopupGoalId = null;
-}
 
 function setTopupMode(mode) {
   currentTopupMode = mode;
@@ -1308,134 +1282,6 @@ function setTopupMode(mode) {
     addBtn.className = 'flex-1 py-1.5 rounded-lg font-medium text-[#848D99] hover:text-white transition-all';
   }
 }
-
-async function submitGoalTopup() {
-  if (!activeTopupGoalId) return;
-  const amount = getUnformattedVal(document.getElementById('goal-topup-amount'));
-  if (!amount) return;
-
-  const goal = Cache?.goals?.find(g => g.id === activeTopupGoalId);
-  if (!goal) return;
-
-  let newSaved = currentTopupMode === 'add' ? (goal.saved + amount) : Math.max(0, goal.saved - amount);
-
-  showToast('Обновление цели...', false, true);
-  try {
-    await getUserCol('Goals').doc(activeTopupGoalId).update({ saved: newSaved });
-    closeGoalTopupModal();
-    await fetchAllData();
-    showToast(currentTopupMode === 'add' ? `В цель внесено +${formatMoney(amount)}` : `Из цели снято −${formatMoney(amount)}`);
-  } catch (err) {
-    showToast('Ошибка: ' + err.message, true);
-  }
-}
-
-// Управление созданием и редактированием целей бюджета
-function openGoalModal() {
-  const form = document.getElementById('budget-goal-form');
-  if (form) form.reset();
-
-  document.getElementById('goal-edit-id').value = '';
-  document.getElementById('goal-share-input').value = 100;
-  document.getElementById('goal-share-label').innerText = '100%';
-  document.getElementById('goal-delete-btn').classList.add('hidden');
-  document.getElementById('budget-goal-dialog-title').innerText = 'Новая цель';
-
-  const dlg = document.getElementById('budget-goal-dialog');
-  if (dlg) dlg.classList.remove('hidden');
-}
-window.openGoalModal = openGoalModal;
-
-function openEditGoalModal(goalId) {
-  const goal = Cache?.goals?.find(g => g.id === goalId);
-  if (!goal) return;
-
-  document.getElementById('goal-edit-id').value = goal.id;
-  document.getElementById('goal-name-input').value = goal.name;
-  setFormattedVal('goal-target-input', goal.target);
-  setFormattedVal('goal-saved-input', goal.saved);
-  document.getElementById('goal-share-input').value = goal.share || 100;
-  document.getElementById('goal-share-label').innerText = (goal.share || 100) + '%';
-  document.getElementById('goal-delete-btn').classList.remove('hidden');
-  document.getElementById('budget-goal-dialog-title').innerText = 'Редактировать цель';
-
-  const dlg = document.getElementById('budget-goal-dialog');
-  if (dlg) dlg.classList.remove('hidden');
-}
-window.openEditGoalModal = openEditGoalModal;
-
-function closeGoalModal() {
-  const dlg = document.getElementById('budget-goal-dialog');
-  if (dlg) dlg.classList.add('hidden');
-}
-window.closeGoalModal = closeGoalModal;
-
-async function submitBudgetGoal(e) {
-  e.preventDefault();
-  const editId = document.getElementById('goal-edit-id').value;
-  const name = document.getElementById('goal-name-input').value.trim();
-  const target = getUnformattedVal(document.getElementById('goal-target-input'));
-  const saved = getUnformattedVal(document.getElementById('goal-saved-input'));
-  const share = parseInt(document.getElementById('goal-share-input').value, 10) || 100;
-
-  if (!name || !target) return;
-
-  showToast('Сохранение цели...', false, true);
-  try {
-    const col = getUserCol('Goals');
-    const goalData = {
-      name,
-      target,
-      saved,
-      share,
-      status: saved >= target ? 'Выполнена' : 'В процессе',
-      updatedAt: Date.now()
-    };
-
-    if (editId) {
-      await col.doc(editId).update(goalData);
-    } else {
-      await col.add({ ...goalData, createdAt: Date.now() });
-    }
-
-    closeGoalModal();
-    await fetchAllData();
-    showToast('Цель сохранена');
-  } catch (err) {
-    showToast('Ошибка: ' + err.message, true);
-  }
-}
-window.submitBudgetGoal = submitBudgetGoal;
-
-async function deleteCurrentEditingGoal() {
-  const editId = document.getElementById('goal-edit-id').value;
-  if (!editId) return;
-
-  showToast('Удаление цели...', false, true);
-  try {
-    await getUserCol('Goals').doc(editId).delete();
-    closeGoalModal();
-    await fetchAllData();
-    showToast('Цель удалена');
-  } catch (err) {
-    showToast('Ошибка: ' + err.message, true);
-  }
-}
-window.deleteCurrentEditingGoal = deleteCurrentEditingGoal;
-
-window.openBudgetPlanModal = openBudgetPlanModal;
-window.closeBudgetPlanModal = closeBudgetPlanModal;
-window.updatePlanForecast = updatePlanForecast;
-window.submitBudgetPlan = submitBudgetPlan;
-window.openAddBillModal = openAddBillModal;
-window.closeAddBillModal = closeAddBillModal;
-window.submitCalendarBill = submitCalendarBill;
-window.toggleBillPaidStatus = toggleBillPaidStatus;
-window.openGoalTopupModal = openGoalTopupModal;
-window.closeGoalTopupModal = closeGoalTopupModal;
-window.setTopupMode = setTopupMode;
-window.submitGoalTopup = submitGoalTopup;
-window.openGoalModal = openGoalModal;
 
 // --- НАВИГАЦИЯ, ФОРМЫ, РЕНДЕР ---
 function switchTab(tab) {
