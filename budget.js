@@ -6,7 +6,9 @@ let currentWizSelectedDay = null;
 let wizardActiveIncomeSources = new Set();
 let wizardCustomCategories = new Set();
 let activeTopupGoalId = null;
-let currentTopupMode = 'topup'; 
+let activeEditCategory = null;
+let currentTopupMode = 'topup';
+let wizGoalIcon = '💻';
 
 // ==========================================
 // 1. Budget Dashboard (Дашборд Бюджета)
