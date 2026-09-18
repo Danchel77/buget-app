@@ -4,7 +4,7 @@
 let currentWizardStep = 1;
 let currentWizSelectedDay = null;
 let wizardActiveIncomeSources = new Set();
-let wizardCustomCategories = [];
+let wizardCustomCategories = new Set();
 let activeTopupGoalId = null;
 let currentTopupMode = 'topup'; 
 
@@ -1241,6 +1241,36 @@ function renderWizLimitsEditor() {
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
+function openAddCategoryLimitPicker() {
+  const allExpenseCats = Cache?.categories?.expense || [];
+  const standardNames = ['Продукты', 'Кафе и рестораны', 'Развлечения', 'Прочие расходы'];
+  
+  const available = allExpenseCats.filter(c => !standardNames.includes(c.name) && !wizardCustomCategories.has(c.name));
+
+  if (available.length === 0) {
+    showAddCategoryDialog('Расход', null);
+    return;
+  }
+
+  const optionsHtml = available.map(c => `
+    <button type="button" onclick="addCategoryToWizard('${escapeHtml(c.name)}')" class="w-full flex items-center justify-between p-3 rounded-xl bg-[#12151C] hover:bg-[#212430] border border-[rgba(255,255,255,0.04)] text-xs text-gray-200 transition-colors cursor-pointer">
+      <div class="flex items-center gap-2.5">
+        <i data-lucide="${c.icon || 'tag'}" class="w-4 h-4 text-[#848D99]"></i>
+        <span>${escapeHtml(c.name)}</span>
+      </div>
+      <span class="text-[#727cff] font-bold">+ Добавить</span>
+    </button>
+  `).join('');
+
+  showDialog('Добавить категорию в лимиты', `
+    <div class="space-y-2 max-h-60 overflow-y-auto pt-2">
+      ${optionsHtml}
+    </div>
+  `, false);
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
 function addCategoryToWizard(catName) {
   wizardCustomCategories.add(catName);
   const dlg = document.getElementById('custom-dialog');
@@ -1464,12 +1494,18 @@ function applyWizCategoryAvg(catName, avg) {
 }
 
 function handleWizardDayClick(day) {
-  currentWizSelectedDay = day;
-  renderWizCalendar();
-  // Вызов открытия окна добавления счета из вашего старого кода
-  if (typeof openAddBillOnDay === 'function') {
-    openAddBillOnDay(day);
+  currentWizSelectedDay = parseInt(day, 10) || 1;
+  const bills = (Cache?.calendarBills || []).filter(b => parseInt(b.day, 10) === currentWizSelectedDay);
+
+  if (bills.length === 0) {
+    // ДЕНЬ ПУСТОЙ: Сразу открываем модалку добавления с подставленным днем!
+    closeWizDayTooltip();
+    openAddBillModal(currentWizSelectedDay);
+  } else {
+    // В ДНЕ ЕСТЬ СЧЕТА: Показываем аккуратный всплывающий тултип
+    showWizDayTooltip(currentWizSelectedDay, bills);
   }
+  renderWizCalendar();
 }
 
 // ==========================================
