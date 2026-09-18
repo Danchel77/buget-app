@@ -1126,13 +1126,6 @@ function openAddBillModalFromWizard() {
   openAddBillModal();
 }
 
-function applyWizCategoryAvg(catName, avg) {
-  const inp = document.querySelector(`[data-wiz-cat="${catName}"]`);
-  if (inp) {
-    inp.value = formatMoney(avg);
-    updateWizLiveTotal();
-  }
-}
 
 function updateWizLiveTotal() {
   let total = 0;
@@ -1146,35 +1139,7 @@ function updateWizLiveTotal() {
   if (weeklyEl) weeklyEl.innerText = `~${formatMoney(Math.round(total / 4.33))}`;
 }
 
-// Расчет финансовой квитанции на Шаге 5
-function calculateAndRenderWizSummary() {
-  const income = getUnformattedVal(document.getElementById('wiz-income-input')) || 0;
-  
-  // Считаем обязательные платежи из календаря
-  const bills = Cache.calendarBills || [];
-  const billsTotal = bills.reduce((acc, b) => acc + (parseFloat(b.amount) || 0), 0);
 
-  // Считаем сумму установленных лимитов
-  let limitsTotal = 0;
-  document.querySelectorAll('[data-wiz-cat]').forEach(inp => {
-    limitsTotal += getUnformattedVal(inp) || 0;
-  });
-
-  const surplus = Math.max(0, income - billsTotal - limitsTotal);
-  const weekly = limitsTotal > 0 ? Math.round(limitsTotal / 4.33) : 0;
-
-  const goalTarget = getUnformattedVal(document.getElementById('wiz-goal-target')) || 100000;
-  const goalSaved = getUnformattedVal(document.getElementById('wiz-goal-saved')) || 0;
-  const remainingToGoal = Math.max(0, goalTarget - goalSaved);
-  const monthsToGoal = surplus > 0 ? Math.ceil(remainingToGoal / surplus) : 0;
-
-  document.getElementById('wiz-sum-income').innerText = formatMoney(income);
-  document.getElementById('wiz-sum-bills').innerText = `-${formatMoney(billsTotal)}`;
-  document.getElementById('wiz-sum-limits').innerText = `-${formatMoney(limitsTotal)}`;
-  document.getElementById('wiz-sum-surplus').innerText = `+${formatMoney(surplus)}/мес`;
-  document.getElementById('wiz-sum-week').innerText = formatMoney(weekly);
-  document.getElementById('wiz-sum-timeline').innerText = monthsToGoal > 0 ? `~${monthsToGoal} мес.` : 'Цель достигнута!';
-}
 
 // Вспомогательный расчет истории трат из выписок
 function calculateHistoricalCategoryAverages() {
@@ -1214,81 +1179,6 @@ function calculateHistoricalCategoryAverages() {
   return map;
 }
 
-async function finishBudgetOnboarding() {
-  showToast('Запуск бюджета...', false, true);
-
-  const goalName = document.getElementById('wiz-goal-name').value.trim() || 'Новая цель';
-  const goalTarget = getUnformattedVal(document.getElementById('wiz-goal-target')) || 100000;
-  const goalSaved = getUnformattedVal(document.getElementById('wiz-goal-saved')) || 0;
-  const income = getUnformattedVal(document.getElementById('wiz-income-input')) || 0;
-
-  // 1. Собираем установленные лимиты категорий
-  let limitsTotal = 0;
-  const categoryLimits = {};
-  document.querySelectorAll('[data-wiz-cat]').forEach(inp => {
-    const val = getUnformattedVal(inp);
-    if (val > 0) {
-      limitsTotal += val;
-      categoryLimits[inp.dataset.wizCat] = val;
-    }
-  });
-
-  try {
-    const batch = db.batch();
-
-    // 2. Создаем или обновляем первую цель накопления
-    const goalsCol = getUserCol('Goals');
-    const existingGoalsSnap = await goalsCol.limit(1).get();
-    let targetGoalRef;
-
-    if (!existingGoalsSnap.empty) {
-      targetGoalRef = existingGoalsSnap.docs[0].ref;
-      batch.update(targetGoalRef, {
-        name: goalName,
-        target: goalTarget,
-        saved: goalSaved,
-        share: 100,
-        status: goalSaved >= goalTarget ? 'Выполнена' : 'В процессе',
-        updatedAt: Date.now()
-      });
-    } else {
-      targetGoalRef = goalsCol.doc();
-      batch.set(targetGoalRef, {
-        name: goalName,
-        target: goalTarget,
-        saved: goalSaved,
-        share: 100,
-        status: goalSaved >= goalTarget ? 'Выполнена' : 'В процессе',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      });
-    }
-
-    // 3. Сохраняем генеральный план бюджета
-    const planRef = getUserCol('BudgetPlan').doc('plan');
-    batch.set(planRef, {
-      isConfigured: true,
-      monthlyIncome: income,
-      monthlyVariableLimit: limitsTotal > 0 ? limitsTotal : Math.max(0, income - 40000), // Фоллбэк
-      categoryLimits: categoryLimits,
-      updatedAt: Date.now()
-    }, { merge: true });
-
-    // 4. Коммитим все изменения единым пакетом
-    await batch.commit();
-
-    // 5. Полная перезагрузка актуальных данных и переход к дашборду
-    await fetchAllData();
-    // Сброс сохраненного шага после успешного запуска бюджета
-    localStorage.removeItem('budget_wizard_step');
-    currentWizardStep = 1;
-
-    showToast('Бюджет успешно активирован!');
-  } catch (err) {
-    console.error('Ошибка активации бюджета:', err);
-    showToast('Ошибка сохранения: ' + err.message, true);
-  }
-}
 
 let activeEditCategory = null;
 
@@ -1399,43 +1289,6 @@ async function submitBudgetPlan(e) {
   } catch (err) {
     showToast('Ошибка: ' + err.message, true);
   }
-}
-
-// Добавление платежа календаря
-function openAddBillOnDay(day) {
-  openAddBillModal(day);
-}
-
-
-window.openAddBillModal = openAddBillModal;
-
-
-
-
-window.openEditBillModal = openEditBillModal;
-
-async function deleteCurrentEditingBill() {
-  const id = document.getElementById('bill-edit-id').value;
-  if (!id) return;
-
-  showToast('Удаление платежа...', false, true);
-  try {
-    await getUserCol('CalendarBills').doc(id).delete();
-    closeAddBillModal();
-    await fetchAllData();
-    renderWizardCalendar();
-    showToast('Платеж удален');
-  } catch (e) {
-    showToast('Ошибка удаления', true);
-  }
-}
-window.deleteCurrentEditingBill = deleteCurrentEditingBill;
-
-async function toggleBillPaidStatus(billId, newStatus) {
-  try {
-    await getUserCol('CalendarBills').doc(billId).update({ isPaid: newStatus });
-    await fetchAllData();
-  } catch (e) {}
 }
 
 // Быстрое пополнение виртуальной копилки цели
