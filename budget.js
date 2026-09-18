@@ -3,7 +3,7 @@
 // ==========================================
 let currentWizardStep = 1;
 let currentWizSelectedDay = null;
-let wizardActiveIncomeSources = new Set();
+let wizardActiveIncomeSources = new Set(['Зарплата', 'Кэшбек']);
 let wizardCustomCategories = new Set();
 let activeTopupGoalId = null;
 let activeEditCategory = null;
@@ -620,67 +620,6 @@ function processGoals(goals) {
   });
 }
 
-function renderGoals() {
-  const data = Cache.goals || [];
-  if (data.length === 0) {
-    document.getElementById('goals-list').innerHTML = '<div class="text-center text-[#848D99] py-10 text-[13px]">Целей нет</div>';
-    return;
-  }
-  document.getElementById('goals-list').innerHTML = data.map(g => {
-    const goalIcon = getGoalIcon(g.name);
-
-    // Расчет ежемесячного плана пополнений для достижения цели в срок
-    let paceBadge = '';
-    if (g.rawDeadline && !g.isAchieved) {
-      const now = new Date();
-      const dl = new Date(g.rawDeadline);
-      const monthsRemaining = Math.max(1, Math.round((dl - now) / (1000 * 60 * 60 * 24 * 30.4375)));
-      const remainingSum = Math.max(0, g.target - g.saved);
-      const monthlyNeed = Math.ceil(remainingSum / monthsRemaining);
-      paceBadge = `<span class="text-[11px] text-[#848D99] font-normal">Осталось ${monthsRemaining} мес. • <span class="whitespace-nowrap">Вносить ~${formatMoney(monthlyNeed)}/мес.</span></span>`;
-    }
-
-    return `
-      <div class="card rounded-2xl w-full flex flex-col p-5 cursor-pointer overflow-hidden mb-4 border border-[rgba(255,255,255,0.06)] ${g.isAchieved ? 'ring-1 ring-[#30D158]/40 bg-[#30D158]/5' : 'bg-[#181B24]'}" 
-           data-id="${g.id}" data-table="Goals"
-           onclick="openCardContextMenu(event, '${escapeHtml(g.name)}', () => editGoal('${g.id}', '${escapeHtml(g.name)}', ${g.target}, '${g.rawDeadline}'), () => deleteRecord('Goals', '${g.id}'))">
-        
-        <div class="flex justify-between items-start w-full mb-3">
-          <div class="flex items-center gap-3 min-w-0">
-            <div class="w-10 h-10 rounded-2xl ${g.isAchieved ? 'bg-[#30D158]/15 text-[#30D158]' : 'bg-[#6C5DD3]/15 text-[#6C5DD3]'} flex items-center justify-center flex-shrink-0">
-              <i data-lucide="${goalIcon}" class="w-5 h-5"></i>
-            </div>
-            <div class="min-w-0">
-              <h3 class="text-[16px] font-semibold text-gray-100 truncate leading-tight">${escapeHtml(g.name)}</h3>
-              <div class="mt-0.5">${paceBadge || `<span class="text-[11px] text-[#848D99]">До ${escapeHtml(g.deadlineStr)}</span>`}</div>
-            </div>
-          </div>
-
-          ${g.isAchieved 
-            ? `<span class="px-2.5 py-0.5 text-[10px] font-bold tracking-wider uppercase bg-[#30D158]/20 text-[#30D158] rounded-full flex-shrink-0">Выполнена</span>`
-            : `<span class="text-[15px] font-bold ${g.progress >= 75 ? 'text-emerald-400' : 'text-[#6C5DD3]'}">${g.progress}%</span>`
-          }
-        </div>
-
-        <div class="flex items-end justify-between w-full mt-2 mb-2">
-          <div class="text-[13px] font-medium tracking-wide">
-            <span class="text-white text-[17px] font-bold">${formatMoney(g.saved)}</span>
-            <span class="text-gray-600 mx-1">из</span>
-            <span class="text-gray-400">${formatMoney(g.target)}</span>
-          </div>
-        </div>
-
-        <!-- Выразительный градиентный прогресс-бар высотой 8.5px -->
-        <div class="w-full bg-[rgba(255,255,255,0.06)] h-[8.5px] rounded-full overflow-hidden">
-          <div class="h-full rounded-full transition-all duration-500 ${g.isAchieved ? 'bg-[#30D158]' : 'bg-gradient-to-r from-[#6C5DD3] to-[#32ADE6]'}" style="width:${g.progress}%"></div>
-        </div>
-      </div>
-    `;
-  }).join('');
-  
-  if(typeof lucide !== 'undefined') lucide.createIcons();
-}
-
 // Умный определитель векторной иконки цели по смыслу названия
 function getGoalIcon(name) {
   const n = (name || '').toLowerCase();
@@ -793,16 +732,6 @@ function deleteBudgetGoal(goalId, goalName) {
       showToast('Ошибка удаления', true);
     }
   });
-}
-
-function openGoalSheet(id, name, target, rawDeadline) {
-  openActionSheet(
-    id, 
-    name, 
-    `Цель: ${formatMoney(target)}`,
-    () => editGoal(id, name, target, rawDeadline),
-    () => deleteRecord('Goals', id)
-  );
 }
 
 function openGoalTopupModal(goalId, goalName) {
@@ -1511,7 +1440,7 @@ function handleWizardDayClick(day) {
 }
 
 // ==========================================
-// Global Scope Exports
+// 5. Global Scope Exports
 // ==========================================
 window.renderBudgetTab = renderBudgetTab;
 window.renderBudgetCalendar = renderBudgetCalendar;
@@ -1519,6 +1448,13 @@ window.renderBudgetGoals = renderBudgetGoals;
 window.renderBudgetCategoryLimits = renderBudgetCategoryLimits;
 window.isBillPaidInCurrentMonth = isBillPaidInCurrentMonth;
 
+// План бюджета
+window.openBudgetPlanModal = openBudgetPlanModal;
+window.closeBudgetPlanModal = closeBudgetPlanModal;
+window.updatePlanForecast = updatePlanForecast;
+window.submitBudgetPlan = submitBudgetPlan;
+
+// Счета календаря
 window.openAddBillModal = openAddBillModal;
 window.closeAddBillModal = closeAddBillModal;
 window.openEditBillModal = openEditBillModal;
@@ -1528,9 +1464,10 @@ window.toggleBillPaidStatus = toggleBillPaidStatus;
 window.openDayBillsModal = openDayBillsModal;
 window.closeDayBillsModal = closeDayBillsModal;
 window.deleteCalendarBill = deleteCalendarBill;
-window.openAddBillOnDay = openAddBillOnDay;
 
+// Цели и копилки
 window.processGoals = processGoals;
+window.getGoalIcon = getGoalIcon;
 window.openGoalModal = openGoalModal;
 window.closeGoalModal = closeGoalModal;
 window.openEditGoalModal = openEditGoalModal;
@@ -1539,24 +1476,35 @@ window.deleteCurrentEditingGoal = deleteCurrentEditingGoal;
 window.deleteBudgetGoal = deleteBudgetGoal;
 window.openGoalTopupModal = openGoalTopupModal;
 window.closeGoalTopupModal = closeGoalTopupModal;
+window.setTopupMode = setTopupMode;
 window.submitGoalTopup = submitGoalTopup;
 
+// Мастер (Онбординг)
 window.initBudgetWizard = initBudgetWizard;
 window.goToWizardStep = goToWizardStep;
+window.openWizardIconPicker = openWizardIconPicker;
+window.selectWizardGoalIcon = selectWizardGoalIcon;
 window.updateWizGoalSlider = updateWizGoalSlider;
 window.recalculateWizardIncome = recalculateWizardIncome;
+window.adoptCalculatedIncome = adoptCalculatedIncome;
 window.calculateHistoricalIncomeForWizard = calculateHistoricalIncomeForWizard;
+window.toggleWizardIncomeSource = toggleWizardIncomeSource;
+window.addAnotherBillFromTooltip = addAnotherBillFromTooltip;
 window.renderWizCalendar = renderWizCalendar;
+window.renderWizDayBillsList = renderWizDayBillsList;
+window.openAddBillModalFromWizard = openAddBillModalFromWizard;
 window.showWizDayTooltip = showWizDayTooltip;
 window.closeWizDayTooltip = closeWizDayTooltip;
 window.renderWizLimitsEditor = renderWizLimitsEditor;
+window.openAddCategoryLimitPicker = openAddCategoryLimitPicker;
+window.addCategoryToWizard = addCategoryToWizard;
+window.removeWizardCustomCat = removeWizardCustomCat;
+window.updateWizLiveTotal = updateWizLiveTotal;
 window.calculateAndRenderWizSummary = calculateAndRenderWizSummary;
 window.finishBudgetOnboarding = finishBudgetOnboarding;
 window.openCategoryLimitModal = openCategoryLimitModal;
+window.closeCategoryLimitModal = closeCategoryLimitModal;
 window.submitCategoryLimit = submitCategoryLimit;
 window.applyWizCategoryAvg = applyWizCategoryAvg;
 window.handleWizardDayClick = handleWizardDayClick;
-
-// Сохраняем алиасы для обратной совместимости с вашим HTML, 
-// если там остались старые вызовы
 window.selectWizCalendarDay = handleWizardDayClick;
