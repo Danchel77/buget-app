@@ -840,22 +840,7 @@ function smartPositionDropdown(menu, triggerBtn) {
 
 
 // --- ЛОГИКА ЦЕЛЕЙ (АВТОНОМНЫЕ ВИРТУАЛЬНЫЕ КОПИЛКИ) ---
-function processGoals(goals) {
-  return goals.map(g => {
-    const tar = parseFloat(g.target) || 0;
-    const sav = parseFloat(g.saved) || 0;
-    const share = parseFloat(g.share) || (goals.length > 0 ? Math.round(100 / goals.length) : 100);
-    return {
-      id: g.id,
-      name: g.name,
-      target: tar,
-      saved: sav,
-      share: share,
-      progress: Math.min(100, tar > 0 ? (sav / tar) * 100 : 0).toFixed(1),
-      isAchieved: sav >= tar
-    };
-  });
-}
+
 
 // =============================================================
 // ДВИЖОК ЭКРАНА БЮДЖЕТА: ОНБОРДИНГ, ПУЛЬС, АВТОСВЯЗКА ЧЕКОВ И ЦЕЛИ
